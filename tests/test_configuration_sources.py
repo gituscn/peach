@@ -13,6 +13,24 @@ from peach import media_configuration as media_config, onboarding, settings_file
 
 
 class ConfigurationIsolationTests(unittest.TestCase):
+    def test_phone_access_addresses_use_runtime_protocol_scope_and_ipv6(self):
+        from peach.routes_configuration import network_payload
+        runtime = SimpleNamespace(host='0.0.0.0', port=8900, tls_enabled=True,
+                                  mdns_enabled=True, mdns_port=443, mdns_name='peach-win', mdns_address='192.168.1.8')
+        request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(settings=runtime)),
+                                  base_url='https://peach-win.local/')
+        with patch('peach.distribution.standalone', return_value=False):
+            result = network_payload(request, self.config)
+            self.assertEqual(result['lan_url'], 'https://peach-win.local/')
+            self.assertEqual(result['ip_url'], '')
+            self.assertEqual(result['scope'], 'lan')
+            self.assertFalse(result['editable'])
+            runtime.tls_enabled, runtime.mdns_enabled, runtime.mdns_address = False, False, 'fd00::8'
+            self.assertEqual(network_payload(request, self.config)['ip_url'], 'http://[fd00::8]:8900/')
+            runtime.host = '127.0.0.1'
+            local = network_payload(request, self.config)
+            self.assertEqual((local['scope'], local['lan_url'], local['ip_url']), ('local', '', ''))
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

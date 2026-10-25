@@ -27,7 +27,7 @@ export interface JavBrowserShape { enabled: boolean; ready: boolean }
 /** 每个网盘账号一项：[数据代理走代理, API 代理走代理]，走代理时多出地址、端口与认证三行。 */
 export interface CloudProxyShape { configured: boolean; accounts: [boolean, boolean][]; unlinked: number }
 export interface DownloadsShape { cloud: boolean; has115: boolean; pikpak: boolean; pikpakRoots: boolean; pikpakLoggedIn: boolean; browserLogin: boolean }
-export interface NetworkShape { port: boolean; proxyAddress: boolean; access: string; tunnelNamed: boolean; tunnelNamedMode: boolean; tunnelNote: boolean }
+export interface NetworkShape { port: boolean; addresses?: number; networkEditable?: boolean; lan?: boolean; proxyAddress: boolean; access: string; tunnelNamed: boolean; tunnelNamedMode: boolean; tunnelNote: boolean }
 export interface MaintenanceShape {
   releaseFacts: number; releaseNotes: number; autoUpdateHelp: boolean; startupNote: boolean; desktopNote: boolean;
   storageRows: number; storageNotes: number; reporting: boolean; reportingIdle: boolean; sharing: boolean;
@@ -296,11 +296,16 @@ const network = () => {
   const tunnel = (named && on(shape?.tunnelNamedMode)
     ? help(TUNNEL_HELP.named) + inputField('公开主机名', 'Cloudflare Zero Trust 里指向这台电脑的主机名。') + inputField('隧道令牌', text('16em'))
     : help(TUNNEL_HELP.quick)) + (on(shape?.tunnelNote) ? block('100%', '64px') : '');
-  return (on(shape?.port) ? section('本机访问端口', stack(input('128px')), button('保存配置'), { status: '保存后 Peach 会重启，并跳转到新地址。' }) : '')
-    + section('Peach 代理', row('连接方式', '', 'ui-configuration-skeleton-select') + (on(shape?.proxyAddress) ? stack(inputField('代理地址'), true) : ''), button('保存配置'))
+  const addresses = count(shape?.addresses, 3);
+  const addressFields = Array.from({ length: addresses }, (_, i) => `<div class="flex min-w-0 flex-wrap items-end gap-2"><div class="min-w-0 flex-1">${inputField(['本机地址', '手机连接地址', '备用 IP 地址'][i])}</div>${button('复制地址', 'secondary')}</div>`).join('');
+  return (addresses || on(shape?.port) ? section('访问地址', stack(addressFields + (addresses ? block('100%', '40px') : '')
+      + (on(shape?.networkEditable) ? `<div class="flex flex-col gap-1.5">${fieldLabel('谁可以访问')}${block('min(100%, 20em)', '36px')}</div>` + (on(shape?.lan) ? inputField('局域网访问地址') : '') : '')
+      + (on(shape?.port) ? inputField('端口') : '')), on(shape?.port) ? button('保存配置') : '',
+      on(shape?.port) ? { status: '保存后 Peach 会重启，并跳转到新地址。' } : {}) : '')
     + section('访问密码', stack(accessBody(mode)), mode === 'locked' ? '' : button('保存配置'))
     + section('Cloudflare 公网入口', stack((named ? block('10.5em', '36px') : '') + tunnel),
-      button('启动公网入口', named ? 'secondary' : 'primary') + (named ? button('保存配置') : ''), { aside: chip() });
+      button('启动公网入口', named ? 'secondary' : 'primary') + (named ? button('保存配置') : ''), { aside: chip() })
+    + section('Peach 代理', row('连接方式', '', 'ui-configuration-skeleton-select') + (on(shape?.proxyAddress) ? stack(inputField('代理地址'), true) : ''), button('保存配置'));
 };
 
 /* ---------- 应用与维护 ---------- */

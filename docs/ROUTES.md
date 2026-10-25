@@ -89,7 +89,7 @@
 | `/settings/downloads` | 下载渠道 |
 | `/settings/network` | 网络与访问 |
 | `/settings/maintenance` | 应用与维护 |
-| `/settings/diagnostics` | 系统诊断：系统检查、库健康与来源会话 |
+| `/settings/diagnostics` | 系统诊断：系统检查、库健康、来源会话与后台诊断、刮削记录导出 |
 | `/subscriptions` | 关注管理：关注列表统一管理创作者来源与 JAV 订阅；添加关注提供创作者、女优入口和别名管理，标签管理支持在线标签分页与批量操作 |
 | `/sources` | 来源和凭证：采集来源、访问方式与凭据状态 |
 | `/tasks` | 任务中心与云下载进度 |

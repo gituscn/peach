@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
-from peach import error_reporting, support_bundle
+from peach import error_reporting, support_bundle, scraping_diagnostics
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,6 +81,167 @@ class ErrorReportingTests(unittest.TestCase):
         return subprocess.run([sys.executable, "-X", "utf8", "-c", code],
                               env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
                               capture_output=True, text=True, encoding="utf-8", timeout=30)
+
+    def scraping_config(self):
+        from peach.settings_file import PeachConfig
+        config = PeachConfig(self.root, self.root / 'config.toml')
+        evidence = config.directory('sources') / 'library-metadata'
+        evidence.mkdir(parents=True)
+        return config, evidence
+
+    def test_support_bundle_includes_small_scraping_details_and_source_index(self):
+        config, evidence = self.scraping_config()
+        (evidence / 'ABC-123-javdb.json').write_text(json.dumps({
+            'id': 'ABC-123', 'title': 'private-work-title', 'actresses': [{'name': 'private-performer'}],
+            'Cookie': 'private-cookie'}), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            summary = json.loads(archive.read('scraping/summary.json'))
+            self.assertEqual(summary['records'][0]['code'], 'ABC-123')
+            self.assertEqual(summary['records'][0]['source'], 'javdb')
+            self.assertIn('actresses', summary['records'][0]['fields'])
+            self.assertNotIn('private-', str(summary))
+            self.assertEqual(summary['export']['status'], 'included')
+            snapshot = json.loads(archive.read('scraping/snapshots/0.json'))
+            self.assertEqual(snapshot['fields']['title'], 'private-work-title')
+            self.assertNotIn('private-cookie', str(snapshot))
+            self.assertIn('scraping/manifest.json', archive.namelist())
+            self.assertEqual(json.loads(archive.read('report.json'))['scraping']['status'], 'included')
+
+    def test_support_bundle_marks_large_scraping_details_for_scoped_export(self):
+        config, evidence = self.scraping_config()
+        (evidence / 'ABC-123-javdb.json').write_text(json.dumps({'id': 'ABC-123', 'title': '来源标题'}), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                mock.patch.object(support_bundle, 'SCRAPING_INLINE_LIMIT', 1), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            summary = json.loads(archive.read('scraping/summary.json'))
+            self.assertEqual(summary['export']['status'], 'separate_export_required')
+            self.assertGreater(summary['export']['compressed_bytes'], summary['export']['inline_limit_bytes'])
+            self.assertNotIn('scraping/manifest.json', archive.namelist())
+            self.assertIn('按问题番号', summary['detail'])
+        with zipfile.ZipFile(io.BytesIO(scraping_diagnostics.bundle_bytes(config, codes='ABC-123'))) as archive:
+            self.assertIn('snapshots/0.json', archive.namelist())
+
+    def test_support_bundle_includes_available_small_records_beyond_manual_code_limit(self):
+        config, evidence = self.scraping_config()
+        for number in range(25):
+            code = f'ABC-{number:03}'
+            (evidence / f'{code}-javdb.json').write_text(json.dumps({'id': code, 'title': '来源标题'}), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]), \
+                zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
+            manifest = json.loads(archive.read('scraping/manifest.json'))
+            self.assertEqual(manifest['selection'], 'available')
+            self.assertEqual(len(manifest['codes']), 25)
+            self.assertEqual(len([name for name in archive.namelist() if name.startswith('scraping/snapshots/')]), 25)
+
+    def test_scraping_export_preserves_source_candidate_and_entity_lineage_readonly(self):
+        import sqlite3
+        from contextlib import closing
+        from peach.migrations import upgrade
+        from peach.review_csv import write_rows
+        config, evidence = self.scraping_config()
+        database = config.directory('database') / 'ledger.db'
+        database.parent.mkdir()
+        upgrade(database, ROOT / 'migrations')
+        snapshot = evidence / 'ABC-123-javdb.json'
+        snapshot.write_text(json.dumps({'id': 'ABC-123', 'title': '来源标题',
+            'actresses': [{'name': '来源演员', 'token': 'private-token'}],
+            'cookie': 'private-cookie', 'source_url': 'https://example.com/work?token=private-url'}), encoding='utf-8')
+        unrelated = evidence / 'DEF-456-javdb.json'
+        unrelated.write_text(json.dumps({'id': 'DEF-456', 'title': 'unrelated-title'}), encoding='utf-8')
+        with closing(sqlite3.connect(database)) as connection, connection:
+            connection.execute("INSERT INTO asset(id,location,path,name,medium,code,catalog_title,field_owners) "
+                "VALUES(1,'local','R:/private-file.mp4','private-file.mp4','video','ABC-123','当前标题','{}')")
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                "VALUES(1,'performer','归属演员','归属演员','now','now')")
+            connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence,metadata_json) "
+                "VALUES(1,1,'performer','javinizer:javdb:performers',0.6,?)",
+                (json.dumps({'source': 'javdb', 'raw_snapshot': str(snapshot)}),))
+            connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source) "
+                "VALUES(1,'来源演员','来源演员','javdb')")
+            connection.execute("INSERT INTO review_decision(category,item_key,status,updated_at) "
+                "VALUES('metadata_fields','asset:1:performers','approved','now')")
+        candidate_root = config.directory('generated')
+        candidate_root.mkdir()
+        choices = [{'candidate_key': 'choice', 'source': 'javdb', 'value': ['来源演员'],
+                    'confidence': 0.6, 'raw_snapshot': str(snapshot), 'cookie': 'private-cookie'}]
+        write_rows(candidate_root / 'library-metadata-field-candidates.csv',
+                   ('item_key', 'code', 'asset_id', 'asset_path', 'field', 'candidates_json'),
+                   [dict(item_key='asset:1:performers', code='ABC-123', asset_id=1,
+                         asset_path='R:/private-file.mp4', field='performers', candidates_json=json.dumps(choices))])
+        before = database.read_bytes()
+        with zipfile.ZipFile(io.BytesIO(scraping_diagnostics.bundle_bytes(config, codes='abc-123'))) as archive:
+            content = '\n'.join(archive.read(name).decode() for name in archive.namelist())
+            self.assertIn('来源演员', content)
+            self.assertIn('归属演员', content)
+            for private in ('private-token', 'private-cookie', 'private-url', 'private-file', 'unrelated-title'):
+                self.assertNotIn(private, content)
+            candidates = json.loads(archive.read('candidates.json'))['records']
+            snapshot_ref = candidates[0]['candidates'][0]['snapshot']
+            source = json.loads(archive.read('snapshots/0.json'))
+            self.assertEqual(source['snapshot'], snapshot_ref)
+            self.assertEqual(source['fields']['id'], 'ABC-123')
+            self.assertEqual(json.loads(archive.read('ledger/decisions.json'))['records'][0]['status'], 'approved')
+            self.assertEqual(json.loads(archive.read('manifest.json'))['codes'], ['ABC-123'])
+        self.assertEqual(database.read_bytes(), before)
+
+    def test_scraping_export_reports_invalid_and_oversized_evidence_without_tail_json(self):
+        config, evidence = self.scraping_config()
+        (evidence / 'ABC-123-javdb.json').write_text('{broken', encoding='utf-8')
+        (evidence / 'ABC-123-javbus.json').write_bytes(b'x' * (scraping_diagnostics.FILE_LIMIT + 1))
+        with zipfile.ZipFile(io.BytesIO(scraping_diagnostics.bundle_bytes(config, codes='ABC-123'))) as archive:
+            manifest = json.loads(archive.read('manifest.json'))
+            self.assertEqual(sorted(row['status'] for row in manifest['entries']
+                                    if row['name'].startswith('snapshots/')), ['file_limit', 'unavailable'])
+            self.assertFalse(any(name.startswith('snapshots/') for name in archive.namelist()))
+        for value in ('../secret', 'a/b', ','.join(f'ABC-{n}' for n in range(21))):
+            with self.assertRaises(ValueError):
+                scraping_diagnostics.bundle_bytes(config, codes=value)
+
+    def test_scraping_export_retains_manifest_when_content_budget_is_exhausted(self):
+        config, evidence = self.scraping_config()
+        (evidence / 'ABC-123-javdb.json').write_text(json.dumps({'id': 'ABC-123', 'title': '长' * 80000}), encoding='utf-8')
+        with mock.patch.object(scraping_diagnostics, 'EXPORT_LIMIT', 180000), \
+                zipfile.ZipFile(io.BytesIO(scraping_diagnostics.bundle_bytes(config, codes='ABC-123'))) as archive:
+            manifest = json.loads(archive.read('manifest.json'))
+            self.assertTrue(any(row['status'] == 'size_limit' for row in manifest['entries']))
+            self.assertLessEqual(sum(info.file_size for info in archive.infolist()), 180000)
+
+    def test_scraping_export_rejects_candidate_snapshot_outside_sources_and_remote_download(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from peach.routes_api import require_auth
+        from peach.routes_configuration import router
+        from peach.review_csv import write_rows
+        config, _evidence = self.scraping_config()
+        outside = self.root / 'outside.json'
+        outside.write_text(json.dumps({'title': 'private-outside-evidence'}), encoding='utf-8')
+        generated = config.directory('generated')
+        generated.mkdir()
+        write_rows(generated / 'library-metadata-field-candidates.csv',
+                   ('item_key', 'code', 'candidates_json'),
+                   [dict(item_key='asset:1:title', code='ABC-123', candidates_json=json.dumps([
+                       {'value': '公开作品名', 'raw_snapshot': str(outside)}]))])
+        app = FastAPI()
+        app.include_router(router)
+        app.dependency_overrides[require_auth] = lambda: {}
+        client = TestClient(app, base_url='http://127.0.0.1', client=('127.0.0.1', 1234))
+        with mock.patch('peach.settings_file.load_config', return_value=config):
+            started = client.post('/api/diagnostics/exports', json={'kind': 'scraping', 'codes': 'ABC-123'})
+            self.assertEqual(started.status_code, 200)
+            app.state.diagnostic_exports.job.thread.join(10)
+            identity = started.json()['job_id']
+            response = client.get(f'/api/diagnostics/exports/{identity}/download')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+            with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+                self.assertNotIn('private-outside-evidence', str([archive.read(name) for name in archive.namelist()]))
+                manifest = json.loads(archive.read('manifest.json'))
+                self.assertTrue(any(row['name'].startswith('snapshots/') and row['status'] == 'unavailable'
+                                    for row in manifest['entries']))
+            self.assertEqual(client.post('/api/diagnostics/exports', json={'kind': 'scraping', 'codes': '../secret'}).status_code, 400)
+            remote = TestClient(app, base_url='http://127.0.0.1', client=('192.0.2.55', 1234))
+            self.assertEqual(remote.get('/api/diagnostics/exports').status_code, 403)
 
     def test_processing_export_keeps_recent_bounded_evidence_and_hides_media_names(self):
         from peach.settings_file import PeachConfig
@@ -991,6 +1152,57 @@ runpy.run_path({str(ROOT / 'scripts/build_app_entry.py')!r}, run_name='__main__'
         result = self.probe("from peach.support_bundle import main; raise SystemExit(main())")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(list(self.logs.glob("peach-support-*.zip")))
+
+
+class DiagnosticExportJobTests(unittest.TestCase):
+    def setUp(self):
+        from peach.settings_file import PeachConfig
+        from peach.diagnostic_exports import DiagnosticExports
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.exports = DiagnosticExports(PeachConfig(self.root, self.root / 'config.toml', present=True))
+
+    def test_background_export_can_cancel_and_cleans_partial_output(self):
+        import threading
+        started, release = threading.Event(), threading.Event()
+        def generate(config, destination, **options):
+            Path(destination).write_bytes(b'partial')
+            options['progress'](stage='整理来源快照', done=1, total=3)
+            started.set()
+            release.wait(5)
+            if options['cancelled']():
+                raise scraping_diagnostics.ExportCancelled('导出已取消')
+        with mock.patch.object(scraping_diagnostics, 'bundle_to', side_effect=generate):
+            first = self.exports.start('scraping', 'ABC-123')
+            try:
+                self.assertTrue(started.wait(2))
+                self.assertEqual(self.exports.snapshot()['done'], 1)
+                with self.assertRaises(ValueError):
+                    self.exports.start('support')
+                self.assertEqual(self.exports.cancel(first['job_id'])['status'], 'cancelling')
+            finally:
+                release.set()
+                self.exports.job.thread.join(5)
+        self.assertEqual(self.exports.snapshot()['status'], 'cancelled')
+        self.assertEqual(list(self.exports.root.glob('*')), [])
+
+    def test_completed_export_download_requires_matching_ready_identity(self):
+        def generate(config, destination, **options):
+            with zipfile.ZipFile(destination, 'w') as archive:
+                archive.writestr('manifest.json', '{}')
+        with mock.patch.object(scraping_diagnostics, 'bundle_to', side_effect=generate):
+            first = self.exports.start('scraping', 'ABC-123')
+            self.exports.job.thread.join(5)
+        self.assertEqual(self.exports.snapshot()['status'], 'complete')
+        path, name = self.exports.download(first['job_id'])
+        self.assertEqual(name, 'peach-scraping.zip')
+        self.assertTrue(zipfile.is_zipfile(path))
+        for identity in ('../secret', '0' * 32):
+            with self.assertRaises(FileNotFoundError):
+                self.exports.download(identity)
+        with self.assertRaises(ValueError):
+            self.exports.cancel('stale')
 
 
 if __name__ == "__main__":

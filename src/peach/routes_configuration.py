@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 from collections import deque
 import hashlib
+import ipaddress
 import os
 import shutil
 import threading
@@ -79,9 +80,56 @@ def diagnostic_bundle(request: Request, args: dict[str, str] = Depends(require_a
                                                  user_agent=request.headers.get('user-agent', ''))
     from .error_reporting import local_event
     local_event('browser-context', browser=browser, user_agent=browser.get('user_agent', ''))
-    return Response(support_bundle.bundle_bytes(report=report, browser=browser), media_type="application/zip",
+    return Response(support_bundle.bundle_bytes(report=report, browser=browser, include_scraping=False), media_type="application/zip",
                     headers={"Content-Disposition": 'attachment; filename="peach-support.zip"',
                              "Cache-Control": "no-store"})
+
+
+@router.get('/api/diagnostics/exports')
+def diagnostic_export_status(request: Request, _args=Depends(require_auth)):
+    from .diagnostic_exports import manager
+    local_only(request)
+    return manager(request).snapshot()
+
+
+@router.post('/api/diagnostics/exports')
+def diagnostic_export_start(request: Request, body: dict = Body(default_factory=dict), _args=Depends(require_auth)):
+    from . import diagnostic_context, diagnostic_exports, diagnostics
+    local_only(request)
+    same_origin(request)
+    kind, codes = body.get('kind'), body.get('codes', '')
+    if not isinstance(codes, str):
+        raise HTTPException(400, '请填写有效番号')
+    browser = diagnostic_context.browser_header(request.headers.get('x-peach-browser-diagnostics', ''),
+                                                 user_agent=request.headers.get('user-agent', ''))
+    try:
+        return diagnostic_exports.manager(request).start(kind, codes, browser=browser,
+            report=lambda: diagnostics.report(request.app.state.settings, request.app.state.mount_reachability.summary()))
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.post('/api/diagnostics/exports/{identity}/cancel')
+def diagnostic_export_cancel(request: Request, identity: str, _args=Depends(require_auth)):
+    from .diagnostic_exports import manager
+    local_only(request)
+    same_origin(request)
+    try:
+        return manager(request).cancel(identity)
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@router.get('/api/diagnostics/exports/{identity}/download')
+def diagnostic_export_download(request: Request, identity: str, _args=Depends(require_auth)):
+    from .diagnostic_exports import manager
+    from .streaming import BufferedFileResponse
+    local_only(request)
+    try:
+        path, name = manager(request).download(identity)
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    return BufferedFileResponse(path, filename=name, media_type='application/zip', headers={'Cache-Control': 'no-store'})
 
 
 _CLIENT_ERROR_LOCK = threading.Lock()
@@ -268,6 +316,35 @@ def push_discovery_payload(request: Request, payload: dict[str, Any] | None = No
     return payload
 
 
+def network_payload(request: Request, config) -> dict[str, Any]:
+    """连接地址来自实际监听信息，编辑值来自托盘配置。"""
+    settings = request.app.state.settings
+    standalone = distribution.standalone()
+    try:
+        local = ipaddress.ip_address(settings.host).is_loopback
+    except ValueError:
+        local = settings.host.lower() == 'localhost'
+    scheme = 'https' if settings.tls_enabled else 'http'
+    port = settings.mdns_port if settings.mdns_enabled else settings.port
+    suffix = '' if port == (443 if settings.tls_enabled else 80) else f':{port}'
+    mdns = getattr(request.app.state, 'mdns', None)
+    address = str(getattr(mdns, 'address', '') or settings.mdns_address or '')
+    try:
+        ip = ipaddress.ip_address(address)
+        address = f'[{ip}]' if ip.version == 6 else str(ip)
+        if ip.is_loopback or ip.is_unspecified or ip.is_link_local or ip.is_multicast:
+            address = ''
+    except ValueError:
+        address = ''
+    hostname = settings.mdns_name.removesuffix('.local')
+    return {'editable': managed_configuration() and standalone,
+            'host': config.server.host, 'mdns_name': config.server.mdns_name,
+            'scope': 'local' if local else 'lan',
+            'local_url': f'http://127.0.0.1:{settings.port}/' if standalone else str(request.base_url),
+            'lan_url': f'{scheme}://{hostname}.local{suffix}/' if not local and settings.mdns_enabled else '',
+            'ip_url': f'{scheme}://{address}{suffix}/' if not local and address and not settings.tls_enabled else ''}
+
+
 @router.get("/api/configuration")
 def read_configuration(request: Request, _args=Depends(require_auth)):
     local_only(request)
@@ -275,6 +352,7 @@ def read_configuration(request: Request, _args=Depends(require_auth)):
     if not config.present:
         raise HTTPException(409, "请先完成首次设置")
     result = snapshot(config)
+    _read_section(result, 'network', '访问地址', lambda: network_payload(request, config))
     sync = getattr(request.app.state, "sync", None)
     result["ledger_read_only"] = bool(sync is not None and sync.read_only)
     _read_section(result, "tunnel", "公网入口", lambda: tunnel_payload(
@@ -773,6 +851,18 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
         validated["port"] = port
     except ValueError as exc:
         errors["port"] = str(exc)
+    for field, validator in (('host', onboarding.validate_host), ('mdns_name', onboarding.validate_mdns_name)):
+        if field not in body:
+            continue
+        try:
+            if not isinstance(body[field], str):
+                raise ValueError('请选择访问范围' if field == 'host' else '请填写局域网名称')
+            value = validator(body[field])
+            if not distribution.standalone() and value != getattr(config.server, field):
+                raise ValueError('访问范围与名称由服务启动配置管理')
+            validated[field] = value
+        except ValueError as exc:
+            errors[field] = str(exc)
     return errors, validated
 
 
@@ -1002,7 +1092,9 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
                            library_names=validated.get("library_names", config.library_names),
                            library_icons=validated.get("library_icons", config.library_icons),
                            media_costs=validated.get("media_costs", config.media_costs),
-                           server=replace(config.server, port=validated["port"]))
+                           server=replace(config.server, port=validated["port"],
+                                          host=validated.get('host', config.server.host),
+                                          mdns_name=validated.get('mdns_name', config.server.mdns_name)))
         if prepared.storage_roots:
             from . import media_identity
             prepared = media_identity.project(prepared)

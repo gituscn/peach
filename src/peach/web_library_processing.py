@@ -21,7 +21,7 @@ PUBLIC_FIELDS = frozenset({
     'performer_profile_failed', 'error', 'issue_count', 'paused_count', 'issue_preview',
     'issues_log', 'issues_truncated', 'retryable_asset_ids', 'notes', 'current_asset_id',
     'current_asset_name', 'current_action', 'current_started_at', 'last_progress_at', 'stalled',
-    'waited_seconds', 'completed_at',
+    'waited_seconds', 'completed_at', 'current_source', 'skip_requested',
 })
 
 
@@ -48,6 +48,8 @@ def q_library_processing(contract, _args):
     control = control_for(settings_file.active())
     control.refresh(force=True)
     state['speed_mode'] = control.mode
+    state['skip_requested'] = (state.get('status') == 'running' and state.get('current_asset_id') is not None
+                               and control.skip_asset_id == state.get('current_asset_id'))
     from .media_processing_policy import metadata_only
     state['metadata_only'] = metadata_only(settings_file.active().directory('state'))
     from .job_recovery import read
@@ -65,7 +67,7 @@ def q_library_processing(contract, _args):
 
 def _control_action(contract, config, body):
     action = body['action']
-    if action not in ('pause', 'resume', 'set_speed'):
+    if action not in ('pause', 'resume', 'set_speed', 'skip_current'):
         raise ValueError('处理动作无效')
     previous = _current(contract)
     job_id = body.get('job_id')
@@ -79,6 +81,15 @@ def _control_action(contract, config, body):
     control.refresh(force=True)
     if job_id:
         control.select_job(str(job_id))
+    if action == 'skip_current':
+        asset_id = body.get('asset_id')
+        if (isinstance(asset_id, bool) or not isinstance(asset_id, int)
+                or previous.get('status') != 'running'
+                or previous.get('current_asset_id') != asset_id
+                or previous.get('current_action') not in ('querying_metadata', 'fetching_cover')):
+            raise ValueError('当前影片已变化或不在采集外部资料，请刷新后重试')
+        control.skip_current(str(job_id), asset_id)
+        return q_library_processing(contract, {})
     if action == 'set_speed':
         mode = valid_mode(body.get('speed_mode'))
         control.request(action, mode=mode)

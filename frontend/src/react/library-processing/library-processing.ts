@@ -66,6 +66,9 @@ export interface LibraryProcessingData {
   current_asset_name?: string;
   current_action?: string;
   current_started_at?: number;
+  /** 当前这一项正在等的外部来源；`network` 是它这次请求走的那条路。 */
+  current_source?: { key: string; label: string; network?: string };
+  skip_requested?: boolean;
   last_progress_at?: number;
   stalled?: boolean;
   waited_seconds?: number;
@@ -119,7 +122,27 @@ export interface LibraryProcessingCommand {
 }
 export type ProcessingControlCommand =
   | { action: 'pause' | 'resume'; job_id: string }
-  | { action: 'set_speed'; speed_mode: ProcessingSpeed; job_id?: string };
+  | { action: 'set_speed'; speed_mode: ProcessingSpeed; job_id?: string }
+  | { action: 'skip_current'; job_id: string; asset_id: number };
+
+/** 单部影片问外部来源超过这么久，就把跳过与改走代理摆出来。 */
+export const SLOW_ITEM_SECONDS = 120;
+const SLOW_ACTIONS: Record<string, string> = { fetching_cover: '封面', querying_metadata: '资料' };
+
+export interface SlowItem { what: string; source?: LibraryProcessingData['current_source'] }
+
+/** 跳过入口属于外部资料与封面采集，扫描和生成预览使用各自的任务控制。 */
+export function slowItem(state?: LibraryProcessingData): SlowItem | null {
+  if (state?.status !== 'running' || state.current_asset_id == null) return null;
+  const what = SLOW_ACTIONS[state.current_action || ''];
+  if (!what || (state.waited_seconds || 0) < SLOW_ITEM_SECONDS) return null;
+  return { what, source: state.current_source };
+}
+
+export function slowItemText({ what, source }: SlowItem): string {
+  const who = `${source?.label ? `${source.label} ` : '外部来源'}迟迟没有返回${what}`;
+  return `${who}。可以先跳过这部，任务结束后再重试。`;
+}
 
 /** 暂停中的任务仍占用同一份处理范围，可继续并持续读取状态。 */
 export const processingActive = (state?: LibraryProcessingData) =>
@@ -183,6 +206,7 @@ const ACTION_LABELS: Record<string, string> = {
   reading_local_cover: '读取配套图片',
   querying_metadata: '查询外部资料',
   fetching_cover: '采集缺失封面',
+  skipped: '已跳过',
   generating_preview: '生成视频预览',
   writing_candidates: '保存待确认资料',
 };

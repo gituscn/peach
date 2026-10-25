@@ -297,6 +297,10 @@ export interface ConfigurationData {
   windows?: boolean;
   port: number;
   port_editable?: boolean;
+  network?: {
+    editable: boolean; host: string; mdns_name: string; scope: 'local' | 'lan';
+    local_url: string; lan_url: string; ip_url: string;
+  };
   mount_dependencies?: { name: string; available: boolean; download_url: string }[];
   facts: ConfigurationFact[];
 }
