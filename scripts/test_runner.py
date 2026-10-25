@@ -840,7 +840,8 @@ def shard_plan(names: Iterable[str], shard_count: int,
                seconds: dict[str, float]) -> list[list[str]]:
     """按预计秒数把测试文件装进分片：先长后短，每个文件放进当前最空的一片。
 
-    返回的分片按预计总时长降序排列，派发按这个顺序，最长的先开跑。实测表按模块名记，
+    返回的分片按预计总时长降序排列，派发按这个顺序，最长的先开跑。等负载时按文件数择空。
+    实测表按模块名记，
     没测过的文件取已测文件的中位数；表是空的时所有文件等重，相当于按个数均分。
     """
     names = sorted(names)
@@ -851,7 +852,7 @@ def shard_plan(names: Iterable[str], shard_count: int,
     groups: list[list[str]] = [[] for _ in range(max(1, min(shard_count, len(names))))]
     totals = [0.0] * len(groups)
     for name in sorted(names, key=lambda item: (-weight[item], item)):
-        slot = min(range(len(groups)), key=lambda index: (totals[index], index))
+        slot = min(range(len(groups)), key=lambda index: (totals[index], len(groups[index]), index))
         groups[slot].append(name)
         totals[slot] += weight[name]
     order = sorted(range(len(groups)), key=lambda index: (-totals[index], index))

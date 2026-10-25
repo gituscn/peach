@@ -160,6 +160,16 @@ class EnvironmentIdentityTests(unittest.TestCase):
         os.environ['GITHUB_JOB'] = 'web-e2e'
         self.assertNotEqual(evidence.environment(self.root), first)
 
+    def test_gitlab_retry_metadata_preserves_runtime_identity_and_job_selection(self):
+        os.environ.update(CI_JOB_NAME='verify-macos', CI_JOB_RETRY_COUNT='0',
+                          CI_JOB_STARTED_AT_SLUG='first-start', CI_BUILD_NETWORK_NAME='network-one')
+        first = evidence.environment(self.root)
+        os.environ.update(CI_JOB_RETRY_COUNT='1', CI_JOB_STARTED_AT_SLUG='next-start',
+                          CI_BUILD_NETWORK_NAME='network-two')
+        self.assertEqual(evidence.environment(self.root), first)
+        os.environ['CI_JOB_NAME'] = 'verify-linux'
+        self.assertNotEqual(evidence.environment(self.root), first)
+
     def test_distribution_names_have_canonical_identity(self):
         from types import SimpleNamespace
         self.packages.return_value = [SimpleNamespace(metadata={'Name': 'Some_Pkg'}, version='1')]
@@ -726,6 +736,8 @@ class SubprocessResumeTests(unittest.TestCase):
                 self.assertEqual([path.read_text(encoding='utf8') for path in paths], completed)
                 cached = json.loads(record_file.read_text(encoding='utf8'))
                 self.assertEqual(cached['validated']['full'], stamp)
+                (record_file.parent / 'test-timings.json').write_text(json.dumps({
+                    'seconds': {path.stem: 0.0 for path in paths}}), encoding='utf8')
                 with mock.patch.dict(os.environ, {'PEACH_TEST_RESUME_FIXTURE': 'another-environment'}):
                     code, output = self.invoke(repo, 'full', '--resume')
                 self.assertEqual(code, 0, output)
