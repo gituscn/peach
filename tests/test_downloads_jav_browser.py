@@ -288,6 +288,10 @@ class BrowserTests(unittest.TestCase):
         import io
         import zipfile
         from peach import error_reporting, support_bundle
+        from peach.settings_file import PeachConfig
+        clock = patch("peach.jav_browser_diagnostics.time", Mock(monotonic=lambda: 100.0))
+        clock.start()
+        self.addCleanup(clock.stop)
         path = "/api/jav-browser/errors"
         self.assertEqual(self.client.post(path, json={"events": [self.diagnostic()]}).status_code, 401)
         self.assertEqual(self.client.post(path, headers=self.script_headers, content=b"x" * 17000).status_code, 413)
@@ -303,7 +307,8 @@ class BrowserTests(unittest.TestCase):
                              ("userscript", "timeout", "ABC-123", 60000))
             for private in ("private-message", "private-token", PAGE, self.token, "cloud-secret"):
                 self.assertNotIn(private, text)
-            with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes())) as archive:
+            config = PeachConfig(self.root, self.root / "config.toml")
+            with zipfile.ZipFile(io.BytesIO(support_bundle.bundle_bytes(config=config))) as archive:
                 content = archive.read(next(name for name in archive.namelist() if name.endswith(log.name))).decode()
                 self.assertIn('"stage": "userscript"', content)
         for change in ({"kind": []}, {"site": "https://private.example"}, {"code": "not a code"},
