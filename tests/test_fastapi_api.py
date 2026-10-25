@@ -248,6 +248,9 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.snapshot_file.write_bytes(b"snapshot")
         (self.poster_root / "1_4.jpg").write_bytes(b"poster")
         (self.avatar_root / "1.jpg").write_bytes(b"avatar")
+        from peach import artifact_rules
+        artifact_rules.remember(self.poster_root / '1_4.jpg', source=self.snapshot_file)
+        artifact_rules.remember(self.avatar_root / '1.jpg', source=self.snapshot_file)
         (self.logo_root / "Studio_A.img").write_bytes(b"logo")
         (self.logo_root / "Studio_A.img.ct").write_text("image/png", encoding="utf-8")
         self.page = self.root / "index.html"
@@ -352,6 +355,53 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(checks), {"database", "schema", "configured", "ffmpeg", "media_mounts", "security"})
         self.assertTrue(all(set(check) == {"status", "reason"} for check in checks.values()))
         self.assertNotIn(str(self.media_root), json.dumps(checks))
+
+    async def test_client_update_snapshot_is_authenticated_and_never_fetches_releases(self):
+        before = self.db.read_bytes()
+        with patch('peach.release_updates.check', side_effect=AssertionError('读取不得联网')):
+            self.assertEqual((await self.client.get('/api/client-updates')).status_code, 401)
+            response = await self.client.get('/api/client-updates?t=secret')
+        self.assertEqual(response.status_code, 200)
+        value = response.json()
+        self.assertEqual(value['runtime']['version'], __version__)
+        self.assertEqual(len(value['runtime']['build_id']), 24)
+        self.assertIn('minimum_version', value['userscript'])
+        self.assertEqual(value['repairs']['state'], 'unavailable')
+        self.assertEqual(self.db.read_bytes(), before)
+
+    async def test_userscript_update_snapshot_uses_scoped_token_without_a_movie_code(self):
+        with patch.object(self.app.state.jav_browser, 'authorized', side_effect=lambda token: token == 'script-token'):
+            denied = await self.client.get('/api/jav-browser/updates?t=secret')
+            self.assertEqual(denied.status_code, 401)
+            accepted = await self.client.get('/api/jav-browser/updates', headers={'Authorization':'Bearer script-token'})
+        self.assertEqual(accepted.status_code, 200)
+        self.assertIn('userscript', accepted.json())
+        self.assertIn('no-store', accepted.headers['cache-control'])
+
+    async def test_retry_activates_stopped_workers_before_dispatching_repairs(self):
+        order = []
+        self.app.state.ledger_background_ready = False
+        async def activate():
+            order.append('activate')
+            self.app.state.ledger_background_ready = True
+            return True
+        def retry():
+            self.assertTrue(self.app.state.ledger_background_ready)
+            order.append('retry')
+        self.app.state.ledger_activation = SimpleNamespace(resume=activate)
+        service = self.app.state.upgrade_repairs
+        with patch('peach.api._installation_in_progress', return_value=False), patch.object(
+                service, 'retry', side_effect=retry), patch.object(service, 'snapshot', return_value={'state':'complete'}):
+            response = await self.client.post('/api/configuration/upgrade-repairs/retry?t=secret', json={})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(order, ['activate','retry'])
+
+    async def test_installation_confirmation_rejects_manual_repairs(self):
+        with patch('peach.api._installation_in_progress', return_value=True), patch.object(
+                self.app.state.upgrade_repairs, 'retry') as retry:
+            response = await self.client.post('/api/configuration/upgrade-repairs/retry?t=secret', json={})
+        self.assertEqual(response.status_code, 409)
+        retry.assert_not_called()
 
     async def test_diagnostics_is_authenticated_local_and_uses_the_shared_report(self):
         from peach import diagnostics
@@ -2187,6 +2237,20 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                     self.assertIn('</script><script>演示', shape['names'])
                     self.assertNotIn('<script>', payload)
 
+    async def test_configured_documents_embed_their_loading_runtime_without_executing_json(self):
+        await self.client.post('/login', content='token=secret&next=%2F',
+                               headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        runtime = dict(version='fixture', build_id='</script><script>fixture')
+        with patch('peach.client_updates.runtime_identity', return_value=runtime):
+            for path in ('/', '/settings/maintenance', '/?edit'):
+                response = await self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                marker = '<script type="application/json" id="peach-client-runtime">'
+                payload = response.text.split(marker, 1)[1].split('</script>', 1)[0]
+                self.assertEqual(json.loads(payload), runtime)
+                self.assertNotIn('<script>', payload)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+
     async def test_canonical_page_urls_require_authentication(self):
         for path in ('/assets/1', '/posts/1', '/works/ABC-001', '/performers/1',
                      '/tags/1', '/tasks', '/sources', '/subscriptions', '/settings/library',
@@ -3454,8 +3518,9 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(derived.size, (1600, 1080))
         self.assertEqual(again.content, small.content)
         self.assertEqual(sorted(path.name for path in (self.cover_root.parent / "cover-thumbs").iterdir()
-                                if path.name.startswith("ABC-124")),
-                         ["ABC-124.1600.webp", "ABC-124.800.webp"])
+                                if path.name.startswith("ABC-124") and path.suffix == '.webp'),
+                         sorted(service.path_for('ABC-124').name for service in (
+                             self.app.state.cover_thumb_service, self.app.state.cover_small_thumb_service)))
 
     async def test_a_warm_photo_thumbnail_answers_without_resolving_the_original(self):
         """缩略图已经躺在本地时，这条路径不再去解析原图。
@@ -3478,6 +3543,19 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(again.content, warm.content)
         full = await self.client.get("/photo?id=9", headers=headers)
         self.assertNotEqual(full.status_code, 200)
+
+    async def test_network_photo_uses_its_signed_cache_when_the_source_is_offline(self):
+        from peach import artifact_rules
+        from peach.media import MediaOffline
+        source = self._seed_photo()
+        headers = {'X-Token':'secret'}
+        warm = await self.client.get('/photo-thumb?id=9', headers=headers)
+        destination = self.photo_root / '9.jpg'
+        artifact_rules.remember(destination, source=SimpleNamespace(stat=source.stat))
+        with patch.object(self.app.state.media_engine, 'file_for', side_effect=MediaOffline(9,'smb')):
+            cached = await self.client.get('/photo-thumb?id=9', headers=headers)
+        self.assertEqual(cached.status_code, 200)
+        self.assertEqual(cached.content, warm.content)
 
     async def test_photo_endpoints_require_the_token(self):
         self._seed_photo()
@@ -3709,12 +3787,35 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNotNone(app.state.web_contract.downloads._thread)
             self.assertTrue(app.state.follow_scheduler._started)
             self.assertTrue(app.state.web_contract.feed_scheduler._started)
-            ready = await client.get("/healthz?ready=1")
+            ready = await client.get('/healthz?ready=1')
             self.assertEqual(ready.status_code, 200)
-            self.assertTrue(ready.json()["ready"])
+            self.assertTrue(ready.json()['ready'])
         self.assertIsNone(app.state.web_contract.downloads._thread)
         self.assertFalse(app.state.follow_scheduler._started)
         self.assertFalse(app.state.web_contract.feed_scheduler._started)
+
+    async def test_installation_confirmation_defers_workers_until_commit(self):
+        from peach import update_tasks
+        parent = self.settings.db_path.parent
+        parent.mkdir(parents=True)
+        database = fresh_ledger(parent)
+        token = update_tasks.reserve(database)
+        try:
+            async with self.ledger_client(database) as (app, client):
+                self.assertTrue(app.state.ledger_background_deferred)
+                self.assertIsNone(app.state.web_contract.downloads._thread)
+                ready = await client.get('/healthz?ready=1')
+                self.assertEqual(ready.status_code, 200)
+                self.assertTrue(ready.json()['background_deferred'])
+                update_tasks.release(database, token)
+                for _ in range(50):
+                    if not app.state.ledger_background_deferred:
+                        break
+                    await asyncio.sleep(.1)
+                self.assertTrue(app.state.ledger_background_ready)
+                self.assertIsNotNone(app.state.web_contract.downloads._thread)
+        finally:
+            update_tasks.release(database, token)
 
     async def test_service_startup_replays_an_interrupted_library_request_with_its_scope(self):
         from peach import job_recovery, settings_file
@@ -3736,11 +3837,13 @@ class UnconfiguredMachineTests(unittest.IsolatedAsyncioTestCase):
             invoked.set()
             return {'status': 'complete'}
         with patch('peach.settings_file.active', return_value=config), patch(
-                'peach.web_library_processing.process_library', side_effect=process):
+                'peach.web_library_processing.process_library', side_effect=process), patch(
+                'peach.seed_followup.plan', return_value=[]):
             async with self.ledger_client(database) as (app, _client):
                 self.assertTrue(await asyncio.to_thread(invoked.wait, 5))
                 thread = app.state.web_contract.library_processing_job.thread
                 await asyncio.to_thread(thread.join, 5)
+                self.assertFalse(thread.is_alive())
                 self.assertEqual(job_recovery.read(database, 'library-processing')['status'], 'complete')
 
     async def test_cancelled_installation_resumes_the_paused_task_in_the_existing_service(self):
@@ -3945,6 +4048,7 @@ class RouteAuthContractTests(unittest.TestCase):
         cls.special_guards = {
             ("GET", "/api/jav-browser"): routes_jav_browser.browser_client,
             ("GET", "/api/jav-browser/identify"): routes_jav_browser.browser_client,
+            ("GET", "/api/jav-browser/updates"): routes_jav_browser.browser_client,
             ("POST", "/api/jav-browser"): routes_jav_browser.browser_client,
             ("POST", "/api/jav-browser/errors"): routes_jav_browser.browser_client,
         }

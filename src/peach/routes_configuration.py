@@ -724,6 +724,46 @@ def check_updates(request: Request, _args=Depends(require_auth)):
     return result
 
 
+@router.get('/api/client-updates')
+def client_updates(request: Request, _args=Depends(require_auth)):
+    from .client_updates import snapshot
+    result = snapshot(request.app.state.automatic_updates)
+    result['update_job'] = standalone_update.public()
+    result['repairs'] = request.app.state.upgrade_repairs.snapshot()
+    return result
+
+
+@router.post('/api/configuration/upgrade-repairs/retry')
+async def retry_upgrade_repairs(request: Request, _args=Depends(require_auth)):
+    import asyncio
+    from .api import _installation_in_progress
+    local_only(request)
+    same_origin(request)
+    try:
+        if await asyncio.to_thread(_installation_in_progress, request.app.state.settings.db_path):
+            raise ValueError('正在安装更新，请稍后重试')
+        service = request.app.state.upgrade_repairs
+        activation = getattr(request.app.state, 'ledger_activation', None)
+        if activation is not None and not request.app.state.ledger_background_ready:
+            if not await activation.resume():
+                return service.snapshot()
+        await asyncio.to_thread(service.retry)
+        return service.snapshot()
+    except (ValueError, OSError, Timeout) as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.get('/api/configuration/upgrade-repairs/review')
+def upgrade_repairs_review(request: Request, _args=Depends(require_auth)):
+    local_only(request)
+    service = request.app.state.upgrade_repairs
+    path = service.root / 'catalog-review.json'
+    if not path.is_file():
+        raise HTTPException(404, '暂无升级复核记录')
+    return Response(path.read_bytes(), media_type='application/json',
+                    headers={'Content-Disposition': 'attachment; filename="upgrade-review.json"'})
+
+
 @router.get("/api/configuration/update-status")
 def update_status(request: Request, _args=Depends(require_auth)):
     local_only(request)

@@ -53,6 +53,8 @@ Scanning, cloud downloads and media processing share junk checks. Attachments wi
 
 Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. When metadata or cover requests take too long, skip the current work, keep completed results, and retry unfinished items afterward. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
 
+Upgrades automatically process existing metadata and caches while preserving manual edits. Normal use requires no migration scripts. The app and independently installed userscript offer update notices; page refreshes remain your choice. See [automatic upgrade processing](docs/OPERATIONS.md#升级后的自动处理) for scope and recovery.
+
 System diagnostics generate reports and selected scraping records in the background, with progress and cancellation. Network settings show local and phone connection addresses; standalone desktop deployments can change access scope and the local network name.
 
 First-time setup lets you choose the Peach proxy for metadata requests and dependency downloads. Windows, macOS and Docker distributions include an isolated amane runtime; source and wheel installations prepare Peach's locked version automatically when first needed. If preparation fails, pending items remain available for retry after fixing the network or runtime.

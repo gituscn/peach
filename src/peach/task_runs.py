@@ -93,6 +93,8 @@ TASK_LABELS = {
     "resource-apply": "资源同步清理",
     "scraping-cover": "封面采集",
     "media-repair": "媒体修复",
+    "upgrade-repairs": "自动修复",
+    "upgrade-library": "自动修复资料",
     "organize": "按模板整理",
     "batch": "批量操作",
     "scrape-codes": "番号资料刮削",

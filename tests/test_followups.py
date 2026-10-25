@@ -1560,6 +1560,32 @@ class ProcessLibraryTests(LedgerTestCase):
 
 
 class TaskPayloadTests(LedgerTestCase):
+    def test_installation_pause_preserves_the_same_followup_for_resume(self):
+        from peach import update_tasks
+        from peach.jobs import JobPaused
+        calls = []
+        tokens = []
+        def work(_contract, _key, _handle):
+            calls.append('run')
+            if len(calls) == 1:
+                tokens.append(update_tasks.reserve(self.db))
+                raise JobPaused('安装期间暂停')
+            return {'outcome':'完成'}
+        kind = echo_type('upgrade-test', run=work)
+        parent = self.parent()
+        with registered(kind):
+            child = self.store.enqueue_followups(parent.id, [('upgrade-test:1','upgrade-test','处理')])['queued'][0]
+            runner = FollowupRunner(SimpleNamespace(task_runs=self.store))
+            try:
+                self.assertEqual(runner.drain(), 1)
+                self.assertEqual(self.store.get(child).status, 'pending')
+            finally:
+                for token in tokens:
+                    update_tasks.release(self.db, token)
+            self.assertEqual(runner.drain(), 1)
+        self.assertEqual(self.store.get(child).status, 'succeeded')
+        self.assertEqual(calls, ['run','run'])
+
     def test_the_detail_endpoint_gives_both_ends_of_the_chain(self):
         from peach.web_tasks import q_task
 

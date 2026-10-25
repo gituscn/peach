@@ -192,6 +192,12 @@ def _migrate(args: argparse.Namespace) -> int:
         print(f"PENDING {migration.version} {migration.name}")
     if args.action == "status" or not pending:
         return 0
+    config = settings_file.active()
+    if args.db.resolve() == (config.directory('database') / 'ledger.db').resolve():
+        from .runtime_prepare import configured_ledger_writer
+        writer, reason = configured_ledger_writer(config)
+        if not writer:
+            raise SystemExit(f'本机不能迁移账本：{reason}；请先在写入端迁移并同步')
     if args.db.resolve() == DEFAULT_DB.resolve() and not args.yes:
         raise SystemExit("refusing to modify the real ledger without --yes")
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")

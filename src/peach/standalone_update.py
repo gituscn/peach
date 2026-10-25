@@ -73,6 +73,16 @@ def public() -> dict:
         "state", "progress", "message", "downloaded", "total", "version", "updated_at"}}
 
 
+def installation_pending() -> bool:
+    """当前独立包仍在安装确认期；兼容未保留任务预约的更新助手。"""
+    if not distribution.standalone():
+        return False
+    data = read()
+    return (public().get('state') == 'installing' and data.get('version') == __version__
+            and isinstance(data.get('target'), str)
+            and Path(data['target']).resolve() == Path(sys.executable).resolve().parent)
+
+
 def extract(archive: Path, destination: Path, progress, *, tool_files: set[str] | None = None) -> Path:
     destination = destination.resolve()
     with zipfile.ZipFile(archive) as package:
@@ -239,6 +249,18 @@ def start() -> dict:
     return public()
 
 
+def _update_writer(stage: Path) -> bool:
+    """读取端只替换兼容程序；待迁移结构必须先由写入端同步。"""
+    from .migrations import plan
+    from .runtime_prepare import configured_ledger_writer
+    config = settings_file.load_config()
+    writer, reason = configured_ledger_writer(config)
+    database = config.directory('database') / 'ledger.db'
+    if not writer and database.is_file() and plan(database, stage / '_internal' / 'migrations')[1]:
+        raise ValueError(f'本机不能迁移账本：{reason}；请先在写入端迁移并同步')
+    return writer
+
+
 def request_restart() -> dict:
     if not distribution.standalone() or sys.platform != "win32":
         raise ValueError("此安装方式不支持独立包更新")
@@ -246,12 +268,14 @@ def request_restart() -> dict:
         data = read()
         if data.get("state") != "ready":
             raise ValueError("更新尚未准备完成")
+        writer = _update_writer(Path(data.get('stage', '')))
         db = settings_file.load_config().directory("database") / "ledger.db"
-        token = update_tasks.reserve(db)
+        token = update_tasks.reserve(db) if writer else None
         try:
             write(data, state="restarting", task_token=token, progress=0, message="正在保存任务进度，随后重启安装")
         except Exception:
-            update_tasks.release(db, token)
+            if token:
+                update_tasks.release(db, token)
             raise
     return public()
 
@@ -263,21 +287,24 @@ def poll(tray) -> None:
         return
     try:
         data = read()
+        writer = _update_writer(Path(data.get('stage', '')))
         db = settings_file.load_config().directory("database") / "ledger.db"
-        token = data.get("task_token") or update_tasks.reserve(db)
+        token = (data.get("task_token") or update_tasks.reserve(db)) if writer else None
         if not data.get("task_token"):
             write(data, task_token=token)
-        update_tasks.wait_quiescent(db)
+        if token:
+            update_tasks.wait_quiescent(db)
         helper = Path(data["helper"]) / "Peach.exe"
         environment = os.environ.copy()
         environment["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
         environment[settings_file.DATA_ROOT_ENV] = str(settings_file.load_config().data_root.resolve())
         process = subprocess.Popen([str(helper), "--apply-standalone-update", str(state_path()), str(os.getpid())],
                          cwd=str(helper.parent), env=environment, creationflags=subprocess.CREATE_NO_WINDOW)
-        update_tasks.transfer(db, token, process.pid)
+        if token:
+            update_tasks.transfer(db, token, process.pid)
         tray.exit(reason="standalone-update")
     except Exception as exc:
-        if 'token' in locals():
+        if locals().get('token'):
             update_tasks.release(db, token)
         write(read(), state="error", message=f"未能重启：{exc}")
     finally:
@@ -293,8 +320,11 @@ def migrate_database(stage: Path, data: dict) -> Path | None:
     _, pending = plan(database, stage / "_internal" / "migrations")
     if not pending:
         return None
+    if not _update_writer(stage):
+        raise ValueError('读取端不能迁移账本')
     backup = config.directory("state") / "update-backups" / data["id"] / "ledger.db"
-    sqlite_backup(database, backup)
+    if not backup.is_file():
+        sqlite_backup(database, backup)
     write(data, database_backup=str(backup), state="installing", progress=10, message="正在更新本地数据库")
     environment = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT="1", PEACH_DATA_ROOT=str(config.data_root.resolve()))
     with (backup.parent / "migration.log").open("wb") as log:
@@ -318,6 +348,54 @@ def restore_database(data: dict) -> None:
             raise RuntimeError("数据库恢复检查失败")
 
 
+def preserve_local_state(data: dict, *, include_database: bool = True) -> None:
+    """安装前保存配置与可恢复任务状态；日志、凭据和更新预约独立保留。"""
+    from .migrations import sqlite_backup
+    config = settings_file.load_config()
+    root = config.directory('state') / 'update-backups' / data['id']
+    root.mkdir(parents=True, exist_ok=True)
+    db = config.directory('database') / 'ledger.db'
+    if include_database and db.is_file():
+        sqlite_backup(db, root / 'ledger.db')
+    paths = {'config': config.path, **{name: config.directory('state') / name for name in (
+        'job-recovery', 'library-processing.json', 'upgrade-repairs')}}
+    present = []
+    for name, path in paths.items():
+        if path.is_dir():
+            shutil.copytree(path, root / name)
+            present.append(name)
+        elif path.is_file():
+            shutil.copy2(path, root / name)
+            present.append(name)
+    atomic_write_text(root / 'state.json', json.dumps(present))
+
+
+def restore_local_state(data: dict) -> None:
+    """只恢复本事务显式保存的配置和任务路径。"""
+    config = settings_file.load_config()
+    root = config.directory('state') / 'update-backups' / data['id']
+    manifest = root / 'state.json'
+    if not manifest.is_file():
+        return
+    present = json.loads(manifest.read_text(encoding='utf-8'))
+    paths = {'config': config.path, **{name: config.directory('state') / name for name in (
+        'job-recovery', 'library-processing.json', 'upgrade-repairs')}}
+    for name, path in paths.items():
+        resolved = path.resolve()
+        if name != 'config' and not resolved.is_relative_to(config.directory('state').resolve()):
+            raise ValueError('任务恢复路径越界')
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
+        if name in present:
+            if (root / name).is_dir():
+                shutil.copytree(root / name, path)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(root / name, path)
+
+
 def _transaction_paths(manifest: Path):
     """只接受本机状态文件与同卷暂存目录，安装目标须为完整独立包。"""
     if manifest.resolve() != state_path().resolve():
@@ -333,9 +411,26 @@ def _transaction_paths(manifest: Path):
     return data, target, transaction, stage
 
 
+def _rollback_installation(data, target, transaction, *, installed, writer, token):
+    """停止本次新程序，恢复原程序和写入端的事务备份，再启动托盘。"""
+    from .windows_restart import find_tray_windows, post_stop, start_tray
+    if installed:
+        for window in find_tray_windows(target / 'Peach.exe'):
+            post_stop(window.handle)
+        replace_with_retry(target, transaction / 'failed')
+    replace_with_retry(transaction / 'backup', target)
+    if writer:
+        restore_database(data)
+    restore_local_state(data)
+    if token:
+        db = settings_file.load_config().directory('database') / 'ledger.db'
+        update_tasks.release(db, token)
+    start_tray(target / 'Peach.exe')
+
+
 def apply(manifest: Path, wait_pid: int) -> int:
     """复制出来的助手等待原托盘正常退出，再在同一卷上切换两个目录。"""
-    from .windows_restart import process_alive, start_tray, find_tray_windows, post_stop
+    from .windows_restart import process_alive, start_tray, find_tray_windows
     from .tray import configured_service_specs
     from .settings_file import load_config
     from . import job_recovery
@@ -348,12 +443,14 @@ def apply(manifest: Path, wait_pid: int) -> int:
     installed = False
     db = load_config().directory("database") / "ledger.db"
     token = data.get("task_token")
-    previous = job_recovery.legacy_library_request(db)
     try:
-        if token:
+        writer = _update_writer(stage)
+        if token and writer:
             update_tasks.transfer(db, token, os.getpid())
-        else:
+        elif writer:
             token = update_tasks.reserve(db)
+        else:
+            token = None
     except Exception as exc:
         write(data, state="error", progress=0, message=f"安装预检未通过，程序与数据库未更改：{exc}")
         return 1
@@ -363,7 +460,10 @@ def apply(manifest: Path, wait_pid: int) -> int:
             if time.monotonic() > deadline:
                 raise TimeoutError("托盘尚未退出，安装已取消")
             time.sleep(.25)
-        job_recovery.import_legacy_library(db, previous)
+        previous = job_recovery.legacy_library_request(db) if writer else None
+        preserve_local_state(data, include_database=writer)
+        if writer:
+            job_recovery.import_legacy_library(db, previous)
         migrate_database(stage, data)
         write(data, state="installing", progress=20, message="正在保留旧版本")
         replace_with_retry(target, backup)
@@ -372,7 +472,6 @@ def apply(manifest: Path, wait_pid: int) -> int:
         replace_with_retry(stage, target)
         installed = True
         write(data, progress=80, message="正在启动新版本")
-        update_tasks.release(db, token)
         start_tray(target / "Peach.exe")
         deadline = time.monotonic() + 90
         specs = configured_service_specs(load_config())
@@ -389,6 +488,8 @@ def apply(manifest: Path, wait_pid: int) -> int:
                         except OSError:
                             pass
                     write(data, state="complete", progress=100, message=f"已更新至 {data['version']}")
+                    if token:
+                        update_tasks.release(db, token)
                     return 0
             except (httpx.HTTPError, ValueError):
                 pass
@@ -399,14 +500,7 @@ def apply(manifest: Path, wait_pid: int) -> int:
             from .error_reporting import event
             event('standalone-update-install', exc)
             try:
-                if installed:
-                    for window in find_tray_windows(target / "Peach.exe"):
-                        post_stop(window.handle)
-                    replace_with_retry(target, transaction / "failed")
-                replace_with_retry(backup, target)
-                restore_database(data)
-                update_tasks.release(db, token)
-                start_tray(target / "Peach.exe")
+                _rollback_installation(data, target, transaction, installed=installed, writer=writer, token=token)
                 message = f"更新失败，已恢复旧版本：{exc}"
             except Exception as rollback:
                 event('standalone-update-rollback', rollback)
@@ -416,7 +510,9 @@ def apply(manifest: Path, wait_pid: int) -> int:
             event('standalone-update-install', exc)
             message = f"更新未安装：{exc}"
             try:
-                restore_database(data)
+                if writer:
+                    restore_database(data)
+                restore_local_state(data)
                 if token:
                     update_tasks.release(db, token)
                 if not process_alive(wait_pid):

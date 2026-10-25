@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
+from peach import artifact_rules, upgrade_rules
 
 from peach.http import HttpRequest, HttpxTransport
 from peach.processing_traffic import ProcessingTraffic, download_route, media_statistics, record_download, record_media_read
@@ -232,7 +233,9 @@ class ProcessingTrafficTests(unittest.TestCase):
         directory = self.config.directory('sources') / 'library-metadata'
         directory.mkdir(parents=True)
         for source in ('r18dev', 'javdb'):
-            (directory / f'ABW-001-{source}.json').write_text(json.dumps({'title': '影片'}), encoding='utf-8')
+            path = directory / f'ABW-001-{source}.json'
+            path.write_text(json.dumps({'title': '影片'}), encoding='utf-8')
+            artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
         traffic = ProcessingTraffic(self.config, self.db, 'collect')
         with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(traffic.plan, '_ready', return_value=True):
             traffic.refresh_plan([self._video()])
