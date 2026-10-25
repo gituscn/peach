@@ -25,8 +25,9 @@ import { Disclosure } from '../settings/section';
 import { queryClient } from '../query';
 import {
   ALL_CONTENT_URL, DISCONNECTED_TEXT, issueDetails, LIBRARY_PROCESSING_KEY, LIBRARY_PROCESSING_URL, PARTIAL_RESULT_TEXT,
-  notesLine, processingActive, processingHasPartialResult, remainingTime, type LibraryProcessingCommand, type LibraryProcessingData,
+  notesLine, processingActive, processingHasPartialResult, remainingTime, slowItem, type LibraryProcessingCommand, type LibraryProcessingData,
 } from './library-processing';
+import { SlowItemNote } from './slow-item';
 import { useLibraryProcessingJob } from './use-library-processing';
 import { setProcessingNoticeVisible, useProcessingNoticeVisibility } from './processing-notice-visibility';
 import { ProcessingActions } from './processing-actions';
@@ -72,12 +73,15 @@ function Outcome(
   const partial = !problem && processingHasPartialResult(state);
   /* 同一份日志只印一处：失败提示带着问题清单时归清单，跑完只剩「7 天内不再问」时归那条提示。 */
   const logInList = failed && !!details?.log;
+  const slow = slowItem(state);
   /* 清单是这一页唯一自己滚的块，原生滚动条在这儿就是一条系统灰柱子。 */
   const list = useOverlayScrollbar<HTMLUListElement>();
   return (
     /* 空着时整块收起：`aria-live` 的容器留着一条空轨道，卡片底下就凭空多出一个间距。 */
     <div aria-live="polite" className="flex flex-col gap-4 empty:hidden">
-      {state.status === 'running' && state.stalled
+      {slow
+        ? <SlowItemNote state={state} slow={slow} />
+        : state.status === 'running' && state.stalled
         ? <Note tone="warning" title="处理较慢">{STALLED_TEXT}</Note>
         : null}
       {failed

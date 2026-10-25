@@ -58,7 +58,7 @@ it('刚刚失败的短任务仍可显示', async () => {
 it('运行任务隐藏后状态更新保持隐藏，恢复时显示当前进度', async () => {
   await open({ status: 'running', job_id: 'hide-current', checked: 1 });
   const options = sonner.custom.mock.calls.at(-1)?.[1] as { onDismiss(): void; dismissible: boolean };
-  expect(options.dismissible).toBe(true);
+  expect(options.dismissible).toBe(false);
   await act(async () => options.onDismiss());
   sonner.custom.mockClear();
   for (const status of ['running', 'pausing', 'paused', 'running', 'failed']) {

@@ -63,13 +63,13 @@ const DETAILS = new Map<number, Row>([
 ]);
 
 /** 列表与队列里的那一份：没有 `entity_refs`，标签只是字符串，同 `/api/items`。 */
-const card = (id: number) => {
+export const card = (id: number) => {
   const { entity_refs: _refs, ...rest } = DETAILS.get(id)!;
   return { ...rest, tags: (rest.tags as { k: string }[]).map((tag) => tag.k) };
 };
 export const CATALOG = [11, 12, 13, 14, 15, 16];
 export const RELATED = [14, 15, 16, 12];
-const PARTS = { title: 'PCH-021', items: [21, 22, 23].map((id, at) => ({
+export const PARTS = { title: 'PCH-021', items: [21, 22, 23].map((id, at) => ({
   ...DETAILS.get(id), part_label: String(at + 1), performer_entities: undefined,
   performers: NAMES.slice(0, 2),
   entity_refs: { performer: NAMES.slice(0, 2).map((name, index) => ref(name, index + 1, { has_image: true })) },

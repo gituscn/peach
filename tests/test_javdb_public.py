@@ -7,11 +7,12 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 from PIL import Image
 
 from peach.http import HttpResponse
-from peach.javdb_public import PublicAPI, PublicSourceUnavailable, decode_image, preview_video_url
+from peach.javdb_public import PublicAPI, PublicSourceUnavailable, decode_image, preview_video_url, public_signature_parts
 from peach.javdb_public import PublicBudgetExceeded, PublicRequestBudget, actor_gender
 from peach.web_jav_detail import (JAV_ACTOR_IMAGE_MAX_AGE, JAV_IMAGE_MAX_AGE, jav_image, q_jav_detail,
                                   q_jav_reviews, q_jav_resources)
@@ -21,6 +22,14 @@ from support.ledger import fresh_ledger
 
 
 class PublicProtocolTests(unittest.TestCase):
+    def test_signature_follows_header_recipe_with_minified_identifiers(self):
+        script = ('const AA="sample-middle",BB="sample-suffix";'
+                  'function makeHeader(){const now=Math.floor(Date.now()/1e3).toString();'
+                  'return`${now}.${AA}.${digest(now+BB)}`}const headers={jdsignature:makeHeader()};')
+        self.assertEqual(public_signature_parts(script), ('sample-middle', 'sample-suffix'))
+        self.assertIsNone(public_signature_parts(script.replace('now+BB', 'now+window.token')))
+        self.assertIsNone(public_signature_parts(script + 'BB="ambiguous";'))
+
     def test_api_and_image_cooldowns_have_independent_scope(self):
         requests = []
         def transport(request, *_):
@@ -130,7 +139,7 @@ class PublicProtocolTests(unittest.TestCase):
         self.assertEqual(api.movie('EXM-001')['id'], 'Exact')
         self.assertTrue(any('/v2/search' in request.url for request in self.requests))
 
-    def api(self, *, wrong_code=False, blocked=False):
+    def api(self, *, wrong_code=False, blocked=False, number='EXM-001'):
         self.requests = []
 
         def transport(request, timeout, max_bytes):
@@ -138,20 +147,29 @@ class PublicProtocolTests(unittest.TestCase):
             if request.url.endswith('/'):
                 body = b'<script src="/assets/index-test.js"></script>'
             elif '/assets/' in request.url:
-                body = b'const S1="test-middle",E1="test-suffix";'
+                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=String(Date.now());'
+                        b'return`${n}.${S1}.${digest(n+E1)}`}const headers={jdsignature:signature()};')
             else:
                 if blocked:
                     return HttpResponse(429, {}, b'')
                 if '/search' in request.url:
-                    data = {'movies': [{'id': 'Exact', 'number': 'EXM-001'}, {'id': 'Other', 'number': 'EXM-002'}]}
+                    data = {'movies': [{'id': 'Exact', 'number': number}, {'id': 'Other', 'number': 'EXM-002'}]}
                 elif '/reviews' in request.url:
                     data = {'reviews': [{'id': 'second' if 'page=2' in request.url else 'first', 'content': '示例评论'}]}
                 else:
-                    data = {'movie': {'id': 'Exact', 'number': 'EXM-002' if wrong_code else 'EXM-001', 'title': '示例作品'}}
+                    data = {'movie': {'id': 'Exact', 'number': 'EXM-002' if wrong_code else number, 'title': '示例作品'}}
                 body = json.dumps({'success': 1, 'data': data}).encode()
             return HttpResponse(200, {}, body)
 
         return PublicAPI(transport, sleeper=lambda _: None)
+
+    def test_fc2_search_uses_product_number_and_validates_canonical_identity(self):
+        api = self.api(number='FC2-1627464')
+        self.assertEqual(api.movie('FC2-PPV-1627464')['number'], 'FC2-1627464')
+        search = next(request for request in self.requests if '/v2/search' in request.url)
+        self.assertEqual(parse_qs(urlsplit(search.url).query)['q'], ['1627464'])
+        with self.assertRaises(PublicSourceUnavailable):
+            self.api().movie('FC2-PPV-1627464')
 
     def test_exact_work_is_cached_and_signed_without_credentials(self):
         api = self.api()
@@ -333,7 +351,8 @@ class DetailProjectionTests(unittest.TestCase):
             elif request.url.endswith('/'):
                 body = b'<script src="/assets/index-test.js"></script>'
             elif '/assets/' in request.url:
-                body = b'const S1="test-middle",E1="test-suffix";'
+                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=String(Date.now());'
+                        b'return`${n}.${S1}.${digest(n+E1)}`}const headers={jdsignature:signature()};')
             else:
                 body = json.dumps({'success': 1, 'data': {'movie': {'id': 'Exact', 'number': 'EXM-001',
                     'actors': [{'id': 'Person', 'name': '甲', 'gender': 0,

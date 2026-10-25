@@ -19,10 +19,11 @@ export function NetworkSettings({ data, receipt, panel, issues }: ConfigurationG
   return (
     <div {...groupRoot(panel)}>
       {issues}
-      {data.editable && data.port_editable !== false && !data.section_errors?.media_sources ? <PortSettings data={data} receipt={receipt} /> : null}
-      {data.peach_proxy ? <PeachProxy initial={data.peach_proxy} receipt={receipt} /> : null}
+      {data.network || (data.editable && data.port_editable !== false && !data.section_errors?.media_sources)
+        ? <PortSettings data={data} receipt={receipt} /> : null}
       {data.access ? <AccessSettings initial={data.access} receipt={receipt} /> : null}
       {data.tunnel ? <TunnelSettings revision={data.revision} initial={data.tunnel} receipt={receipt} /> : null}
+      {data.peach_proxy ? <PeachProxy initial={data.peach_proxy} receipt={receipt} /> : null}
     </div>
   );
 }

@@ -34,7 +34,7 @@ import { MediaCarousel } from '../components/media-carousel';
 import { CatalogPicture } from './catalog-picture';
 import { fetchJavDetail, javDetailKey } from '../jav-detail/jav-detail';
 import { busyProps } from '../settings/use-action';
-import { ExternalPlayback, LocalPlayback } from './external-playback';
+import { ExternalPlayback } from './external-playback';
 import { CoverCrop } from '../cover-crop/cover-crop-page';
 import { queryClient } from '../query';
 import { LibraryCompletionPrompt, missingPreviewIds } from '../library-processing/library-completion';
@@ -119,7 +119,7 @@ function Detail(props: ItemDetailProps & { item: DetailItem; queue: DetailQueue 
           autoplay={props.queue?.autoplay} onEnded={continuePart} />
         <Side item={item} queue={queue} write={write} helpers={helpers} actions={actions} />
       </div>
-      <DetailContinuation editionCards={queue?.kind === 'editions' ? queue.items.length : undefined}
+      <DetailContinuation queueCards={queue?.kind === 'parts' || queue?.kind === 'editions' ? queue.items.length : undefined}
         queue={queue ? <Queue queue={queue} itemId={item.id} helpers={helpers} actions={actions} /> : null}>
         {props.relatedLimit > 0 && (!queue || queue.kind === 'parts' || queue.kind === 'editions')
           ? <Related {...props} item={queue ? { ...item, id: queue.seedId ?? item.id } : item} /> : null}
@@ -178,12 +178,12 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
       {hasPictures ? <>
         <button type="button" data-jav-preview-toggle="" aria-pressed={image !== -2}
           onClick={() => selectImage(image === -2 ? media[0]!.index : -2)}><Glyph name={image === -2 ? 'image' : 'play'} />{image === -2 ? '查看图片' : '播放正片'}</button>
-        {image !== -2 ? <CatalogPicture key={image} item={item} image={image} source={samples.find(sample => sample.index === image)?.source} /> : null}
+        {image !== -2 ? <CatalogPicture key={item.id} item={item} image={image} source={samples.find(sample => sample.index === image)?.source} /> : null}
         <MediaCarousel items={media} position={Math.max(0, media.findIndex(entry => entry.index === image))} onSelect={selectImage}
           below renderThumbnail={entry => <CatalogPicture item={item} image={entry.index === -2 ? media[0]!.index : entry.index}
             source={samples.find(sample => sample.index === (entry.index === -2 ? media[0]!.index : entry.index))?.source} thumbnail />} />
       </> : null}
-      {item.is_jav && item.code && !item.sample_images?.length && (source.isPending || source.error || source.data?.state === 'partial') ?
+      {image !== -2 && item.is_jav && item.code && !item.sample_images?.length && (source.isPending || source.error || source.data?.state === 'partial') ?
         <div data-item-samples-state="">{source.isPending ? <span data-skeleton="samples" role="status" aria-label="正在读取样图" className="relative block h-12 w-20 skeleton-sheen" />
           : <Button variant="secondary" {...busyProps(source.isFetching)} title={source.data?.message || requestErrorMessage(source.error)}
             aria-label="立即重试样图" onClick={() => { refreshSamples.current = true; void source.refetch() }}>立即重试</Button>}</div> : null}
@@ -192,8 +192,7 @@ function MediaFrame({ item, gate, helpers, actions, autoplay, onEnded }: {
           <div role="status" data-item-gate="disc">
             <b>ISO 原盘</b>
             <span>请使用支持原盘的外部播放器打开。</span>
-            <LocalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} />
-            <ExternalPlayback key={`external-${item.id}`} id={item.id} />
+            <ExternalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} />
           </div>
         ) : gate === 'online' ? (
           <div id="onlineGate" role="status" data-item-gate="online">
@@ -393,14 +392,12 @@ function Side({ item, queue, write, helpers, actions }: {
           ) : null}
         </div>
         {(item.medium || 'video') === 'video' && !online && !String(item.name || '').toLowerCase().endsWith('.iso')
-          ? <LocalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} /> : null}
+          ? <ExternalPlayback key={item.id} id={item.id} onOpened={() => actions.toast('已请求打开本地播放器')} /> : null}
         <Identity item={item} helpers={helpers} actions={actions} />
         <Tags item={item} write={write} helpers={helpers} actions={actions} />
         <LibraryCompletionPrompt assetIds={missingPreviewIds([item], helpers.javImage())}
           onComplete={() => { void queryClient.invalidateQueries({ queryKey: itemKey(item.id) }) }} />
         <Trace item={item} />
-        {(item.medium || 'video') === 'video' && item.location !== 'online' && !String(item.name || '').toLowerCase().endsWith('.iso')
-          ? <ExternalPlayback key={item.id} id={item.id} /> : null}
         <div data-stage-actions="" data-item-feedback="">
           <button type="button" id="likeBtn" data-fb="like" aria-label={item.liked ? '取消喜欢' : '喜欢'} title="喜欢 · 记录口味偏好"
             aria-pressed={!!item.liked} {...busy('like')} onClick={() => write.preference({ liked: !item.liked })}><Glyph name="thumbs-up" /></button>

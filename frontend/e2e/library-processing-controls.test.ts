@@ -9,6 +9,42 @@ describe('扫描与采集控制', () => {
   let browser: Browser;
   before(async () => { browser = await launch() });
   after(async () => { await browser?.close() });
+  for (const viewport of VIEWPORTS) it(`${viewport.name}：慢项可跳过，提示随空间同行，浮窗拖动保留`, async () => {
+    let state = { status: 'running', job_id: 'skip-preview', checked: 0, total: 2,
+      current_asset_id: 1, current_asset_name: '作品甲.mp4', current_action: 'querying_metadata',
+      current_source: { key: 'javdb', label: 'JavDB' }, waited_seconds: 130 };
+    const opened = await visit(browser, '/data-cleanup#libraryProcessing', viewport, async page => {
+      await page.route('**/api/library-processing{,?*}', async route => {
+        if (route.request().method() === 'POST') {
+          assert.deepEqual(route.request().postDataJSON(), { action: 'skip_current', job_id: 'skip-preview', asset_id: 1 });
+          state = { ...state, checked: 1, current_asset_id: 2, current_asset_name: '作品乙.mp4', waited_seconds: 0 };
+        }
+        await route.fulfill({ json: state });
+      });
+    });
+    const { page } = opened;
+    try {
+      const dock = page.locator('[data-processing-dock]');
+      await dock.getByRole('button', { name: '跳过这部', exact: true }).waitFor();
+      assert.equal(await dock.locator('xpath=ancestor::*[@data-sonner-toast]').getAttribute('data-dismissible'), 'false');
+      const row = page.locator('[data-note-layout]').filter({ hasText: 'JavDB 迟迟没有返回资料' }).first();
+      const boxes = await row.evaluate(node => ({ text: node.firstElementChild!.getBoundingClientRect().toJSON(),
+        action: node.querySelector('[data-note-action]')!.getBoundingClientRect().toJSON() }));
+      if (!viewport.mobile) assert.ok(Math.abs(boxes.text.y + boxes.text.height / 2 - boxes.action.y - boxes.action.height / 2) < 2);
+      const box = await dock.boundingBox();
+      assert.ok(box);
+      await page.mouse.move(box.x + 80, box.y + 20);
+      await page.mouse.down();
+      await page.mouse.move(box.x - 60, box.y + 20);
+      await page.mouse.up();
+      assert.ok(await dock.isVisible());
+      await dock.getByRole('button', { name: '跳过这部', exact: true }).click();
+      await dock.getByText(/作品乙/).waitFor();
+      assert.ok(await dock.isVisible());
+      assert.equal(await dock.getByRole('button', { name: '跳过这部', exact: true }).count(), 0);
+      assert.ok((await layout(page)).scrollWidth <= viewport.width);
+    } finally { await opened.close() }
+  });
   for (const viewport of VIEWPORTS) {
     it(`${viewport.name}：隐藏、刷新、恢复与新任务的浮窗`, async () => {
       let state = { status: 'running', job_id: 'visibility-first', checked: 2, total: 10 };

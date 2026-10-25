@@ -107,7 +107,8 @@ describe('整页配置记下的结构', () => {
 
   it('从配置算出几块、哪种表单，不含任何值', () => {
     expect(downloadsShape(data)).toEqual({ cloud: true, has115: false, pikpak: true, pikpakRoots: true, pikpakLoggedIn: true, browserLogin: false });
-    expect(networkShape(data)).toEqual({ port: false, proxyAddress: true, access: 'password', tunnelNamed: true, tunnelNamedMode: true, tunnelNote: false });
+    expect(networkShape(data)).toEqual({ port: false, addresses: 0, networkEditable: false, lan: false,
+      proxyAddress: true, access: 'password', tunnelNamed: true, tunnelNamedMode: true, tunnelNote: false });
     expect(maintenanceShape(data)).toMatchObject({ facts: ['版本', 'FFmpeg'], reporting: false, uninstall: false, storageRows: 0 });
   });
 
@@ -116,7 +117,7 @@ describe('整页配置记下的结构', () => {
     expect([...fresh.querySelectorAll('span.text-body-medium')].map(node => node.textContent)).toEqual(['设置访问密码 *', '确认访问密码 *']);
     rememberShape('network', networkShape(data));
     const root = draw('网络与访问');
-    expect(sections(root)).toEqual(['Peach 代理', '访问密码', 'Cloudflare 公网入口']);
+    expect(sections(root)).toEqual(['访问密码', 'Cloudflare 公网入口', 'Peach 代理']);
     expect([...card(root, '访问密码').querySelectorAll('span.text-body-medium')].map(node => node.textContent))
       .toEqual(['当前访问密码 *', '新访问密码 *', '确认新访问密码 *']);
   });

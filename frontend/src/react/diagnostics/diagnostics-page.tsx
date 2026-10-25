@@ -7,7 +7,6 @@ import { SettingsCard, SettingsSectionLabel } from '@/components/application/set
 import { cx } from '@/utils/cx';
 import { errorMessage } from '../../api';
 import { diagnosticsSkeleton } from '../../diagnostics-skeleton';
-import { diagnosticHeaders } from '../../browser-diagnostics';
 import { ErrorExcerpt } from '../activity/error-excerpt';
 import { Note } from '../components/note';
 import { SiteMark } from '../components/site-mark';
@@ -15,6 +14,7 @@ import { Disclosure, Fact, FactList, Section, Stack } from '../settings/section'
 import { busyProps, useAction } from '../settings/use-action';
 import { DIAGNOSTICS_KEY, fetchDiagnostics, type DiagnosticCheck } from './diagnostics';
 import { HealthList } from './health-list';
+import { DiagnosticExportAction, ScrapingExport } from './scraping-export';
 
 const STATUS: Record<string, string> = { ok: '正常', warning: '需检查', failed: '需处理', unknown: '未取得', disabled: '未配置',
   stale: '待复查', unchecked: '尚无记录' };
@@ -41,23 +41,7 @@ export interface DiagnosticsProps {
 }
 
 function DownloadReport() {
-  const action = useAction();
-  const download = () => void action.run('download', async () => {
-    const response = await fetch('/api/diagnostics/bundle', { credentials: 'same-origin', headers: await diagnosticHeaders() });
-    if (!response.ok) throw new Error(`诊断报告下载失败（HTTP ${response.status}）`);
-    const url = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement('a');
-    anchor.href = url; anchor.download = 'peach-support.zip';
-    document.body.append(anchor);
-    try { anchor.click() } finally {
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-  }, () => {});
-  return <div className="flex flex-col items-end gap-2">
-    <Button variant="secondary" onClick={download} {...busyProps(action.busy === 'download')}>下载诊断报告</Button>
-    {action.error ? <Note tone="error">{action.error}</Note> : null}
-  </div>;
+  return <DiagnosticExportAction kind="support" />;
 }
 
 function Check({ name, check, compact = false }: {
@@ -95,7 +79,7 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
   if (!data) return <div className="ui-configpage"><DownloadReport /><Note tone="error" title="诊断读取失败"
     action={<Button variant="secondary" onClick={refresh} {...busyProps(action.busy === 'refresh')}>重新检查</Button>}>
     {query.error ? errorMessage(query.error) : '诊断报告未取得。'}
-  </Note></div>;
+  </Note><ScrapingExport /></div>;
   const attention = Object.entries(data.checks).filter(([, check]) => ['warning', 'failed', 'unknown'].includes(check.status));
   const other = Object.entries(data.checks).filter(([, check]) => !['warning', 'failed', 'unknown'].includes(check.status));
   return <div className="flex min-w-0 flex-col gap-6">
@@ -122,6 +106,7 @@ export function DiagnosticsPage(props: DiagnosticsProps) {
         })}
       </Disclosure>
     </section> : null}
+    <ScrapingExport />
     <section aria-label="来源会话" className="flex min-w-0 flex-col gap-3">
       <SettingsSectionLabel>来源会话</SettingsSectionLabel>
       {data.sources.map(source => <article key={source.source} data-diagnostic-source={source.source}>

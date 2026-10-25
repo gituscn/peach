@@ -32,7 +32,7 @@ export function LibraryProcessingDock({ toast: receipt }: Pick<LibraryProcessing
     }
     toast.custom(() => <div className="peach-react"><ProcessingNoticePanel state={state} problem={problem} measure
       onHide={() => setProcessingNoticeVisible(key, false)} /></div>, {
-      id: TASK_TOAST, toasterId: 'processing', duration: Infinity, dismissible: true,
+      id: TASK_TOAST, toasterId: 'processing', duration: Infinity, dismissible: false,
       closeButton: false, className: 'processing-task-toast',
       onDismiss: () => { setProcessingNoticeVisible(key, false); shown.current = false },
     });
