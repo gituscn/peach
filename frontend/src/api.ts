@@ -8,6 +8,7 @@
 /** 服务端明确回了非 2xx。`status` 留给调用方区分 401／409／404 这类需要不同处置的情况。 */
 import { requestErrorMessage } from './core/request-error';
 import { registerResponseEntities } from './core/entity-links';
+import { libraryScopedPath } from './core/library-scope';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -40,6 +41,7 @@ export const errorMessage = (cause: unknown): string => requestErrorMessage(caus
 
 /** GET 一个 `/api/...` 契约端点。`signal` 中止时抛出 `AbortError`，调用方据此放弃写 DOM。 */
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
+  path = libraryScopedPath(path);
   const response = await fetch(path, {
     headers: { Accept: 'application/json' },
     // 页面口令是 httponly cookie，取数必须带上；跨源请求不在此列。

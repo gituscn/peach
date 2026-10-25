@@ -1926,6 +1926,16 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(detail.json()["liked"])
         self.assertEqual(detail.json()["like_reason"], "镜头自然")
 
+    async def test_item_detail_exposes_stored_medium(self):
+        for medium in ("video", "image", "archive", "audio", "other"):
+            with self.subTest(medium=medium):
+                with closing(sqlite3.connect(self.db)) as connection:
+                    connection.execute("UPDATE asset SET medium=? WHERE id=1", (medium,))
+                    connection.commit()
+                response = await self.client.get("/api/item?t=secret&id=1")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["medium"], medium)
+
     async def test_item_detail_exposes_official_title_and_official_tag_marker(self):
         connection = sqlite3.connect(self.db)
         connection.execute(
