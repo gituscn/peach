@@ -17,7 +17,7 @@ import time
 import unittest
 from collections.abc import Iterable
 from contextlib import contextmanager, nullcontext
-from functools import lru_cache
+from functools import lru_cache, partial
 from pathlib import Path
 
 
@@ -375,7 +375,7 @@ FULL_ONLY_PREFIXES: tuple[str, ...] = (
     'frontend/node_modules/',
     "pyproject.toml",
     "scripts/test_runner.py", "scripts/test_evidence.py", "scripts/test.ps1", "scripts/test.sh",
-    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py",
+    "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_focus.py",
     "scripts/test_history.py", "uv.lock",
     "scripts/test_resume.py", "scripts/test_run_progress.py", "scripts/test_environment_identity.py",
     "scripts/test_shard_results.py",
@@ -700,31 +700,42 @@ class TimedResult(unittest.TextTestResult):
     只量用例本身会漏掉建库、起服务那一段，而分片均衡要的正是整份文件占多久。
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, selection=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.timings = []
         self.files: dict[str, float] = {}
         self.results: list[dict] = []
         self.outcome: dict[str, tuple[str, str | None]] = {}
         self.last = time.monotonic()
+        self.selection = selection or {}
+        self.selection_context = None
 
     def startTestRun(self):
         self.last = time.monotonic()
         super().startTestRun()
 
     def startTest(self, test):
+        if self.selection and test.id() in test_resume.CONTAINERS:
+            self.selection_context = test_resume.selection_environment(
+                self.selection, test_resume.owner('case:' + test.id()))
+            self.selection_context.__enter__()
         self.started = time.monotonic()
         super().startTest(test)
 
     def stopTest(self, test):
-        now = time.monotonic()
-        self.timings.append((round(now - self.started, 3), test.id()))
-        outcome, message = self.outcome.pop(test.id(), ("pass", None))
-        self.results.append(test_history.result(test.id(), outcome, now - self.started, message))
-        module = type(test).__module__
-        self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
-        self.last = now
-        super().stopTest(test)
+        try:
+            now = time.monotonic()
+            self.timings.append((round(now - self.started, 3), test.id()))
+            outcome, message = self.outcome.pop(test.id(), ("pass", None))
+            self.results.append(test_history.result(test.id(), outcome, now - self.started, message))
+            module = type(test).__module__
+            self.files[module] = round(self.files.get(module, 0.0) + now - self.last, 3)
+            self.last = now
+            super().stopTest(test)
+        finally:
+            if self.selection_context is not None:
+                self.selection_context.__exit__(None, None, None)
+                self.selection_context = None
 
     def _mark(self, test, outcome: str, err=None) -> None:
         message = f"{err[0].__name__}: {err[1]}" if err else None
@@ -1090,12 +1101,11 @@ def run_serial_suite(scopes, chosen, original, progress, label):
     """串行执行同一恢复计划，提交与分片相同的文件结果。"""
     selection = progress.child_plan(scopes) if progress is not None else {}
     planned = {'assigned_names': [path.name for path in sorted(chosen)]} if chosen != original else {}
-    with test_resume.selection_environment(selection):
-        suite = build_suite(*scopes, **planned)
-        if progress is not None:
-            suite = test_resume.filter_suite(suite, selection, {path.name for path in chosen}, unittest.TestSuite)
-        with test_history.running():
-            result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+    suite = build_suite(*scopes, **planned)
+    if progress is not None:
+        suite = test_resume.filter_suite(suite, selection, {path.name for path in chosen}, unittest.TestSuite)
+    with test_history.running():
+        result = unittest.TextTestRunner(verbosity=2, resultclass=partial(TimedResult, selection=selection)).run(suite)
     save_file_seconds(result.files)
     rows = result.results + test_history.take_external()
     test_history.append(ROOT, scope=label or " ".join(scopes), rows=rows,
@@ -1127,12 +1137,11 @@ def run_shard_child(args, requested, scopes, files) -> int:
                        if test_resume.owner('case:' + case) in {path.name for path in files})
         if not set(selection.get('case_universe', ())) <= allowed:
             raise ValueError('恢复计划包含本次范围外的补充用例')
-    with test_resume.selection_environment(selection):
-        suite = build_suite(*scopes, shard_index=args.shard_index, shard_count=args.shard_count, **planned)
-        if selection:
-            suite = test_resume.filter_suite(suite, selection, set(planned.get('assigned_names', ())), unittest.TestSuite)
-        with test_history.running():
-            result = unittest.TextTestRunner(verbosity=2, resultclass=TimedResult).run(suite)
+    suite = build_suite(*scopes, shard_index=args.shard_index, shard_count=args.shard_count, **planned)
+    if selection:
+        suite = test_resume.filter_suite(suite, selection, set(planned.get('assigned_names', ())), unittest.TestSuite)
+    with test_history.running():
+        result = unittest.TextTestRunner(verbosity=2, resultclass=partial(TimedResult, selection=selection)).run(suite)
     success = result.wasSuccessful() and result.testsRun > 0
     rows = result.results + test_history.take_external()
     if args.timings is not None:

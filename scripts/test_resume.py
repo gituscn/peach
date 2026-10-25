@@ -295,13 +295,16 @@ def validate_child_plan(root: Path, data: dict, *, state: str, valid_seconds: fl
 
 
 @contextmanager
-def selection_environment(plan):
+def selection_environment(plan, active_module=None):
     changed = {}
     for module, variable in (('test_web_e2e.py', 'PEACH_E2E_FILES'),
                               ('test_frontend_build.py', 'PEACH_VITEST_FILES')):
-        if module in plan.get('external', {}):
+        if module in plan.get('external', {}) and (active_module is None or active_module == module):
             changed[variable] = os.environ.get(variable)
             os.environ[variable] = json.dumps([name.removeprefix('frontend/') for name in plan['external'][module]])
+    if plan.get('focus'):
+        changed['PEACH_TEST_FOCUS'] = os.environ.get('PEACH_TEST_FOCUS')
+        os.environ['PEACH_TEST_FOCUS'] = '1'
     try:
         yield
     finally:

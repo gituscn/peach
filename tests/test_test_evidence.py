@@ -24,6 +24,16 @@ from scripts import test_shard_results
 from support.gitrepo import seed_repository
 
 
+def fixture_process(command, root, env):
+    process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, encoding='utf8')
+    try:
+        output, _ = process.communicate(timeout=180)
+    finally:
+        if process.poll() is None:
+            test_shard_results.stop_process_tree(process)
+    return process.returncode, output
+
 
 
 class ParallelShardTests(unittest.TestCase):
@@ -583,16 +593,8 @@ class SubprocessResumeTests(unittest.TestCase):
         env = {**os.environ, 'GITHUB_ACTIONS': 'false', 'CI': ''}
         for key in ('PEACH_TEST_FOCUS', 'PEACH_E2E_FILES', 'PEACH_VITEST_FILES'):
             env.pop(key, None)
-        process = subprocess.Popen([sys.executable, '-X', 'utf8', str(repo / 'entry.py'),
-                                    '--scope', scope, '--jobs', 'auto'], cwd=repo, env=env,
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                   text=True, encoding='utf8')
-        try:
-            output, _ = process.communicate(timeout=180)
-        finally:
-            if process.poll() is None:
-                test_shard_results.stop_process_tree(process)
-        return process.returncode, output
+        return fixture_process([sys.executable, '-X', 'utf8', str(repo / 'entry.py'),
+                                '--scope', scope, '--jobs', 'auto'], repo, env)
 
     def test_real_parent_and_children_resume_only_the_failed_file(self):
         source = Path(__file__).resolve().parents[1]
@@ -642,6 +644,93 @@ class SubprocessResumeTests(unittest.TestCase):
             self.assertEqual((runtime / 'test_ad_judgement.calls').read_text(encoding='utf8'), successful_calls)
             self.assertEqual(len((runtime / 'test_web_library_shortcuts.calls').read_text(encoding='utf8').splitlines()),
                              len(failed_calls) + 1)
+
+
+class SelectionEnvironmentTests(unittest.TestCase):
+    VARIABLES = ('PEACH_TEST_FOCUS', 'PEACH_E2E_FILES', 'PEACH_VITEST_FILES')
+
+    def setUp(self):
+        self.enterContext(mock.patch.dict(os.environ))
+        for key in self.VARIABLES:
+            os.environ.pop(key, None)
+
+    def suite(self, captured, fail_container=False):
+        def observe(case):
+            captured.append((case.id(), {key: os.environ.get(key) for key in self.VARIABLES}))
+            if fail_container and case.id() in test_resume.CONTAINERS:
+                case.fail('fixture')
+        backend = type('Backend', (unittest.TestCase,), {'__module__': __name__,
+                       'test_before': observe, 'test_after': observe})
+        container = type('VitestTests', (unittest.TestCase,), {'__module__': 'test_frontend_build',
+                         'test_the_island_suite_passes': observe})
+        return unittest.TestSuite([backend('test_before'), container('test_the_island_suite_passes'), backend('test_after')])
+
+    def assert_isolated(self, captured, *, focus):
+        for _, values in (captured[0], captured[2]):
+            self.assertEqual(values, dict.fromkeys(self.VARIABLES))
+        values = captured[1][1]
+        self.assertEqual(json.loads(values['PEACH_VITEST_FILES']), ['test/example.test.ts'])
+        self.assertIsNone(values['PEACH_E2E_FILES'])
+        self.assertEqual(values['PEACH_TEST_FOCUS'], '1' if focus else None)
+        self.assertTrue(all(os.environ.get(key) is None for key in self.VARIABLES))
+
+    def test_serial_formal_selection_only_applies_to_its_container(self):
+        captured = []
+        selection = {'external': {'test_frontend_build.py': ['frontend/test/example.test.ts'],
+                                  'test_web_e2e.py': ['frontend/e2e/example.test.ts']}}
+        progress = mock.Mock()
+        progress.child_plan.return_value = selection
+        progress.checkpoint.return_value = True
+        chosen = {Path('test_frontend_build.py'), Path('test_test_evidence.py')}
+        with mock.patch.object(runner, 'build_suite', return_value=self.suite(captured)), \
+                mock.patch.object(runner, 'save_file_seconds'), mock.patch.object(runner.test_history, 'append'), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertTrue(runner.run_serial_suite(('full',), chosen, chosen, progress, 'fixture')[0])
+        self.assert_isolated(captured, focus=False)
+
+    def test_mixed_focus_selection_does_not_leak_into_backend_cases(self):
+        from scripts import test_focus
+        captured = []
+        args = runner.argparse.Namespace(focus=['fixture'])
+        with mock.patch.object(test_focus, 'selection', return_value=(self.suite(captured), (), ('test/example.test.ts',))), \
+                mock.patch.object(runner.test_history, 'append'), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(test_focus.run(runner, args), 0)
+        self.assert_isolated(captured, focus=True)
+
+    def test_container_failure_restores_selection_before_the_next_case(self):
+        captured = []
+        selection = {'external': {'test_frontend_build.py': ['frontend/test/example.test.ts']}}
+        progress = mock.Mock()
+        progress.child_plan.return_value = selection
+        progress.checkpoint.return_value = True
+        chosen = {Path('test_frontend_build.py'), Path('test_test_evidence.py')}
+        with mock.patch.object(runner, 'build_suite', return_value=self.suite(captured, fail_container=True)), \
+                mock.patch.object(runner, 'save_file_seconds'), mock.patch.object(runner.test_history, 'append'), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertFalse(runner.run_serial_suite(('full',), chosen, chosen, progress, 'fixture')[0])
+        self.assert_isolated(captured, focus=False)
+
+
+class ShardProtocolTests(unittest.TestCase):
+    def test_backend_shard_runs_with_the_full_parent_browser_plan(self):
+        root = Path(__file__).resolve().parents[1]
+        progress = test_run_progress.RunProgress(root, evidence.inputs(root), ('full',),
+            runner.selected_files, runner.scopes_for_changes, runner.SCOPES, supplements=runner.SCOPE_TEST_IDS)
+        with tempfile.TemporaryDirectory() as folder:
+            temporary = Path(folder).resolve()
+            shard = temporary / 'plan.json'
+            shard.write_text(json.dumps([['test_test_planning.py']]), encoding='utf8')
+            resume = temporary / 'resume.json'
+            resume.write_text(json.dumps(progress.child_plan()), encoding='utf8')
+            report = temporary / 'report.json'
+            code, output = fixture_process([sys.executable, '-X', 'utf8', str(root / 'scripts/test_runner.py'),
+                '--scope', 'full', '--shard-plan', str(shard), '--resume-plan', str(resume),
+                '--timings', str(report)], root, dict(os.environ))
+            self.assertEqual(code, 0, output)
+            result = test_shard_results.read_report(report)
+            self.assertTrue(result['success'], output)
+            self.assertGreater(result['count'], 0)
 
 
 class VerificationTests(unittest.TestCase):
@@ -1131,7 +1220,7 @@ class VerificationTests(unittest.TestCase):
         self.assertEqual(runner.scopes_for_changes(["docs/HANDOFF.md"])[0], ("checks",))
         self.assertEqual(runner.scopes_for_changes(["web/app.js", "src/peach/follow.py"])[0],
                          ("follow", "web"))
-        for path in ("pyproject.toml", "scripts/test_runner.py", "scripts/test_evidence.py",
+        for path in ("pyproject.toml", "scripts/test_runner.py", "scripts/test_evidence.py", 'scripts/test_focus.py',
                      "uv.lock", "src/peach/unknown.py"):
             self.assertEqual(runner.scopes_for_changes([path])[0], ("full",))
 

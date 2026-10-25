@@ -1,13 +1,11 @@
 """统一测试入口的定向调试；不签发正式验收记录。"""
 from __future__ import annotations
 
-import json
-import os
 import re
 import sys
 import unittest
 from pathlib import Path
-from unittest import mock
+from functools import partial
 
 VITEST_SUITE = "test_frontend_build.VitestTests.test_the_island_suite_passes"
 
@@ -58,12 +56,15 @@ def run(runner, args) -> int:
         print(error, file=sys.stderr)
         return 2
     print("定向调试：只运行指定用例，不签发正式记录；提交前仍需 auto。", flush=True)
-    flags = {"PEACH_TEST_FOCUS": "1", "PEACH_E2E_FILES": json.dumps(browsers)} if browsers else {}
+    external = {}
+    if browsers:
+        external['test_web_e2e.py'] = ['frontend/' + name for name in browsers]
     if islands:
-        flags["PEACH_VITEST_FILES"] = json.dumps(islands)
-    with mock.patch.dict(os.environ, flags):
-        with runner.test_history.running():
-            result = unittest.TextTestRunner(verbosity=2, resultclass=runner.TimedResult).run(suite)
+        external['test_frontend_build.py'] = ['frontend/' + name for name in islands]
+    plan = {'external': external, 'focus': True}
+    with runner.test_history.running():
+        result = unittest.TextTestRunner(verbosity=2,
+            resultclass=partial(runner.TimedResult, selection=plan)).run(suite)
     runner.test_history.append(runner.ROOT, scope="focus:" + " ".join(args.focus),
                                rows=result.results + runner.test_history.take_external(),
                                files=sorted(result.files))
