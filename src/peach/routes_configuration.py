@@ -842,6 +842,15 @@ def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, A
         errors["media_dirs"] = problems
     else:
         validated["media_dirs"] = paths
+    server_errors, server_values = _validate_server(body, config)
+    errors.update(server_errors)
+    validated.update(server_values)
+    return errors, validated
+
+
+def _validate_server(body, config):
+    """端口、监听范围和局域网名称按运行方式校验。"""
+    errors, validated = {}, {}
     try:
         port = onboarding.validate_port(str(body.get("port", config.server.port)))
         if distribution.standalone():

@@ -65,6 +65,16 @@ def q_library_processing(contract, _args):
     return public_state(state)
 
 
+def _request_skip(control, previous, body):
+    asset_id = body.get('asset_id')
+    if (isinstance(asset_id, bool) or not isinstance(asset_id, int)
+            or previous.get('status') != 'running'
+            or previous.get('current_asset_id') != asset_id
+            or previous.get('current_action') not in ('querying_metadata', 'fetching_cover')):
+        raise ValueError('当前影片已变化或不在采集外部资料，请刷新后重试')
+    control.skip_current(str(body['job_id']), asset_id)
+
+
 def _control_action(contract, config, body):
     action = body['action']
     if action not in ('pause', 'resume', 'set_speed', 'skip_current'):
@@ -82,13 +92,7 @@ def _control_action(contract, config, body):
     if job_id:
         control.select_job(str(job_id))
     if action == 'skip_current':
-        asset_id = body.get('asset_id')
-        if (isinstance(asset_id, bool) or not isinstance(asset_id, int)
-                or previous.get('status') != 'running'
-                or previous.get('current_asset_id') != asset_id
-                or previous.get('current_action') not in ('querying_metadata', 'fetching_cover')):
-            raise ValueError('当前影片已变化或不在采集外部资料，请刷新后重试')
-        control.skip_current(str(job_id), asset_id)
+        _request_skip(control, previous, body)
         return q_library_processing(contract, {})
     if action == 'set_speed':
         mode = valid_mode(body.get('speed_mode'))

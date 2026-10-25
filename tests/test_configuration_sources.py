@@ -16,12 +16,12 @@ class ConfigurationIsolationTests(unittest.TestCase):
     def test_phone_access_addresses_use_runtime_protocol_scope_and_ipv6(self):
         from peach.routes_configuration import network_payload
         runtime = SimpleNamespace(host='0.0.0.0', port=8900, tls_enabled=True,
-                                  mdns_enabled=True, mdns_port=443, mdns_name='peach-win', mdns_address='192.168.1.8')
+                                  mdns_enabled=True, mdns_port=443, mdns_name='peach-writer', mdns_address='192.0.2.8')
         request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(settings=runtime)),
-                                  base_url='https://peach-win.local/')
+                                  base_url='https://peach-writer.local/')
         with patch('peach.distribution.standalone', return_value=False):
             result = network_payload(request, self.config)
-            self.assertEqual(result['lan_url'], 'https://peach-win.local/')
+            self.assertEqual(result['lan_url'], 'https://peach-writer.local/')
             self.assertEqual(result['ip_url'], '')
             self.assertEqual(result['scope'], 'lan')
             self.assertFalse(result['editable'])
@@ -88,6 +88,7 @@ class ConfigurationIsolationTests(unittest.TestCase):
                 stack.enter_context(patch.object(routes, "local_only"))
                 stack.enter_context(patch.object(routes.settings_file, "load_config", return_value=self.config))
                 stack.enter_context(patch.object(routes, "snapshot", return_value={"media_dirs": [], "port": 8900}))
+                stack.enter_context(patch.object(routes, "network_payload", return_value={"scope": "local"}))
                 stack.enter_context(patch.object(routes, "tunnel_payload", return_value={"state": "idle"}))
                 for key, module, name in (("push_discovery", routes, "push_discovery_payload"),
                                           ("downloads", routes.web_downloads, "settings_payload")):
