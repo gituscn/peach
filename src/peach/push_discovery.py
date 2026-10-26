@@ -35,6 +35,7 @@ import logging
 import os
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -823,24 +824,39 @@ class _LocalEventHandler:
     def __init__(self, service: PushDiscoveryService):
         self.service = service
         self.roots: list[tuple[str, PureWindowsPath, Path]] = []
+        self.started_at = time.time_ns()
 
     def register(self, location: str, declared_root: str, directory: Path) -> None:
         self.roots.append((location, PureWindowsPath(declared_root), directory))
 
     def dispatch(self, event) -> None:
-        if getattr(event, 'event_type', '') == 'moved':
-            old = self._mapped(getattr(event, 'src_path', ''))
-            new = self._mapped(getattr(event, 'dest_path', ''))
-            if old and new and old[0] == new[0]:
-                self.service.submit_move(old[0], old[1], new[1], directory=getattr(event, 'is_directory', False))
-                return
-        if getattr(event, "is_directory", False):
+        if not self._current_event(event) or self._move_event(event) or getattr(event, "is_directory", False):
             return
         for attribute in ("dest_path", "src_path"):
             raw = getattr(event, attribute, "")
             if raw and getattr(event, "event_type", "") in _LOCAL_EVENTS:
                 self._offer(raw)
                 return
+
+    def _current_event(self, event) -> bool:
+        # FSEvents 会补送启动前的事件；只检查事件命中的文件，不为此遍历整个来源。
+        if sys.platform != 'darwin':
+            return True
+        raw = getattr(event, 'dest_path', '') or getattr(event, 'src_path', '')
+        try:
+            return bool(raw) and Path(os.fsdecode(raw)).stat().st_ctime_ns >= self.started_at
+        except OSError:
+            return False
+
+    def _move_event(self, event) -> bool:
+        if getattr(event, 'event_type', '') != 'moved':
+            return False
+        old = self._mapped(getattr(event, 'src_path', ''))
+        new = self._mapped(getattr(event, 'dest_path', ''))
+        if old and new and old[0] == new[0]:
+            self.service.submit_move(old[0], old[1], new[1], directory=getattr(event, 'is_directory', False))
+            return True
+        return False
 
     def _offer(self, raw: str) -> None:
         mapped = self._mapped(raw)

@@ -695,7 +695,7 @@ class ProcessingControlTests(unittest.TestCase):
         def scan(*_args, **kwargs):
             kwargs['progress'](1, 10)
             kwargs['progress'](2, 30)
-            return SimpleNamespace(files=2, total_bytes=30, new_ids=[], junk_isolated=1)
+            return SimpleNamespace(files=2, total_bytes=30, new_ids=(), junk_isolated=1)
         with patch('peach.library_processing.scan_location', side_effect=scan), \
                 patch('peach.library_processing._online_source_root', return_value=self.root), \
                 patch('peach.library_processing._ffprobe_path', return_value=None), \

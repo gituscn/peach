@@ -89,7 +89,8 @@ it('启动等待期间不重复提交，结束后刷新馆藏并给出封面与�
   await click(primary);
   expect(posts).toHaveLength(1);
   await response.release({ status: 'running', job_id: 'complete-one' });
-  expect(host.textContent).toBe('');
+  expect(host.textContent).toContain('当前任务结束后可单独补全');
+  expect(primary.getAttribute('aria-disabled')).toBe('true');
   await click(more);
   expect(more.getAttribute('aria-expanded')).toBe('false');
   await act(async () => queryClient.setQueryData(LIBRARY_PROCESSING_KEY,

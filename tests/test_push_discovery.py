@@ -616,6 +616,29 @@ class CloudChannelTests(_ServiceCase):
 
 
 class LocalChannelTests(_ServiceCase):
+    def test_historic_macos_events_do_not_enter_the_queue(self):
+        service = mock.Mock()
+        with mock.patch.object(push.time, 'time_ns', return_value=100):
+            handler = push._LocalEventHandler(service)
+        handler.register('local', self.declared['local'][0], self.media)
+        event = SimpleNamespace(event_type='created', src_path=str(self.media/'old.mp4'), is_directory=False)
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=99)):
+            handler.dispatch(event)
+        service.submit.assert_not_called()
+        event.src_path = str(self.media/'new.mp4')
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=100)):
+            handler.dispatch(event)
+        service.submit.assert_called_once_with('local', self.ledger('local', 'new.mp4'))
+        service.submit.reset_mock()
+        event.event_type, event.dest_path = 'moved', str(self.media/'renamed.mp4')
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=101)):
+            handler.dispatch(event)
+        service.submit_move.assert_called_once_with('local', self.ledger('local', 'new.mp4'),
+                                                   self.ledger('local', 'renamed.mp4'), directory=False)
+
     def test_default_native_watcher_is_idle_until_new_files_arrive(self):
         (self.media/'existing.mp4').write_bytes(b'old')
         service = self.service()
