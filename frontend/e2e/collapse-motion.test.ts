@@ -72,7 +72,9 @@ describe('折叠正文与箭头共用动画', () => {
       });
       try {
         await opened.page.locator('#toasts [data-processing-dock]').waitFor();
-        await settle(opened.page);
+        // 此任务由夹具保持运行，补全入口的忙态不会在本用例中结束。
+        const taskButtons = '[data-library-completion] [data-split-button] > button[aria-busy="true"]';
+        await settle(opened.page, 'body', { except: taskButtons });
         await motion(opened.page, opened.page.locator('#toasts [data-processing-dock] button[aria-controls]'));
         await opened.page.evaluate(() => {
           localStorage.setItem('peach.post-setup-tutorial.v1', 'pending');
@@ -81,7 +83,7 @@ describe('折叠正文与箭头共用动画', () => {
         });
         await opened.page.reload({ waitUntil: 'load' });
         await opened.page.locator('#postSetupTutorial .post-setup-notification').waitFor();
-        await settle(opened.page);
+        await settle(opened.page, 'body', { except: taskButtons });
         await motion(opened.page, opened.page.locator('[data-tutorial-collapse]'));
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }

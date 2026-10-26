@@ -796,7 +796,7 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media
   body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card]:not([data-variant="next"]) [data-media-byline] {
     flex-wrap: wrap;
     height: auto;
-    min-height: 2.7em;
+    min-height: calc(2.7em + 2px);
     row-gap: 2px;
   }
 }
