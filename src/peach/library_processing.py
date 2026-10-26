@@ -14,6 +14,7 @@ from contextlib import closing
 from contextvars import copy_context
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path, PureWindowsPath
 from urllib.parse import urlparse
 
@@ -1879,10 +1880,11 @@ class _SourceScan:
     probed: int = 0
     scanned_bytes: int = 0
     junk_isolated: int = 0
+    new_ids: tuple[int, ...] = ()
 
 
 def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update, issue,
-                  scan_checkpoints=None, save_checkpoint=lambda: None, initial_probed=0):
+                  scan_checkpoints=None, save_checkpoint=lambda: None, initial_probed=0, incremental=False):
     """发现本趟可访问的来源根，按阶段登记文件并探测新视频。"""
     result = _SourceScan([], probed=initial_probed)
     def count_junk(checked):
@@ -1909,9 +1911,10 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                     save_checkpoint()
                 registered = scan_location(db_path, source, root, declared_roots=config.locations,
                                            mounts=mounts, report=lambda line: None,
-                                           read_directory=directory_entries,
+                                           read_directory=partial(directory_entries, file_identity=source == 'local'),
                                            onerror=lambda error: issue(None, str(error), action='scanning_files'),
                                            resume_state=scan_checkpoints.get(key), save_checkpoint=remember,
+                                           new_only=incremental,
                                            progress=lambda files, size: update(
                                                stage='扫描文件', scanned=result.scanned + files,
                                                scanned_bytes=result.scanned_bytes + size,
@@ -1919,10 +1922,11 @@ def _scan_sources(config, db_path, *, locations, asset_ids, stage, guard, update
                 result.scanned += registered.files
                 result.scanned_bytes += registered.total_bytes
                 result.junk_isolated += registered.junk_isolated
+                result.new_ids += registered.new_ids
                 if stage == SCAN_STAGE:
                     result.probed += probe_unmeasured(
                         db_path, ffprobe, source, root, config=config,
-                        on_junk=count_junk,
+                        on_junk=count_junk, asset_ids=list(registered.new_ids) if incremental else None,
                         report=lambda done, total: update(stage='读取时长与分辨率',
                             checked=result.probed + done, total=result.probed + total, probed=result.probed + done))
                 reattach_in(db_path, registered.new_ids)
@@ -2401,6 +2405,17 @@ def _read_local_metadata(config, db_path, row, cover_root, listing, state, updat
     return code, nfo is not None, payload, entries
 
 
+def _settle_collection_state(state, summary, rows, update):
+    summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
+    summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
+    update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
+           outcome='partial' if state['issue_count'] else 'complete',
+           checked=len(rows), total=len(rows), **summary,
+           error=issue_summary(state['issue_count'], state['paused_count']),
+           completed_at=time.time(), current_asset_id=None, current_asset_name='',
+           current_action='', current_started_at=None, current_deadline_at=None)
+
+
 def _processing_steps(stage, asset_ids, *, metadata_only_enabled):
     """按本趟真实处理范围构造有序阶段清单。"""
     scanning = asset_ids is None and stage in (ALL_STAGES, SCAN_STAGE)
@@ -2535,11 +2550,26 @@ class _ProcessingIssues:
         self.report(dict(self.state))
 
 
+def _initial_processing_scope(db_path, selected_ids, retry_ids, incremental, resume_state):
+    """区分待发现范围与首次预估范围；增量恢复沿用已冻结的影片集合。"""
+    if incremental:
+        from .library_new_assets import pending
+        previous = (resume_state or {}).get('incremental_ids')
+        return None, list(previous) if previous is not None else pending(db_path)
+    if selected_ids is not None:
+        return selected_ids, selected_ids
+    if retry_ids is not None:
+        chosen = list(dict.fromkeys(map(int, retry_ids)))
+        return chosen, chosen
+    return None, None
+
+
 def process_library(config, db_path, candidate_root, cover_root, *, location='configured',
                     report=lambda state: None, provider_factory=None, job_id=None,
                     retry_ids=None, active=lambda: True, stage=ALL_STAGES,
                     database=None, route_overrides=None, state_file=None, asset_ids=None,
-                    resume_state=None, speed_mode=None, protected_ids=(), recheck_existing=False):
+                    resume_state=None, speed_mode=None, protected_ids=(), recheck_existing=False,
+                    incremental=False):
     """登记文件与确定的番号，外部资料保留为可复核候选。
 
     `retry_ids` 为 `None` 时处理整个馆藏；给定时只处理这些项目（上一任务记录的
@@ -2564,13 +2594,11 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
     path = Path(state_file) if state_file is not None else state_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
     retrying = retry_ids is not None
-    targeted = retrying or selected_ids is not None
-    chosen_ids = selected_ids if selected_ids is not None else list(dict.fromkeys(map(int, retry_ids or [])))
-    scope_ids = chosen_ids if targeted else None
+    scope_ids, initial_ids = _initial_processing_scope(db_path, selected_ids, retry_ids, incremental, resume_state)
     control = task_control(config, state_file)
     identity = job_id or uuid.uuid4().hex
     from .processing_inventory import recent_rows
-    traffic = ProcessingTraffic(config, db_path, stage, scope_ids,
+    traffic = ProcessingTraffic(config, db_path, stage, initial_ids,
                                 resume_state=resume_state, inventory_rows=recent_rows(config, db_path, stage, scope_ids))
     def control_report(**values):
         resume_fields(state, values)
@@ -2587,7 +2615,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         state = dict(job_id=identity, status='running',
                      stage='检查配套文件' if retrying else '扫描文件',
                      checked=0, total=0, scanned=0, scanned_bytes=0, probed=0, identified=0, candidates=0, covers=0, previews=0,
-                     requested_stage=stage, asset_ids=scope_ids,
+                     requested_stage=stage, asset_ids=scope_ids, incremental=incremental,
                      issue_count=0, paused_count=0, issue_preview=[], issues_truncated=False,
                      notes={}, retryable_asset_ids=[],
                      last_progress_at=time.time(), progress_seq=0,
@@ -2596,7 +2624,10 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                      followups=[],
                      junk_isolated=0, junk_review=0,
                      started_at=time.time(), error='')
-        state.update(initial_estimate(config, db_path, stage, scope_ids, speed_mode))
+        state.update(initial_estimate(config, db_path, stage, initial_ids, speed_mode))
+        if incremental:
+            state['incremental_ids'] = initial_ids
+            traffic.unknown_files = True
         state['steps'] = _processing_steps(stage, scope_ids,
             metadata_only_enabled=metadata_only(config.directory('state')))
         _restore_processing_counts(state, resume_state)
@@ -2654,12 +2685,21 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             sources = _scan_sources(config, db_path, locations=locations, asset_ids=scope_ids,
                                     stage=stage, guard=guard, update=update, issue=issue,
                                     scan_checkpoints=state['scan_checkpoints'],
-                                    save_checkpoint=lambda: flush_state(force=True), initial_probed=state['probed'])
+                                    save_checkpoint=lambda: flush_state(force=True), initial_probed=state['probed'],
+                                    incremental=incremental)
+            if incremental:
+                from .library_new_assets import _active_videos
+                scope_ids = _active_videos(db_path, sorted(set(initial_ids) | set(sources.new_ids)))
+                state['asset_ids'] = state['incremental_ids'] = scope_ids
+                traffic.asset_ids = scope_ids
             state.update(scanned=sources.scanned, scanned_bytes=sources.scanned_bytes, probed=sources.probed)
             state['junk_isolated'] = max(state['junk_isolated'], sources.junk_isolated)
             traffic.unknown_files = False
             traffic.refresh_plan()
             finish_step('sources')
+            if incremental and not scope_ids:
+                _settle_collection_state(state, {}, [], update)
+                return state
             _prepare_processing_media(config, db_path, judgement_database, locations, sources,
                                       scope_ids, protected_ids, stage, state, update)
             finish_step('inspect')
@@ -2815,16 +2855,8 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
                 config, database, candidate_root, cover_root, groups, remote, asset_ids=scope_ids,
                 active=active, update=update, issue=issue, watermark=entity_watermark, covered=covered,
                 people=_people_allowed(config))
-            summary['auto_applied'] = summary.get('auto_applied', 0) + state['auto_applied']
-            summary['auto_rejected'] = summary.get('auto_rejected', 0) + state['auto_rejected']
             finish_step('collect')
-            update(status='failed' if state['issue_count'] else 'complete', stage='处理结束',
-                   outcome='partial' if state['issue_count'] else 'complete',
-                   checked=len(rows), total=len(rows),
-                   **summary,
-                   error=issue_summary(state['issue_count'], state['paused_count']),
-                   completed_at=time.time(), current_asset_id=None, current_asset_name='',
-                   current_action='', current_started_at=None, current_deadline_at=None)
+            _settle_collection_state(state, summary, rows, update)
         except Exception:
             state.update(status='failed', outcome='interrupted', error='处理被中断。核对媒体目录后重试。', completed_at=time.time())
             state.update(interrupted_state(control))
@@ -2836,5 +2868,6 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
             flush_candidates(force=True)
             remote.close()
         from .library_new_assets import remember
-        remember(db_path, completed=[row['id'] for row in rows])
+        unfinished = set(state['retryable_asset_ids'])
+        remember(db_path, completed=[row['id'] for row in rows if row['id'] not in unfinished])
         return state

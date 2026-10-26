@@ -75,7 +75,7 @@ class InventoryTests(unittest.TestCase):
                                    ('mounted', 'A:\\Cloud\\' + name, name, 'video'))
         before = self.db.read_bytes()
         registered = preview(self.config, self.db, 'all', None)
-        self.assertEqual(registered['workload']['video_files'], 1)
+        self.assertEqual(registered['workload']['video_files'], 2)
         self.assertEqual(self.db.read_bytes(), before)
 
     def test_extra_directories_have_no_discovered_or_registered_workload(self):
@@ -117,15 +117,25 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(result['workload']['jav_titles'], 1)
         self.assertNotIn(token, _SESSIONS)
 
-    def test_existing_root_and_selected_assets_do_not_list_directories(self):
+    def test_selected_assets_and_collection_do_not_list_directories(self):
         with closing(sqlite3.connect(self.db)) as connection, connection:
             connection.execute("INSERT INTO asset(location,path,name,medium,size) VALUES(?,?,?,?,?)",
                                ('mounted', 'A:\\Cloud\\ABW-001.mp4', 'ABW-001.mp4', 'video', 1024))
-        for stage, asset_ids in (('all', None), ('all', [1]), ('collect', None)):
+        for stage, asset_ids in (('all', [1]), ('collect', None)):
             result = preview(self.config, self.db, stage, asset_ids)
             self.assertTrue(result['inventory']['complete'])
             self.assertEqual(result['workload']['video_files'], 1)
         self.walk.assert_not_called()
+
+    def test_full_library_inventory_discovers_new_files_beside_registered_files(self):
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO asset(location,path,name,medium,size) VALUES(?,?,?,?,?)",
+                               ('mounted', 'A:\\Cloud\\ABW-001.mp4', 'ABW-001.mp4', 'video', 1024))
+        (self.media/'ABW-001.mp4').touch()
+        (self.media/'ABW-002.mp4').touch()
+        result = preview(self.config,self.db,'all',None)
+        self.assertTrue(result['inventory']['complete'])
+        self.assertEqual(result['workload']['video_files'],2)
 
     def test_unreadable_directory_reports_incomplete_counts(self):
         with patch('peach.scan.os.scandir', side_effect=PermissionError('拒绝访问')):
@@ -137,6 +147,16 @@ class InventoryTests(unittest.TestCase):
     def test_invalid_continuation_is_rejected(self):
         with self.assertRaisesRegex(ValueError, '预检已结束'):
             preview(self.config, self.db, 'scan', None, 'invalid')
+
+    def test_incremental_preview_finds_additions_in_a_root_with_completed_assets(self):
+        for name in ('old.mp4','new.mp4'):
+            (self.media/name).touch()
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            connection.execute("INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)",
+                               ('mounted','A:\\Cloud\\old.mp4','old.mp4','video'))
+        result = preview(self.config,self.db,'all',None,incremental=True)
+        self.assertEqual(result['workload']['video_files'],1)
+        self.assertTrue(result['inventory']['complete'])
 
     def test_started_task_uses_recent_inventory_and_registered_rows_take_precedence(self):
         (self.media / 'ABW-001.mp4').touch()

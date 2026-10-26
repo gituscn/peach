@@ -71,7 +71,7 @@ export function skeletonHtml(label='正在读取内容',{className='',variant='p
 /** 索引页的占位：名册网格、字母表或标签云，尺寸取最终那一副。首屏和页内换档共用这一份。 */
 export function indexSkeletonHtml({kind,layout='big',mode='alphabet'}:{kind?:string;layout?:string;mode?:string}={}):string{
   if(kind==='tags')return tagSkeletonHtml({ mode });
-  const company=kind==='studios'||kind==='agencies';
+  const company=kind==='studios'||kind==='agencies'||kind==='series';
   const cell='<span class="icell"><span class="ring skeleton"></span><span class="nm skeleton">&nbsp;</span><span class="n skeleton">&nbsp;</span></span>';
   const body=`<div class="igrid" data-cells="${company?'company':'people'}" data-layout="${esc(layout)}">${cell.repeat(12)}</div>`;
   const label='正在读取索引';

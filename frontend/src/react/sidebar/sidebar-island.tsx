@@ -184,7 +184,7 @@ function countsOf(latest: SidebarFacets | null): Map<string, number> | null {
   if (!latest) return null;
   const counts = new Map<string, number>();
   const rows: [string, SidebarChip[]][] = [['loc', latest.locations], ['orient', latest.orientations],
-    ['region', latest.regions], ['creator', latest.creators], ['tag', latest.tags], ['tag', latest.tech]];
+    ['region', latest.regions], ['year', latest.years || []], ['creator', latest.creators], ['tag', latest.tags], ['tag', latest.tech]];
   for (const [key, chips] of rows) for (const chip of chips) counts.set(`${key}\n${chip.value}`, chip.n ?? 0);
   return counts;
 }
@@ -238,6 +238,7 @@ function catalogGroups(
       : null,
     /* 产地紧挨着来源：两者回答的都是「这批片打哪来」，一个说存储，一个说发行体系。可多选。 */
     spec('产地', 'general', facets.regions, 'region', true),
+    spec('发行年份', 'meta', facets.years || [], 'year', true),
     spec('画幅', 'meta', facets.orientations, 'orient', false),
     spec('创作者', 'artist', facets.creators, 'creator', false, 'creator'),
     spec('内容标签', 'general', facets.tags, 'tag', false, 'tag'),

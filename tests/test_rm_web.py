@@ -25,6 +25,43 @@ from support.ledger import fresh_ledger
 
 
 class WebDataTests(unittest.TestCase):
+    def test_release_year_filter_and_facets_share_scope_and_keep_other_year_options(self):
+        with self.contract.write_transaction() as connection:
+            connection.execute("UPDATE asset SET release_date='2024-03-05' WHERE id=1")
+            connection.execute("UPDATE asset SET release_date='2023' WHERE id=2")
+        self.assertEqual([r['id'] for r in q_items(self.contract, {'year':'2024'})['items']], [1])
+        self.assertEqual(q_items(self.contract, {'loc':'115', 'year':'2024'})['total'], 0)
+        self.assertEqual(q_items(self.contract, {'year':'2024,2023'})['total'], 2)
+        facets = rm_web.q_facets(self.contract, filters={'year':'2024'})
+        self.assertEqual([(r['k'], r['n']) for r in facets['years']], [('2024',1),('2023',1)])
+        local = rm_web.q_facets(self.contract, filters={'loc':'local', 'year':'2024'})
+        self.assertEqual([(r['k'], r['n']) for r in local['years']], [('2024',1)])
+        for malformed in ('2024x', '24', '2024,', '2024 OR 1=1'):
+            with self.subTest(year=malformed), self.assertRaises(ValueError):
+                q_items(self.contract, {'year':malformed})
+
+    def test_release_year_unknown_is_distinct_from_malformed_dates_and_insertion_date(self):
+        for date in (None, '', '0000', '20240-01-01', 'unknown'):
+            with self.contract.write_transaction() as connection:
+                connection.execute('UPDATE asset SET release_date=? WHERE id=1', (date,))
+            self.assertIn(1, [r['id'] for r in q_items(self.contract, {'year':'none'})['items']])
+            self.assertEqual(q_items(self.contract, {'year':'2026'})['total'], 0)
+
+    def test_series_index_search_and_pagination_preserve_canonical_identity(self):
+        self.assertEqual(rm_web.q_index(self.contract, 'series')['items'], [])
+        with self.contract.write_transaction() as connection:
+            for eid, name in ((201,'系列一'), (202,'系列二')):
+                connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                                   "VALUES(?,'series',?,?,'2026-01-01','2026-01-01')", (eid,name,name))
+                connection.execute("INSERT INTO asset_entity(asset_id,entity_id,role,source,confidence) "
+                                   "VALUES(1,?,'series','test',1.0)", (eid,))
+        first = rm_web.q_index(self.contract, 'series', limit=1)
+        second = rm_web.q_index(self.contract, 'series', limit=1, offset=1)
+        self.assertTrue(first['has_more'])
+        self.assertEqual([first['items'][0]['entity_id'], second['items'][0]['entity_id']], [201,202])
+        found = rm_web.q_index(self.contract, 'series', q='二')['items']
+        self.assertEqual([(r['entity_id'],r['entity_kind'],r['n']) for r in found], [(202,'series',1)])
+
     def test_registered_directory_extras_are_excluded_and_personal_records_remain_accessible(self):
         self.contract.database.media_roots = (r'R:\Media',)
         with self.contract.write_transaction() as connection:

@@ -153,7 +153,7 @@ describe('设计决定：配置控件', () => {
       try {
         const page = opened.page;
         await page.emulateMedia({ reducedMotion: 'no-preference' });
-        const tabs = page.getByRole('tablist', { name: '公司类型' });
+        const tabs = page.getByRole('tablist', { name: '资料类型' });
         const surface = tabs.locator(':scope > span[aria-hidden="true"]');
         await surface.waitFor();
         const original = await surface.elementHandle();

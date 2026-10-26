@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { RiCompassLine, RiPauseLine, RiPlayLine, RiDeleteBinLine } from '@remixicon/react';
+import { RiPauseLine, RiPlayLine, RiDeleteBinLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { Input } from '@/components/base/input/input';
 import { confirmModal } from '@peach/legacy/ui';
 import { errorMessage } from '../../api';
 import { cardClass } from '../components/card';
+import { BrowserIcon } from '../components/browser-icon';
 import { Note } from '../components/note';
 import { queryClient } from '../query';
 import { busyProps } from '../settings/use-action';
@@ -51,7 +52,7 @@ export function BrowserSources({ browsers, sources, range, children }:
         const bookmarks = records.reduce((total, source) => total + (source.bookmarks || 0), 0);
         return <div key={browser.id} data-taste-source="browser" className={SOURCE_TILE}>
         <span className="inline-grid size-8 shrink-0 place-items-center rounded-lg text-text-secondary">
-          <RiCompassLine aria-hidden className="size-4" />
+          <BrowserIcon name={browser.name} />
         </span>
         <div className="flex min-w-0 grow flex-col gap-0.5">
           <b className="text-body-2-medium break-words text-text-primary">{browser.name}</b>

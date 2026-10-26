@@ -2583,6 +2583,18 @@ class LibraryWatchdogTests(unittest.TestCase):
         provider.cover.return_value = False
         return provider
 
+    @windows_ledger_roots
+    def test_empty_incremental_sync_completes_without_metadata_queries(self):
+        media = self.root/'media'
+        media.mkdir()
+        db = fresh_ledger(self.root)
+        provider = self._provider()
+        result = process_library(self._config(media),db,self.root/'generated',self.root/'covers',
+                                 incremental=True,provider_factory=lambda:provider)
+        self.assertEqual(result['status'],'complete')
+        self.assertEqual(result['asset_ids'],[])
+        provider.query.assert_not_called()
+
     def test_state_save_waits_for_a_reader_holding_the_file(self):
         # 进度条轮询读状态时，Windows 上替换被占着的目标会报 WinError 5，任务随之中断。
         config = self._config(self.root / 'media')
@@ -3038,6 +3050,12 @@ class LibraryWatchdogTests(unittest.TestCase):
             self.assertEqual(initial['stage'], '准备采集资料')
             w_library_processing(contract, {})
             self.assertEqual(run.call_args.kwargs['stage'], 'all')
+            w_library_processing(contract, {'incremental':True})
+            self.assertTrue(run.call_args.kwargs['incremental'])
+            with self.assertRaisesRegex(ValueError, '开关值'):
+                w_library_processing(contract, {'incremental':'true'})
+            with self.assertRaisesRegex(ValueError, '只支持扫描或同步'):
+                w_library_processing(contract, {'stage':'metadata','incremental':True})
             with self.assertRaises(ValueError):
                 w_library_processing(contract, {'stage': 'thumbnails'})
 

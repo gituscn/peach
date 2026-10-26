@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import re
 import time
 from collections.abc import Callable
 
@@ -226,6 +227,22 @@ def _canonical_tag_names(contract, names):
         return list(dict.fromkeys(canonical))
 
 
+RELEASE_YEAR_SQL = ("CASE WHEN substr(trim(a.release_date),1,4) GLOB '[0-9][0-9][0-9][0-9]' "
+                    "AND substr(trim(a.release_date),1,4) BETWEEN '1000' AND '9999' "
+                    "AND (length(trim(a.release_date))=4 OR substr(trim(a.release_date),5,1)='-') "
+                    "THEN substr(trim(a.release_date),1,4) ELSE '' END")
+
+
+def release_year_filter(value, *, trash=False):
+    if not value or trash:
+        return [], []
+    years = sorted(set(str(value).split(',')))
+    if any(year != 'none' and (not re.fullmatch(r'[1-9][0-9]{3}', year)) for year in years):
+        raise ValueError('发行年份须为四位年份或未知年份')
+    return [RELEASE_YEAR_SQL + ' IN (' + ','.join('?' for _ in years) + ')'], [
+        '' if year == 'none' else year for year in years]
+
+
 def catalog_filter(contract: WebContract, args):
     """视频列表与侧栏使用同一组筛选条件。"""
     trash = args.get("state") == "trash"
@@ -289,6 +306,9 @@ def catalog_filter(contract: WebContract, args):
     region_where, region_par = region_filter(args.get("region"), trash)
     where += region_where
     par += region_par
+    year_where, year_par = release_year_filter(args.get('year'), trash=trash)
+    where += year_where
+    par += year_par
     if not trash and args.get("jav") == "1":
         # 只有番号形态还不够：JI-103 这类 creator clip 没有任何发行证据。
         where.append(JAV_ASSET_PREDICATE)
@@ -1339,6 +1359,17 @@ FACETS_TABLES = GROUP_TABLES + ("entity_alias", "asset_tag_preference", "asset_p
                                 "watch_queue", "follow_item", "follow_source")
 
 
+def _release_year_facets(contract, connection, scope, values, state, filters, asset_id):
+    """年份选项遵循其它筛选，但不被已选年份收窄。"""
+    if filters is not None and asset_id is None:
+        conditions, parameters = catalog_filter(contract, {**filters, 'state':state, 'year':''})
+        scope += 'AND ' + ' AND '.join(conditions) + ' '
+        values = [*values, *parameters]
+    return [dict(k=row['k'] or 'none', label=row['k'] or '未知年份', n=row['n'])
+            for row in connection.execute('SELECT '+RELEASE_YEAR_SQL+' AS k,count(*) AS n FROM asset a '
+                "WHERE a.medium='video' "+scope+' GROUP BY k ORDER BY k DESC', values)]
+
+
 def q_facets(
     contract: WebContract,
     jav: bool = False,
@@ -1378,6 +1409,7 @@ def q_facets(
             "SUM(CASE WHEN a.play_count>0 THEN 1 ELSE 0 END) AS played "
             "FROM asset a WHERE a.medium='video' " + scope +
             "GROUP BY a.location ORDER BY n DESC", scope_params)]
+        out['years'] = _release_year_facets(contract, c, scope, scope_params, state, filters, asset_id)
         if filters is not None and asset_id is None:
             conditions, parameters = catalog_filter(contract, {**filters, "state": state})
             scope += "AND " + " AND ".join(conditions) + " "

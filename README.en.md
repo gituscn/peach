@@ -94,6 +94,8 @@ Try search, filters and profiles in the [live demo](https://demo.peach.video). I
   </tr>
 </table>
 
+Daily sync discovers new files and completes pending videos; full-library maintenance has a separate menu. Browse series alongside studios and agencies, and filter the catalog by release year. Narrow cards retain release dates on a separate line.
+
 ## Download and use
 
 ### Windows

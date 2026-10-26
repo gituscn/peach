@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "a7147330-d8be-4d3c-9eba-f2ec16ddbc2a", e._sentryDebugIdIdentifier = "sentry-dbid-a7147330-d8be-4d3c-9eba-f2ec16ddbc2a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "5f2cf884-17b6-405a-a00f-f83748aece16", e._sentryDebugIdIdentifier = "sentry-dbid-5f2cf884-17b6-405a-a00f-f83748aece16");
 	} catch {}
 })();
 import { ActivePoints as e, ActivityHeat as t, AnimatedItems as n, BAR_DOMAIN as r, CHART_CARD as i, CHART_COLORS as a, CartesianLabelListContextProvider as o, CategoryTick as s, ChartBackground as c, ChartContainer as l, ChartHead as u, ChartLegend as d, ChartLegendContent as f, ChartTip as p, ChartTooltip as m, ChartTooltipContent as h, DefaultZIndexes as g, Dots as _, EvilBarChart as v, ExpandableRanking as y, LabelListFromLabelProp as ee, Layer as b, LoadingIndicator as x, PolarAngleAxis as S, PolarChart as C, PolarLabelContextProvider as te, PolarLabelFromLabelProp as w, Polygon as T, RegisterGraphicalItemId as ne, SetPolarGraphicalItem as re, SetPolarLegendPayload as ie, SetTooltipEntrySettings as ae, Text as E, ZIndexLayer as oe, adaptEventsOfChild as se, addRadiusAxis as ce, arrayTooltipSearcher as le, barLabel as ue, categoryAxisWidth as de, cn as fe, createSelector as D, defaultPolarChartProps as pe, defaultPolarRadiusAxisProps as me, fitLabel as he, getAxisTypeBasedOnLayout as ge, getBandSizeOfAxis as _e, getClassNameFromUnknown as ve, getColorsCount as ye, getTooltipNameProp as be, getValueByDataKey as xe, identity as Se, interpolate as Ce, isArrayLike as we, isCategoricalAxis as Te, isNullish as Ee, iteratee as De, matchAnimationItems as Oe, matchByIndex as ke, noop as Ae, polarToCartesian as O, removeRadiusAxis as je, resolveDefaultProps as Me, selectAngleAxis as Ne, selectChartDataAndAlwaysIgnoreIndexes as Pe, selectChartLayout as Fe, selectPolarAxisScale as Ie, selectPolarAxisTicks as k, selectPolarViewBox as Le, selectRadiusAxis as Re, selectUnfilteredPolarItems as ze, svgPropertiesAndEvents as Be, svgPropertiesNoEvents as A, svgPropertiesNoEventsFromUnknown as Ve, tone as He, useAnimationCallbacks as Ue, useAnimationStartSnapshot as We, useAppDispatch as Ge, useAppSelector as j, useIsPanorama as Ke, usePolarChartLayout as qe } from "./peach-app.expandable-ranking-BmXZyQ5x.js";
@@ -1429,9 +1429,838 @@ function ji({ flows: e }) {
 		]
 	});
 }
+var Mi = {
+	version: 1,
+	note: "浏览器品牌标识仅用于识别相应数据源；商标归各自所有者。",
+	icons: [
+		{
+			id: "chrome",
+			aliases: [
+				"chrome",
+				"Google Chrome",
+				"谷歌浏览器"
+			],
+			file: "chrome.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/chrome/chrome_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "eccdfe9d867373e2da66eedfcaaab40cbcdf6a221b83d6ee1400895a3e4c8046",
+			bytes: 3166
+		},
+		{
+			id: "chrome-beta",
+			aliases: ["chrome-beta", "chrome beta"],
+			file: "chrome-beta.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/chrome-beta/chrome-beta_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "34d7c73511f666e282e6ffca64315b53c287402de0e594976574a20e9031434f",
+			bytes: 3731
+		},
+		{
+			id: "chrome-dev",
+			aliases: ["chrome-dev", "chrome dev"],
+			file: "chrome-dev.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/chrome-dev/chrome-dev_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "3cc498eae83afeefb6f3ab5d24f4edead0ce6597e3afb91e4dcdaff923bb5a0a",
+			bytes: 3706
+		},
+		{
+			id: "chrome-canary",
+			aliases: ["chrome-canary", "chrome canary"],
+			file: "chrome-canary.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/chrome-canary/chrome-canary_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "590d38919b0c3df5dffeb1d4cbe9a24b211920932bcc367778f4962270e0997c",
+			bytes: 1858
+		},
+		{
+			id: "chromium",
+			aliases: ["chromium", "Chromium浏览器"],
+			file: "chromium.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/chromium/chromium_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "9fc23dba1ec6765aee3e6c200ee1b77a7e4ac56a25dd5a89027d3b01f3389d21",
+			bytes: 2035
+		},
+		{
+			id: "edge",
+			aliases: [
+				"edge",
+				"Microsoft Edge",
+				"微软Edge"
+			],
+			file: "edge.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/edge/edge_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "a189a6054451f74073ba27c9e0ff35f46402263a2f883a74b9f6a89bb42b7975",
+			bytes: 3574
+		},
+		{
+			id: "edge-beta",
+			aliases: ["edge-beta", "edge beta"],
+			file: "edge-beta.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/edge-beta/edge-beta_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "074d4b135e89f1621d55a48831196b5c95b27084e15ffeee7bd3ef869a06e394",
+			bytes: 3820
+		},
+		{
+			id: "edge-dev",
+			aliases: ["edge-dev", "edge dev"],
+			file: "edge-dev.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/edge-dev/edge-dev_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "70df54bb62d68ae61f042b54bced912ba87f334675b625963fa82bba172e2501",
+			bytes: 3671
+		},
+		{
+			id: "edge-canary",
+			aliases: ["edge-canary", "edge canary"],
+			file: "edge-canary.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/edge-canary/edge-canary_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "b0ec80dc2b855f7dc6b4ecee8735c3a397d5803a7a4801011c545d765e5ac705",
+			bytes: 3728
+		},
+		{
+			id: "firefox",
+			aliases: [
+				"firefox",
+				"Mozilla Firefox",
+				"火狐浏览器"
+			],
+			file: "firefox.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/firefox/firefox_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "98c4837a6cdce28d66cd51ea1e13cf130a5ac7bd097579a6714ad8345c16d3c9",
+			bytes: 3943
+		},
+		{
+			id: "firefox-beta",
+			aliases: ["firefox-beta", "firefox beta"],
+			file: "firefox-beta.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/firefox-beta/firefox-beta_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "2f25600de1c538cdf5965541c1f4960ef0a0da76fc0030b5a36af8288b9dac94",
+			bytes: 4365
+		},
+		{
+			id: "firefox-developer-edition",
+			aliases: [
+				"firefox-developer-edition",
+				"firefox developer edition",
+				"Firefox Developer Edition",
+				"Firefox Dev"
+			],
+			file: "firefox-developer-edition.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/firefox-developer-edition/firefox-developer-edition_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "482ee0acf9deccbaf0253801f0a2ded2798b33166e3696fc1ae97f15788a335c",
+			bytes: 4463
+		},
+		{
+			id: "firefox-nightly",
+			aliases: ["firefox-nightly", "firefox nightly"],
+			file: "firefox-nightly.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/firefox-nightly/firefox-nightly_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "4082cba90a03962cd7be1ef6a8e7b3915d8b8e5411f919fbeb4d4f62684aa4cb",
+			bytes: 4124
+		},
+		{
+			id: "brave",
+			aliases: ["brave"],
+			file: "brave.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/brave/brave_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "fc67ee59d32612dc08eac9461fae8840441e888cceae7c07465ebdbfa58c5d63",
+			bytes: 2416
+		},
+		{
+			id: "brave-beta",
+			aliases: ["brave-beta", "brave beta"],
+			file: "brave-beta.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/brave-beta/brave-beta_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "fb029b4501f68c803429385b496bee9c3ce16710f8f12f9bae9f7db74bce2e1a",
+			bytes: 3085
+		},
+		{
+			id: "brave-dev",
+			aliases: ["brave-dev", "brave dev"],
+			file: "brave-dev.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/brave-dev/brave-dev_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "1797ab7fc86b1952851082f1dbeb7ff6816525d2654cdc0e455f7dd6d109a0da",
+			bytes: 3837
+		},
+		{
+			id: "brave-nightly",
+			aliases: ["brave-nightly", "brave nightly"],
+			file: "brave-nightly.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/brave-nightly/brave-nightly_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "e2f0e7506642d7491521f10250d0ede60c2a1e89ea7fdb6f8a2a366189643de4",
+			bytes: 3929
+		},
+		{
+			id: "vivaldi",
+			aliases: ["vivaldi"],
+			file: "vivaldi.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/vivaldi/vivaldi_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "2cef8b72a605bfd4b3a665e88773ff6e915972db1e874fd3373f34d8e43c03d1",
+			bytes: 2657
+		},
+		{
+			id: "vivaldi-snapshot",
+			aliases: ["vivaldi-snapshot", "vivaldi snapshot"],
+			file: "vivaldi-snapshot.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/vivaldi-snapshot/vivaldi-snapshot_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "d7adcb47765e5982d50565a4db328c6656d19503252f49855ae891dc655df22e",
+			bytes: 2286
+		},
+		{
+			id: "opera",
+			aliases: ["opera"],
+			file: "opera.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera/opera_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "907f47f584ca0f83446680a2ce1b4dc4dc81ac2e2bec0090e5b4ac98ccade4d4",
+			bytes: 2152
+		},
+		{
+			id: "opera-beta",
+			aliases: ["opera-beta", "opera beta"],
+			file: "opera-beta.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera-beta/opera-beta_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "1a5164ba569241ac87ceb2878190a261d52a63e4218ee16290f6adde7fe1380e",
+			bytes: 4225
+		},
+		{
+			id: "opera-developer",
+			aliases: ["opera-developer", "opera developer"],
+			file: "opera-developer.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera-developer/opera-developer_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "b5f0fbb90b11daa64b1642beddb00ae73120f46184f6a31e83584a6d2c91efc2",
+			bytes: 3854
+		},
+		{
+			id: "opera-gx",
+			aliases: ["opera-gx", "opera gx"],
+			file: "opera-gx.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera-gx/opera-gx_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "d92a6e2dbecfdbc0e4986d6eabce5f7c75804699fe8a7b64fe0c0167617a7d0e",
+			bytes: 1504
+		},
+		{
+			id: "opera-neon",
+			aliases: ["opera-neon", "opera neon"],
+			file: "opera-neon.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera-neon/opera-neon_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "12d0a029aa3f3b5e70805bb2c39304efdb1db75e59e9ba89f05f880dc0b6aa1a",
+			bytes: 3385
+		},
+		{
+			id: "opera-mini",
+			aliases: ["opera-mini", "opera mini"],
+			file: "opera-mini.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/opera-mini/opera-mini_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "2509f1615ead4c8ddb25dfcc6024ba2e2b98f4da2a012a4039882597903646f9",
+			bytes: 3009
+		},
+		{
+			id: "safari",
+			aliases: ["safari", "Apple Safari"],
+			file: "safari.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/safari/safari_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "5a4608283c36615ebcfb0762f64cfe5706b03bfdcedc5810fe10ee883ca4fff0",
+			bytes: 4497
+		},
+		{
+			id: "safari-technology-preview",
+			aliases: ["safari-technology-preview", "safari technology preview"],
+			file: "safari-technology-preview.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/safari-technology-preview/safari-technology-preview_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "29a6403e566b4b53f125bcdb7381d86eb14558e84d7ff4eb9f74e559fd4d8c72",
+			bytes: 4404
+		},
+		{
+			id: "samsung-internet",
+			aliases: [
+				"samsung-internet",
+				"samsung internet",
+				"Samsung Internet Browser"
+			],
+			file: "samsung-internet.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/samsung-internet/samsung-internet_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "239c8d26b38cba9fa9468555a93637b29de64d2f0f2769ddd007d78c564288b0",
+			bytes: 1814
+		},
+		{
+			id: "tor",
+			aliases: ["tor"],
+			file: "tor.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/tor/tor_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "54bae0a77f813c2c9bf7594b52e98931630a450a5ea42dced26e0df3f432fe01",
+			bytes: 3685
+		},
+		{
+			id: "tor-alpha",
+			aliases: ["tor-alpha", "tor alpha"],
+			file: "tor-alpha.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/tor-alpha/tor-alpha_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "9b8b2dfae28ac7fcb452e25225ce337b954ab9c8dc7939364ed1219c9c42864a",
+			bytes: 3643
+		},
+		{
+			id: "yandex",
+			aliases: ["yandex"],
+			file: "yandex.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/yandex/yandex_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "803d73b46b135e783ef9984a35ffcb0b43f31cfe8d6be4a1371598ebdc549f89",
+			bytes: 3139
+		},
+		{
+			id: "uc",
+			aliases: ["uc", "UC浏览器"],
+			file: "uc.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/uc/uc_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "7bfd919258b12a5900a8d19eabe1a16a0f7f50eaebe872fb7f13f6929cdf4c1e",
+			bytes: 2853
+		},
+		{
+			id: "dolphin",
+			aliases: ["dolphin"],
+			file: "dolphin.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/dolphin/dolphin_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "2c796d4a3ac4303edc73e33c3a36d709fbaa644b701d98ca1460aa6679c19aa9",
+			bytes: 2018
+		},
+		{
+			id: "maxthon",
+			aliases: [
+				"maxthon",
+				"傲游",
+				"傲游浏览器"
+			],
+			file: "maxthon.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/maxthon/maxthon_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "f807f58b4a0550a5470a713a4737054c5d5ecebe61687c77e77b2bfab1c544c5",
+			bytes: 1375
+		},
+		{
+			id: "midori",
+			aliases: ["midori"],
+			file: "midori.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/midori/midori_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "b3149a3d9dcbe8158078f8c47a39e839c2609f2dbce574e6175d4ef7f381f0d4",
+			bytes: 4288
+		},
+		{
+			id: "falkon",
+			aliases: ["falkon"],
+			file: "falkon.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/falkon/falkon_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "93992beb736d43622ddc085b41955aea13a735c011928c56076b5ed5c74d694c",
+			bytes: 4285
+		},
+		{
+			id: "pale-moon",
+			aliases: ["pale-moon", "pale moon"],
+			file: "pale-moon.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/pale-moon/pale-moon_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "6ffacc33960787e0411897a33524bb03c78df9204cf7dbfc5f063f4b5e73d5e1",
+			bytes: 4771
+		},
+		{
+			id: "seamonkey",
+			aliases: ["seamonkey"],
+			file: "seamonkey.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/seamonkey/seamonkey_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "37dd8ccb6700d83b030614329253af2ac68c44084c887a2d5ca10ea91aa066a5",
+			bytes: 4525
+		},
+		{
+			id: "web",
+			aliases: [
+				"web",
+				"Epiphany",
+				"GNOME Web"
+			],
+			file: "web.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/web/web_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "3f149719ecd35cefa8dae87a699550fbfa44b4d2d3b4b4c90ade545c3b9754a8",
+			bytes: 2678
+		},
+		{
+			id: "qutebrowser",
+			aliases: ["qutebrowser"],
+			file: "qutebrowser.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/qutebrowser/qutebrowser_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "8134a7f55a2ca191361ba3ecc5219e3d707a945c7e91e38da310ee12ffeee3eb",
+			bytes: 3818
+		},
+		{
+			id: "epic",
+			aliases: ["epic"],
+			file: "epic.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/epic/epic_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "53dfd851e21ab4f0727891cb2e330503cc250c05216d825be016e84e98ea4dd4",
+			bytes: 5534
+		},
+		{
+			id: "icecat",
+			aliases: ["icecat"],
+			file: "icecat.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/icecat/icecat_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "828718a56d67123abe3526fd42835ffbbb05769791922c2a0564dae92762ecc9",
+			bytes: 5700
+		},
+		{
+			id: "basilisk",
+			aliases: ["basilisk"],
+			file: "basilisk.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/basilisk/basilisk_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "9a0b3f467fe972e7a3e805fcc4b719eccfb1bb1d29d9a9f3afec7cc9dc2349f3",
+			bytes: 2331
+		},
+		{
+			id: "avant",
+			aliases: ["avant"],
+			file: "avant.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/avant/avant_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "a4c66ad8bc25ce59f71713f7c93629cd17b989d886cb8beacf178730631b01a5",
+			bytes: 4586
+		},
+		{
+			id: "otter",
+			aliases: ["otter"],
+			file: "otter.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/otter/otter_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "8fea2736a78b36e8c9eabfd5c47e7b46f28209aa9f1e2a199a54cfeeac290812",
+			bytes: 5220
+		},
+		{
+			id: "netsurf",
+			aliases: ["netsurf"],
+			file: "netsurf.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/netsurf/netsurf_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "d57d4ff6fb7052d5228932da17955232ecc5051908cf6580d73c6db3d2b248bd",
+			bytes: 4003
+		},
+		{
+			id: "puffin",
+			aliases: ["puffin"],
+			file: "puffin.png",
+			content_type: "image/png",
+			source_url: "https://raw.githubusercontent.com/alrra/browser-logos/58881b84c4d73adc03c06fa2c275a7abee02d935/src/puffin/puffin_48x48.png",
+			source_page: "https://github.com/alrra/browser-logos",
+			revision: "58881b84c4d73adc03c06fa2c275a7abee02d935",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "e182c2f54a37e0e1ff6a9469f1cb65bb8299f9b5eaca162c29b7cb9f6cc79768",
+			bytes: 3697
+		},
+		{
+			id: "aside",
+			aliases: ["aside", "Aside Browser"],
+			file: "aside.png",
+			content_type: "image/png",
+			source_url: "https://aside.com/icon.png?icon.0lfc1q-r_ms2e.png",
+			source_page: "https://aside.com/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "949971a69f8643358bd52875a02a53e60136a88790487c83e42a24cb39f0adea",
+			bytes: 27423
+		},
+		{
+			id: "zen",
+			aliases: ["zen", "Zen Browser"],
+			file: "zen.svg",
+			content_type: "image/svg+xml",
+			source_url: "https://zen-browser.app/favicon.svg",
+			source_page: "https://zen-browser.app/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "090a9ce0283dc66359be584bd1db9227faf4f15fc666f261759852e2519c7c68",
+			bytes: 531
+		},
+		{
+			id: "qq",
+			aliases: [
+				"qq",
+				"QQBrowser",
+				"QQ浏览器"
+			],
+			file: "qq.ico",
+			content_type: "image/x-icon",
+			source_url: "https://browser.qq.com/favicon.ico",
+			source_page: "https://browser.qq.com/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "0c4cfdc5683b15f0b3b1019db71edfa975cadccbd61ce2f340acbdc4b114dbed",
+			bytes: 2047
+		},
+		{
+			id: "360se",
+			aliases: ["360se", "360安全浏览器"],
+			file: "360se.png",
+			content_type: "image/png",
+			source_url: "https://p4.ssl.qhimg.com/t110b9a93016f838be146a5b14d.png",
+			source_page: "https://browser.360.cn/se/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "3363c9c2dd239ab6ac3a59501bf609cc2a94664ab5a1b8f0f0a2bec21aaab34a",
+			bytes: 2219
+		},
+		{
+			id: "360chrome",
+			aliases: ["360chrome", "360极速浏览器"],
+			file: "360chrome.ico",
+			content_type: "image/x-icon",
+			source_url: "https://browser.360.cn/ee/favicon.ico",
+			source_page: "https://browser.360.cn/ee/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "eb11e02318a389cf4b9e06a8ca66694d2d544fbe8bfd28555e2189727675bd8e",
+			bytes: 5430
+		},
+		{
+			id: "sogou",
+			aliases: [
+				"sogou",
+				"搜狗",
+				"搜狗浏览器",
+				"Sogou Explorer"
+			],
+			file: "sogou.ico",
+			content_type: "image/x-icon",
+			source_url: "https://sogou.browser.qq.com/favicon.ico",
+			source_page: "https://ie.sogou.com/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "d9b78205c61561e23594886cc7bd24a5842a36602384f059efe670455c40c74f",
+			bytes: 5430
+		},
+		{
+			id: "arc",
+			aliases: ["arc"],
+			file: "arc.png",
+			content_type: "image/png",
+			source_url: "https://arc.net/favicon.png",
+			source_page: "https://arc.net/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "2e6881ee4ea7b22e3bdd97f2432b7ce5bb3e3d5bbbdb5457a4a4f8b69a43e7bd",
+			bytes: 1586
+		},
+		{
+			id: "librewolf",
+			aliases: ["librewolf"],
+			file: "librewolf.svg",
+			content_type: "image/svg+xml",
+			source_url: "https://librewolf.net/icon.svg",
+			source_page: "https://librewolf.net/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "b85d68f1b5b47b9b2c3a3e6b5f5a0f887577e0eb6ee8387fb7b81f5f8e4017c4",
+			bytes: 5916
+		},
+		{
+			id: "floorp",
+			aliases: ["floorp"],
+			file: "floorp.svg",
+			content_type: "image/svg+xml",
+			source_url: "https://floorp.app/icon.svg?51b46abeef3fc9d9",
+			source_page: "https://floorp.app/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "15cf85f15cd722524008cb621763eb8560561048df210cf3a6180732c254f49b",
+			bytes: 2199
+		},
+		{
+			id: "waterfox",
+			aliases: ["waterfox"],
+			file: "waterfox.svg",
+			content_type: "image/svg+xml",
+			source_url: "https://www.waterfox.com/favicons/favicon.svg",
+			source_page: "https://www.waterfox.net/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "05294e9a22b85b32fa632657ac3c2258f56d37f30931ababc494fe8a4b86ea7a",
+			bytes: 9266
+		},
+		{
+			id: "duckduckgo",
+			aliases: ["duckduckgo"],
+			file: "duckduckgo.png",
+			content_type: "image/png",
+			source_url: "https://duckduckgo.com/static-assets/favicons/DDG-iOS-icon_152x152.png",
+			source_page: "https://duckduckgo.com/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "f6e52a35e8854ebf14c9b8442302f6f7d5d0063f0215b7210edf4676d7fd7369",
+			bytes: 3576
+		},
+		{
+			id: "115",
+			aliases: [
+				"115",
+				"115浏览器",
+				"115 Browser"
+			],
+			file: "115.ico",
+			content_type: "image/x-icon",
+			source_url: "https://115.com/",
+			source_page: "https://115.com/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "fba0c364bb745bef18683be03f08b086cb5e46498b8c1dbd32ecdee6624303fe",
+			bytes: 63051,
+			extraction: {
+				method: "PE resource extraction",
+				executable: "115chrome.exe",
+				executable_sha256: "31d3c29ffade6eb30504173b299d396a42758b2093c442b2adebe83f03750ae9",
+				resource_group: "IDR_MAINFRAME"
+			}
+		},
+		{
+			id: "360chromex",
+			aliases: [
+				"360chromex",
+				"360极速X",
+				"360极速浏览器X"
+			],
+			file: "360chrome.ico",
+			content_type: "image/x-icon",
+			source_url: "https://browser.360.cn/ee/favicon.ico",
+			source_page: "https://browser.360.cn/ee/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "eb11e02318a389cf4b9e06a8ca66694d2d544fbe8bfd28555e2189727675bd8e",
+			bytes: 5430
+		},
+		{
+			id: "quark",
+			aliases: [
+				"quark",
+				"夸克",
+				"夸克浏览器"
+			],
+			file: "quark.png",
+			content_type: "image/png",
+			source_url: "https://gw.alicdn.com/imgextra/i3/O1CN018r2tKf28YP7ev0fPF_!!6000000007944-2-tps-48-48.png",
+			source_page: "https://www.quark.cn/",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "824e079d7d987305f2a0d15de5b1dfe0dc8cb7131afe1dbdaf1ea3ae3dd2d740",
+			bytes: 1210
+		},
+		{
+			id: "2345",
+			aliases: [
+				"2345",
+				"2345浏览器",
+				"2345加速浏览器"
+			],
+			file: "2345.png",
+			content_type: "image/png",
+			source_url: "https://img.onlinedown.net/download/202306/190435-649ac2436780c.png",
+			source_page: "https://www.onlinedown.net/soft/111609.htm",
+			revision: "",
+			license: "Logo and trademark belong to the browser owner",
+			sha256: "4c7a1b786d1208c89e00027c46544debe27a6f684b859cfd116b4e796703d38e",
+			bytes: 29648
+		}
+	]
+}, Ni = (e) => e.normalize("NFKC").toLowerCase().replace(/[\s_-]/g, ""), Pi = new Map(Mi.icons.flatMap((e) => e.aliases.map((t) => [Ni(t), e.id])));
+function Fi(e) {
+	return Pi.get(Ni(e));
+}
+function Ii({ name: e }) {
+	let [t, n] = (0, H.useState)(""), r = Fi(e);
+	return r && t !== r ? /* @__PURE__ */ (0, Y.jsx)("img", {
+		src: `/browser-icon/${r}`,
+		width: 24,
+		height: 24,
+		alt: "",
+		"aria-hidden": !0,
+		loading: "lazy",
+		className: "size-6 shrink-0 object-contain",
+		onError: () => n(r)
+	}) : /* @__PURE__ */ (0, Y.jsx)(et, {
+		"aria-hidden": !0,
+		className: "size-5 shrink-0 text-foreground-icon-secondary"
+	});
+}
 // src/react/taste/browser-sources.tsx
-var Mi = "flex min-w-0 items-center gap-3 rounded-xl bg-background-primary-default p-3";
-function Ni({ browsers: e, sources: t, range: n, children: r }) {
+var Li = "flex min-w-0 items-center gap-3 rounded-xl bg-background-primary-default p-3";
+function Ri({ browsers: e, sources: t, range: n, children: r }) {
 	let [i, a] = (0, H.useState)(!1), [o, s] = (0, H.useState)(""), [c, l] = (0, H.useState)(""), u = V({
 		mutationFn: (e) => At(e, n),
 		onSuccess: (e) => {
@@ -1510,14 +2339,11 @@ function Ni({ browsers: e, sources: t, range: n, children: r }) {
 					let n = t.filter((t) => e.source_keys?.includes(t.source_key)), r = n.reduce((e, t) => e + (t.visits || 0), 0), i = n.reduce((e, t) => e + (t.bookmarks || 0), 0);
 					return /* @__PURE__ */ (0, Y.jsxs)("div", {
 						"data-taste-source": "browser",
-						className: Mi,
+						className: Li,
 						children: [
 							/* @__PURE__ */ (0, Y.jsx)("span", {
 								className: "inline-grid size-8 shrink-0 place-items-center rounded-lg text-text-secondary",
-								children: /* @__PURE__ */ (0, Y.jsx)(et, {
-									"aria-hidden": !0,
-									className: "size-4"
-								})
+								children: /* @__PURE__ */ (0, Y.jsx)(Ii, { name: e.name })
 							}),
 							/* @__PURE__ */ (0, Y.jsxs)("div", {
 								className: "flex min-w-0 grow flex-col gap-0.5",
@@ -1597,13 +2423,13 @@ function Ni({ browsers: e, sources: t, range: n, children: r }) {
 	});
 }
 // src/react/taste/taste-page.tsx
-var Pi = 10, Fi = Mt(ct, lt, "text-body-2-medium"), Q = `${F()} flex flex-col gap-4`, Ii = "rounded-xl bg-background-primary-default p-3", Li = "读取运行 Peach 的这台电脑上的浏览历史与书签", Ri = "导入或读取浏览记录后，这里会列出记录来自哪些设备。", zi = "馆藏中暂时没有与你浏览过的内容相符的标签。", Bi = "读取浏览记录后，这里会按类别汇总你浏览过的内容。", Vi = "这些标签出现在浏览记录中，Peach 的观看或评价记录中尚未出现这些标签", Hi = "采集浏览记录后，这里会列出浏览过的标签。", Ui = "采集浏览记录后，这里会列出浏览过的创作者。", Wi = "采集浏览记录后，这里会列出常访问的网站。", Gi = "在 Peach 里播放或评价作品后，这里会列出对应的标签。", Ki = "在 Peach 里播放或评价作品后，这里会列出对应的创作者。", qi = "在 Peach 里播放或评价作品后，这里会列出对应的女优。", Ji = "在运行 Peach 的电脑上使用浏览器：点上面的「读取浏览器记录」。", Yi = "记录在其他设备上：导出文件后，选择「导入历史文件」或「导入书签文件」。书签支持浏览器导出的 HTML 文件和 Chromium Bookmarks JSON 文件。", Xi = "需要刷新时再次读取或导入；数据源可在页面底部移除。", Zi = "删除这个来源的已导入记录，原始文件保留。若浏览器仍启用，下次读取会再次导入。", Qi = "peach-taste-guide-dismissed", $i = (0, H.createContext)(/* @__PURE__ */ (0, Y.jsx)(Qe, {
+var zi = 10, Bi = Mt(ct, lt, "text-body-2-medium"), Q = `${F()} flex flex-col gap-4`, Vi = "rounded-xl bg-background-primary-default p-3", Hi = "读取运行 Peach 的这台电脑上的浏览历史与书签", Ui = "导入或读取浏览记录后，这里会列出记录来自哪些设备。", Wi = "馆藏中暂时没有与你浏览过的内容相符的标签。", Gi = "读取浏览记录后，这里会按类别汇总你浏览过的内容。", Ki = "这些标签出现在浏览记录中，Peach 的观看或评价记录中尚未出现这些标签", qi = "采集浏览记录后，这里会列出浏览过的标签。", Ji = "采集浏览记录后，这里会列出浏览过的创作者。", Yi = "采集浏览记录后，这里会列出常访问的网站。", Xi = "在 Peach 里播放或评价作品后，这里会列出对应的标签。", Zi = "在 Peach 里播放或评价作品后，这里会列出对应的创作者。", Qi = "在 Peach 里播放或评价作品后，这里会列出对应的女优。", $i = "在运行 Peach 的电脑上使用浏览器：点上面的「读取浏览器记录」。", ea = "记录在其他设备上：导出文件后，选择「导入历史文件」或「导入书签文件」。书签支持浏览器导出的 HTML 文件和 Chromium Bookmarks JSON 文件。", ta = "需要刷新时再次读取或导入；数据源可在页面底部移除。", na = "删除这个来源的已导入记录，原始文件保留。若浏览器仍启用，下次读取会再次导入。", ra = "peach-taste-guide-dismissed", ia = (0, H.createContext)(/* @__PURE__ */ (0, Y.jsx)(Qe, {
 	size: "small",
 	href: "/",
 	children: "浏览馆藏"
 }));
-function ea() {
-	return (0, H.useContext)($i);
+function aa() {
+	return (0, H.useContext)(ia);
 }
 function $({ icon: e, term: t, figure: n, detail: r, detailTitle: i, accent: a }) {
 	return /* @__PURE__ */ (0, Y.jsx)("div", {
@@ -1621,7 +2447,7 @@ function $({ icon: e, term: t, figure: n, detail: r, detailTitle: i, accent: a }
 		})
 	});
 }
-function ta({ name: e, domain: t }) {
+function oa({ name: e, domain: t }) {
 	return /* @__PURE__ */ (0, Y.jsxs)("span", {
 		className: "relative inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-lg bg-background-tertiary-default text-caption-1-medium text-text-secondary",
 		children: [It(e).toUpperCase(), /* @__PURE__ */ (0, Y.jsx)("img", {
@@ -1635,23 +2461,23 @@ function ta({ name: e, domain: t }) {
 		})]
 	});
 }
-function na({ html: e }) {
+function sa({ html: e }) {
 	return /* @__PURE__ */ (0, Y.jsx)("span", {
 		className: `relative inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-background-tertiary-default text-caption-1-medium text-text-secondary ${mn}`,
 		dangerouslySetInnerHTML: { __html: e }
 	});
 }
-function ra({ rows: e, kind: t, visual: n, empty: r, onSignal: i }) {
+function ca({ rows: e, kind: t, visual: n, empty: r, onSignal: i }) {
 	if (!e.length) return /* @__PURE__ */ (0, Y.jsx)(tt, {
 		size: "compact",
 		icon: R,
 		title: "记录还不够",
-		actions: /* @__PURE__ */ (0, Y.jsx)(ea, {}),
+		actions: /* @__PURE__ */ (0, Y.jsx)(aa, {}),
 		children: r
 	});
 	let a = Jt(e);
 	return /* @__PURE__ */ (0, Y.jsx)(y, {
-		previewCount: Pi,
+		previewCount: zi,
 		className: "inline-grid w-full gap-x-7 gap-y-2 sm:grid-cols-2",
 		children: e.map((e, r) => {
 			let o = !!t && !!e.peach_items, s = String(e.source_domain || ""), c = /* @__PURE__ */ (0, Y.jsxs)(Y.Fragment, { children: [
@@ -1670,15 +2496,15 @@ function ra({ rows: e, kind: t, visual: n, empty: r, onSignal: i }) {
 					className: "w-6 shrink-0 text-caption-1-regular tabular-nums text-text-secondary",
 					children: r + 1
 				}),
-				n === "domain" ? /* @__PURE__ */ (0, Y.jsx)(ta, {
+				n === "domain" ? /* @__PURE__ */ (0, Y.jsx)(oa, {
 					name: e.name,
 					domain: e.name
 				}) : null,
-				n === "creator" && !e.entity_id && !e.has_avatar && s ? /* @__PURE__ */ (0, Y.jsx)(ta, {
+				n === "creator" && !e.entity_id && !e.has_avatar && s ? /* @__PURE__ */ (0, Y.jsx)(oa, {
 					name: e.name,
 					domain: s
 				}) : null,
-				n !== "none" && n !== "domain" && (e.entity_id || e.has_avatar || !s) ? /* @__PURE__ */ (0, Y.jsx)(na, { html: Ot(e.name, e.entity_id ? {
+				n !== "none" && n !== "domain" && (e.entity_id || e.has_avatar || !s) ? /* @__PURE__ */ (0, Y.jsx)(sa, { html: Ot(e.name, e.entity_id ? {
 					id: e.entity_id,
 					has_image: !!e.has_image,
 					image_version: e.image_version,
@@ -1715,7 +2541,7 @@ function ra({ rows: e, kind: t, visual: n, empty: r, onSignal: i }) {
 		})
 	});
 }
-function ia({ label: e, panels: t, onSignal: n }) {
+function la({ label: e, panels: t, onSignal: n }) {
 	return /* @__PURE__ */ (0, Y.jsxs)(Ze, {
 		className: `${F({ padding: "none" })} flex flex-col`,
 		children: [/* @__PURE__ */ (0, Y.jsx)("div", {
@@ -1732,14 +2558,14 @@ function ia({ label: e, panels: t, onSignal: n }) {
 		}), t.map((e) => /* @__PURE__ */ (0, Y.jsx)(Ye, {
 			id: e.id,
 			className: "px-4 pt-3.5 pb-4",
-			children: /* @__PURE__ */ (0, Y.jsx)(ra, {
+			children: /* @__PURE__ */ (0, Y.jsx)(ca, {
 				...e.props,
 				onSignal: n
 			})
 		}, e.id))]
 	});
 }
-function aa({ data: e, onSignal: t, navigate: n }) {
+function ua({ data: e, onSignal: t, navigate: n }) {
 	let r = e.analysis;
 	if (!r?.headline) return null;
 	let i = r.confidence || {}, a = [...(r.explore || []).map((e) => ({
@@ -1783,7 +2609,7 @@ function aa({ data: e, onSignal: t, navigate: n }) {
 			r.points?.length ? /* @__PURE__ */ (0, Y.jsx)("div", {
 				className: "inline-grid w-full gap-3 sm:grid-cols-2",
 				children: r.points.map((e) => /* @__PURE__ */ (0, Y.jsxs)("div", {
-					className: `flex min-w-0 flex-col gap-1 ${Ii}`,
+					className: `flex min-w-0 flex-col gap-1 ${Vi}`,
 					children: [/* @__PURE__ */ (0, Y.jsx)("span", {
 						className: "text-caption-1-regular text-text-secondary",
 						children: e.label
@@ -1798,7 +2624,7 @@ function aa({ data: e, onSignal: t, navigate: n }) {
 				children: a.map((e) => /* @__PURE__ */ (0, Y.jsxs)("button", {
 					type: "button",
 					onClick: e.act,
-					className: `flex w-full min-w-0 cursor-pointer items-center gap-3 ${Ii} text-left outline-none hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
+					className: `flex w-full min-w-0 cursor-pointer items-center gap-3 ${Vi} text-left outline-none hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring`,
 					children: [/* @__PURE__ */ (0, Y.jsxs)("span", {
 						className: "flex min-w-0 grow flex-col gap-1",
 						children: [/* @__PURE__ */ (0, Y.jsx)("b", {
@@ -1822,15 +2648,15 @@ function aa({ data: e, onSignal: t, navigate: n }) {
 					href: "/",
 					children: "浏览馆藏"
 				}),
-				children: zi
+				children: Wi
 			})
 		]
 	});
 }
-function oa({ onboarding: e, done: t }) {
+function da({ onboarding: e, done: t }) {
 	let [n, r] = (0, H.useState)(() => {
 		try {
-			return localStorage.getItem(Qi) === "1";
+			return localStorage.getItem(ra) === "1";
 		} catch {
 			return !1;
 		}
@@ -1846,11 +2672,11 @@ function oa({ onboarding: e, done: t }) {
 			children: [
 				/* @__PURE__ */ (0, Y.jsx)("p", {
 					className: "text-body-2-regular text-text-secondary",
-					children: Ji
+					children: $i
 				}),
 				/* @__PURE__ */ (0, Y.jsx)("p", {
 					className: "text-body-2-regular text-text-secondary",
-					children: Yi
+					children: ea
 				}),
 				/* @__PURE__ */ (0, Y.jsxs)("ul", {
 					className: "flex list-disc flex-col gap-1 pl-5 text-body-2-regular text-text-secondary",
@@ -1886,7 +2712,7 @@ function oa({ onboarding: e, done: t }) {
 				}),
 				/* @__PURE__ */ (0, Y.jsx)("p", {
 					className: "text-body-2-regular text-text-secondary",
-					children: Xi
+					children: ta
 				}),
 				/* @__PURE__ */ (0, Y.jsx)("span", {
 					className: "self-start",
@@ -1895,7 +2721,7 @@ function oa({ onboarding: e, done: t }) {
 						size: "small",
 						onClick: () => {
 							try {
-								localStorage.setItem(Qi, "1");
+								localStorage.setItem(ra, "1");
 							} catch {}
 							r(!0);
 						},
@@ -1906,7 +2732,7 @@ function oa({ onboarding: e, done: t }) {
 		})
 	});
 }
-function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
+function fa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 	let i = (0, H.useRef)(null), [a, o] = (0, H.useState)(!1), s = (e) => {
 		o(!1), e();
 	};
@@ -1916,7 +2742,7 @@ function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 		"data-variant": "primary",
 		children: [/* @__PURE__ */ (0, Y.jsx)(M, {
 			leadingIcon: et,
-			title: Li,
+			title: Hi,
 			onClick: t,
 			...P(e),
 			children: "读取浏览器记录"
@@ -1945,7 +2771,7 @@ function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 			children: [
 				/* @__PURE__ */ (0, Y.jsxs)("button", {
 					type: "button",
-					className: Fi,
+					className: Bi,
 					onClick: () => s(t),
 					children: [/* @__PURE__ */ (0, Y.jsx)(et, {
 						"aria-hidden": !0,
@@ -1954,7 +2780,7 @@ function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 				}),
 				/* @__PURE__ */ (0, Y.jsxs)("button", {
 					type: "button",
-					className: Fi,
+					className: Bi,
 					onClick: () => s(n),
 					children: [/* @__PURE__ */ (0, Y.jsx)(mt, {
 						"aria-hidden": !0,
@@ -1963,7 +2789,7 @@ function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 				}),
 				/* @__PURE__ */ (0, Y.jsxs)("button", {
 					type: "button",
-					className: Fi,
+					className: Bi,
 					onClick: () => s(r),
 					children: [/* @__PURE__ */ (0, Y.jsx)(Bt, {
 						"aria-hidden": !0,
@@ -1974,14 +2800,14 @@ function sa({ busy: e, onRefresh: t, onImport: n, onImportBookmarks: r }) {
 		})
 	})] });
 }
-function ca({ sources: e, browsers: t, window: n, toast: r, emptyActions: i }) {
+function pa({ sources: e, browsers: t, window: n, toast: r, emptyActions: i }) {
 	let a = V({
 		mutationFn: (e) => Yt(e, n),
 		onSuccess: (e) => {
 			z.setQueryData(B(n), e.dashboard), r("已移除口味数据源");
 		}
 	});
-	return /* @__PURE__ */ (0, Y.jsxs)(Ni, {
+	return /* @__PURE__ */ (0, Y.jsxs)(Ri, {
 		browsers: t,
 		sources: e,
 		range: n,
@@ -1993,7 +2819,7 @@ function ca({ sources: e, browsers: t, window: n, toast: r, emptyActions: i }) {
 			})
 		}) : null, e.length ? /* @__PURE__ */ (0, Y.jsx)(Y.Fragment, { children: e.filter((e) => !t.some((t) => t.source_keys?.includes(e.source_key))).map((e) => /* @__PURE__ */ (0, Y.jsxs)("div", {
 			"data-taste-source": "import",
-			className: Mi,
+			className: Li,
 			children: [
 				/* @__PURE__ */ (0, Y.jsx)("span", {
 					className: "inline-grid size-8 shrink-0 place-items-center rounded-lg text-text-secondary",
@@ -2026,7 +2852,7 @@ function ca({ sources: e, browsers: t, window: n, toast: r, emptyActions: i }) {
 					onClick: () => {
 						a.isPending || jt({
 							title: "移除口味数据源",
-							body: Zi,
+							body: na,
 							confirmLabel: "移除口味数据源",
 							onConfirm: () => a.mutateAsync(e.source_key)
 						});
@@ -2038,11 +2864,11 @@ function ca({ sources: e, browsers: t, window: n, toast: r, emptyActions: i }) {
 			icon: Tt,
 			title: "还没有数据源",
 			actions: i,
-			children: Ri
+			children: Ui
 		})]
 	});
 }
-function la(e) {
+function ma(e) {
 	let { onSignal: n, navigate: r, toast: i, onboarding: a } = e, [o, s] = (0, H.useState)("all"), [c, l] = (0, H.useState)("browser"), u = (0, H.useRef)(null), d = (0, H.useRef)(null), f = ln({
 		queryKey: B(o),
 		queryFn: ({ signal: e }) => Pt(o, e),
@@ -2091,7 +2917,7 @@ function la(e) {
 			children: "导入历史文件"
 		})]
 	});
-	return /* @__PURE__ */ (0, Y.jsx)(un, { children: /* @__PURE__ */ (0, Y.jsxs)($i, {
+	return /* @__PURE__ */ (0, Y.jsx)(un, { children: /* @__PURE__ */ (0, Y.jsxs)(ia, {
 		value: o === "all" ? c === "peach" ? /* @__PURE__ */ (0, Y.jsx)(Qe, {
 			size: "small",
 			variant: "secondary",
@@ -2137,7 +2963,7 @@ function la(e) {
 										children: t
 									}, e))
 								}),
-								/* @__PURE__ */ (0, Y.jsx)(sa, {
+								/* @__PURE__ */ (0, Y.jsx)(fa, {
 									busy: m || g.isPending || v.isPending,
 									onRefresh: ee,
 									onImport: () => u.current?.click(),
@@ -2163,7 +2989,7 @@ function la(e) {
 							]
 						})]
 					}),
-					/* @__PURE__ */ (0, Y.jsx)(oa, {
+					/* @__PURE__ */ (0, Y.jsx)(da, {
 						onboarding: a,
 						done: !!(x.history_sources || b.updated_at)
 					}),
@@ -2263,8 +3089,8 @@ function la(e) {
 										size: "compact",
 										icon: R,
 										title: "暂无口味维度",
-										actions: /* @__PURE__ */ (0, Y.jsx)(ea, {}),
-										children: Bi
+										actions: /* @__PURE__ */ (0, Y.jsx)(aa, {}),
+										children: Gi
 									})
 								})]
 							}),
@@ -2281,7 +3107,7 @@ function la(e) {
 								empty: "还没有可用于分析的口味网站访问记录。"
 							}),
 							/* @__PURE__ */ (0, Y.jsx)(ji, { flows: b.creator_flows }),
-							/* @__PURE__ */ (0, Y.jsx)(ia, {
+							/* @__PURE__ */ (0, Y.jsx)(la, {
 								label: "浏览器口味维度",
 								onSignal: n,
 								panels: [
@@ -2292,7 +3118,7 @@ function la(e) {
 											rows: C.browser_tags || [],
 											kind: "tag",
 											visual: "none",
-											empty: Hi
+											empty: qi
 										}
 									},
 									{
@@ -2302,7 +3128,7 @@ function la(e) {
 											rows: C.browser_creators || [],
 											kind: "creator",
 											visual: "creator",
-											empty: Ui
+											empty: Ji
 										}
 									},
 									{
@@ -2322,7 +3148,7 @@ function la(e) {
 											rows: C.domains || [],
 											kind: "",
 											visual: "domain",
-											empty: Wi
+											empty: Yi
 										}
 									},
 									{
@@ -2332,7 +3158,7 @@ function la(e) {
 											rows: ne,
 											kind: "",
 											visual: "none",
-											empty: Vi
+											empty: Ki
 										}
 									}
 								]
@@ -2394,18 +3220,18 @@ function la(e) {
 									]
 								}), /* @__PURE__ */ (0, Y.jsxs)("div", {
 									className: "flex min-w-0 grow flex-col",
-									children: [/* @__PURE__ */ (0, Y.jsx)(ua, {
+									children: [/* @__PURE__ */ (0, Y.jsx)(ha, {
 										term: "有标签",
 										value: re,
 										rest: S.untagged || 0
-									}), /* @__PURE__ */ (0, Y.jsx)(ua, {
+									}), /* @__PURE__ */ (0, Y.jsx)(ha, {
 										term: "有身份",
 										value: ie,
 										rest: S.unidentified || 0
 									})]
 								})]
 							}),
-							/* @__PURE__ */ (0, Y.jsx)(ia, {
+							/* @__PURE__ */ (0, Y.jsx)(la, {
 								label: "Peach 口味维度",
 								onSignal: n,
 								panels: [
@@ -2416,7 +3242,7 @@ function la(e) {
 											rows: C.peach_tags || [],
 											kind: "tag",
 											visual: "none",
-											empty: Gi
+											empty: Xi
 										}
 									},
 									{
@@ -2426,7 +3252,7 @@ function la(e) {
 											rows: C.peach_creators || [],
 											kind: "creator",
 											visual: "creator",
-											empty: Ki
+											empty: Zi
 										}
 									},
 									{
@@ -2436,7 +3262,7 @@ function la(e) {
 											rows: C.peach_performers || [],
 											kind: "performer",
 											visual: "entity",
-											empty: qi
+											empty: Qi
 										}
 									}
 								]
@@ -2445,12 +3271,12 @@ function la(e) {
 					})
 				]
 			}),
-			/* @__PURE__ */ (0, Y.jsx)(aa, {
+			/* @__PURE__ */ (0, Y.jsx)(ua, {
 				data: b,
 				onSignal: n,
 				navigate: r
 			}),
-			/* @__PURE__ */ (0, Y.jsx)(ca, {
+			/* @__PURE__ */ (0, Y.jsx)(pa, {
 				sources: b.sources || [],
 				browsers: b.browsers || [],
 				window: o,
@@ -2460,7 +3286,7 @@ function la(e) {
 		]
 	}) });
 }
-function ua({ term: e, value: t, rest: n }) {
+function ha({ term: e, value: t, rest: n }) {
 	let r = Math.max(t + n, 1);
 	return /* @__PURE__ */ (0, Y.jsxs)("div", {
 		className: "flex flex-col gap-1.5 border-b border-separator-border py-3 last:border-b-0",
@@ -2480,6 +3306,6 @@ function ua({ term: e, value: t, rest: n }) {
 		})]
 	});
 }
-export { Qi as TASTE_GUIDE_KEY, la as TastePage };
+export { ra as TASTE_GUIDE_KEY, ma as TastePage };
 
-//# debugId=a7147330-d8be-4d3c-9eba-f2ec16ddbc2a
+//# debugId=5f2cf884-17b6-405a-a00f-f83748aece16

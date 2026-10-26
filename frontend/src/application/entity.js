@@ -187,7 +187,7 @@ export function showEntityMissing(kind){
 export function openEntity(kind,name){openRoutedPage(entityState.application.fresh(kind,name))}
 
 export function installEntity9() {
-entityState.ENTITY_FILTER_KEYS = ['loc','creator','tag','state','dur_min','dur_max','orient','sort','dir'];
+entityState.ENTITY_FILTER_KEYS = ['loc','creator','tag','state','dur_min','dur_max','orient','year','sort','dir'];
 entityState.emptyEntityFilters = emptyEntityFilters;
 entityState.parseEntityFilters = search=>parseEntityFilters(search,{sort:preferencesState.appSettings.defaultSort,dir:preferencesState.appSettings.defaultSortDirection});
 entityState.entityFilterSearch = entityFilterSearch;

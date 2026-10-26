@@ -182,6 +182,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 }
 .peach-react [data-media-card]:not([data-variant="next"]) [data-media-meta] > * { pointer-events: auto; }
 .peach-react [data-media-card]:not([data-follow-item], [data-variant="next"]) [data-media-meta] { height: calc(var(--card-meta-block) + 16px); }
+body:not([data-surface="/trash"]) .peach-react [data-media-card]:not([data-follow-item], [data-variant="next"]) [data-media-meta] { height: auto; }
 .peach-react [data-media-card][data-variant="next"]:not([data-follow-item]) [data-media-meta] {
   --card-meta-tags: calc(var(--fs-xs) * 2.9);
   height: var(--card-meta-block);
@@ -636,8 +637,8 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   flex: none;
   align-items: center;
   min-width: 0;
-  height: 20px;
-  line-height: 20px;
+  min-height: 1.5em;
+  line-height: 1.5;
   overflow: hidden;
   white-space: nowrap;
   gap: 8px;
@@ -666,6 +667,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react button[data-media-who] { cursor: pointer; }
 .peach-react [data-media-who] > span { overflow: hidden; text-overflow: ellipsis; }
 .peach-react :is([data-media-release], [data-media-size]) { display: inline-flex; flex: none; align-items: center; gap: 4px; white-space: nowrap; }
+.peach-react [data-media-facts] { display: inline-flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 .peach-react [data-media-byline] svg { width: var(--icon-inline); height: var(--icon-inline); flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .peach-react span[data-media-who] { cursor: default; }
 .peach-react [data-media-who-more] { flex: none; color: var(--muted); white-space: nowrap; }
@@ -676,6 +678,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
 .peach-react [data-variant="next"] [data-media-who-more] { flex: none; white-space: nowrap; }
 .peach-react [data-variant="next"] [data-media-why] { flex: 1 1 0; }
 .peach-react [data-variant="next"] :is([data-media-size], [data-media-release]) { display: none; }
+.peach-react [data-variant="next"] [data-media-facts] { display: none; }
 .peach-react [data-media-next-reason] {
   display: -webkit-box;
   flex: none;
@@ -696,9 +699,10 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   -webkit-box-orient: vertical;
 }
 .peach-react [data-media-next-reason]:focus-visible { outline: 2px solid var(--tungsten); outline-offset: 2px; }
-/* 日期优先让位给署名和体积，取舍依据是扣除头像后的文字区宽度。 */
+/* 窄卡片把日期与体积移到独立一行，保留署名的截断与完整日期。 */
 @container media-meta (width < 360px) {
-  .peach-react [data-media-release] { display: none; }
+  .peach-react [data-media-card]:not([data-variant="next"]) [data-media-byline] { flex-wrap: wrap; row-gap: 2px; }
+  .peach-react [data-media-card]:not([data-variant="next"]) [data-media-facts] { flex-basis: 100%; }
 }
 @container media-meta (width < 200px) {
   .peach-react [data-media-card]:not([data-variant="next"]) [data-media-who-more] { display: none; }
@@ -745,7 +749,7 @@ body[data-surface="/trash"] .peach-react button[data-media-title] {
   .peach-react [data-media-tags] > :nth-child(n+3) { display: none; }
 }
 
-/* 密集一档固定为标题、身份、标签三行。缺少标签时第三行仍保留，同一网格不会被撑成四行；
+/* 密集一档保留标题、身份和标签；窄卡片的日期另起一行。缺少标签时仍保留标签位置；
  * 普通卡也留出叠层卡的 7px，每行是否出现分卷卡不决定整行高度。回收站的网格列宽是自己定的，
  * 不跟密度走，卡是有边的面，这一套不套给它。 */
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-grid] > :is([data-media-card], [data-mix-card]) { padding-top: 7px; }
@@ -784,6 +788,18 @@ body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] [data-media-tags] { flex-wrap: nowrap; align-items: flex-start; height: 38px; overflow: hidden; }
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-text] > [data-media-tags] { margin-top: -4px; }
 body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card] [data-media-tag]:nth-child(n+2) { display: none; }
+@container media-meta (width < 360px) {
+  body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card]:not([data-variant="next"]) [data-media-text] {
+    grid-template-rows: 1.35em auto 30px;
+    height: auto;
+  }
+  body[data-density="dense"]:not([data-surface="/trash"]) .peach-react [data-media-card]:not([data-variant="next"]) [data-media-byline] {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 2.7em;
+    row-gap: 2px;
+  }
+}
 
 /* ── 回收站里的资源卡 ── */
 body[data-surface="/trash"] .peach-react [data-media-text] { height: var(--card-meta-block); }
@@ -955,7 +971,7 @@ body .peach-react [data-media-grid][data-single-column] [data-media-card] [data-
   display: -webkit-box; min-height: 0; white-space: normal; -webkit-line-clamp: 2;
 }
 body .peach-react [data-media-grid][data-single-column] [data-media-card] [data-media-byline] {
-  height: 20px; line-height: 20px;
+  height: auto; min-height: 20px; line-height: 20px;
 }
 body .peach-react [data-media-grid][data-single-column] [data-media-card] [data-media-tags]:empty { display: none; }
 .peach-react [data-load-more] {

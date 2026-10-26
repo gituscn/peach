@@ -327,7 +327,7 @@ def ingest_path(
     db_path: str | os.PathLike[str], location: str, path: str, *,
     declared_roots: Mapping[str, Sequence[str]],
     mounts: Mapping[str, Sequence[str | Path]] | None = None,
-    windows: bool | None = None,
+    windows: bool | None = None, move_from: str | None = None,
 ) -> IngestResult:
     """按扫描的同一口径登记一个文件。
 
@@ -372,6 +372,19 @@ def ingest_path(
         registered, conflicts = _registered_paths(connection, location, str(ledger_dir))
         if str(ledger_path).casefold() in conflicts:
             raise conflicts[str(ledger_path).casefold()]
+        from .file_identity import FileIdentityIndex
+        from .smb_media import SmbResource
+        identities = FileIdentityIndex(db_path) if location == 'local' and not isinstance(directory, SmbResource) else None
+        if identities is not None:
+            previous = None
+            if move_from:
+                old = PureWindowsPath(move_from)
+                check_scan_target(location, str(old.parent), declared_roots=declared_roots)
+                old_directory = walk_root_for(location, str(old.parent), declared_roots=declared_roots,
+                                              mounts=mounts or {}, windows=windows)
+                previous = (location, move_from, old_directory / old.name)
+            if identities.relocate(connection, location, str(ledger_path), directory / name, stat, previous=previous):
+                registered[str(ledger_path).casefold()] = str(ledger_path)
         inserted_ids = _upsert_records(connection, [(location, str(ledger_path), name, medium,
                                      stat.st_size, mtime, now, now)], registered, conflicts)
         stored_path = registered[str(ledger_path).casefold()]
@@ -383,7 +396,11 @@ def ingest_path(
         reattached = len(record_rehome.reattach(connection, [asset_id] if new else [], now=now))
         acquired = len(wants.reconcile(connection, [asset_id] if new else []))
         folder_rules.apply_new(connection, [asset_id] if new else [])
+        if identities is not None:
+            identities.observe(connection, location, stored_path, directory / name, stat)
         connection.commit()
+        if identities is not None:
+            identities.save()
     finally:
         connection.close()
     junk.isolate(db_path, asset_ids=[asset_id])
@@ -571,6 +588,34 @@ def _record_directory_subtitles(connection, location, directory, here, conflicts
     return subtitles.record(connection, location, unambiguous, now)
 
 
+def _scan_file_stat(connection, identities, registered, observations, location, ledger_path, directory, entry, *, direct):
+    """读取本次文件快照，接回已移动的身份，并积累提交后的身份观测。"""
+    stat = entry.stat()
+    if identities is not None:
+        native = Path(directory) / entry.name
+        if direct and not stat.st_ino:
+            stat = native.stat()
+        if identities.relocate(connection, location, ledger_path, native, stat):
+            registered[ledger_path.casefold()] = ledger_path
+        observations.append((location, ledger_path, native, stat))
+    return stat
+
+
+def _commit_scan_records(connection, db, batch, registered, conflicts, identities, observations):
+    inserted = _upsert_records(connection, batch, registered, conflicts)
+    if identities is not None:
+        for location, path, native, stat in observations:
+            identities.observe(connection, location, registered.get(path.casefold(), path), native, stat)
+    connection.commit()
+    if identities is not None:
+        identities.save()
+    from .library_new_assets import remember
+    remember(db, inserted)
+    batch.clear()
+    observations.clear()
+    return inserted
+
+
 def _scan_location(
     db_path: str | os.PathLike[str], location: str, root: str, *,
     declared_roots: Mapping[str, str], mounts: Mapping[str, str | Path] | None = None,
@@ -578,7 +623,7 @@ def _scan_location(
     progress: Callable[[int, int], None] = lambda files, total_bytes: None,
     resume_state: dict | None = None,
     save_checkpoint: Callable[[dict], None] = lambda state: None,
-    read_directory=None, onerror=lambda error: None,
+    read_directory=None, onerror=lambda error: None, new_only=False,
 ) -> ScanResult:
     """遍历 `root`（数据库中的路径格式）对应的本机目录，把文件元数据 upsert 进 `asset`。
 
@@ -604,6 +649,7 @@ def _scan_location(
     skipped = previous.get('sidecars', 0)
     tracks = previous.get('subtitles', 0)
     orphans = previous.get('orphan_subtitles', 0)
+    discovered = set(previous.get('new_ids', []))
     video_dirs = set(previous.get('video_dirs', []))
     pending = _pending_directories(previous, walk_root)
     batch: list[tuple] = []
@@ -615,7 +661,7 @@ def _scan_location(
         video_dirs.intersection_update(artwork_parents)
         save_checkpoint(dict(mapping=mapping, scan_time=now, pending=list(pending), files=files,
                              total_bytes=total, sidecars=skipped, subtitles=tracks,
-                             orphan_subtitles=orphans, video_dirs=sorted(video_dirs),
+                             orphan_subtitles=orphans, new_ids=sorted(discovered), video_dirs=sorted(video_dirs),
                              current_directory=directory, cursor=cursor, here=dict(here or {})))
     # 写事务只在每批 upsert 到 commit 之间打开，遍历与 stat 都在两次 commit 之间，不持锁。
     # 忙等时长与 `LedgerDatabase.connect` 一致。
@@ -623,6 +669,9 @@ def _scan_location(
     try:
         connection.execute("PRAGMA journal_mode=WAL")
         registered, conflicts = _registered_paths(connection, location, root)
+        from .file_identity import FileIdentityIndex
+        identities = FileIdentityIndex(db_path) if location == 'local' and not remote else None
+        observations = []
         for conflict in conflicts.values():
             onerror(conflict)
             report(str(conflict))
@@ -648,8 +697,12 @@ def _scan_location(
                               path=ledger_path, library_roots=library_roots):
                     skipped += 1
                     continue
+                if new_only and ledger_path.casefold() in registered:
+                    here[name] = (None, None)
+                    continue
                 try:
-                    stat = entry.stat()
+                    stat = _scan_file_stat(connection, identities, registered, observations, location,
+                                           ledger_path, directory, entry, direct=read_directory is None)
                 except OSError as error:
                     onerror(error)
                     continue
@@ -661,45 +714,39 @@ def _scan_location(
                 total += stat.st_size
                 progress(files, total)
                 if len(batch) >= BATCH_SIZE:
-                    inserted_ids = _upsert_records(connection, batch, registered, conflicts)
-                    connection.commit()
-                    remember(db_path, inserted_ids)
-                    batch.clear()
+                    inserted_ids = _commit_scan_records(connection, db_path, batch, registered, conflicts,
+                                                       identities, observations)
+                    discovered.update(inserted_ids)
                     save_directory(directory, name, here)
                     report(f"  {time.time() - started:5.0f}s  {files:,} 文件  "
                            f"{total / 1024 ** 4:.2f} TB")
-            inserted_ids = []
-            if batch:
-                inserted_ids = _upsert_records(connection, batch, registered, conflicts)
-                batch.clear()
+            inserted_ids = _commit_scan_records(connection, db_path, batch, registered, conflicts,
+                                               identities, observations)
             directory_tracks, directory_orphans = _record_directory_subtitles(
                 connection, location, ledger_root.joinpath(*relative), here, conflicts, now)
             connection.commit()
+            discovered.update(inserted_ids)
             remember(db_path, inserted_ids)
             tracks += directory_tracks
             orphans += directory_orphans
             save_directory()
-        if batch:
-            inserted_ids = _upsert_records(connection, batch, registered, conflicts)
-        else:
-            inserted_ids = []
-        connection.commit()
+        inserted_ids = _commit_scan_records(connection, db_path, batch, registered, conflicts,
+                                           identities, observations)
+        discovered.update(inserted_ids)
         remember(db_path, inserted_ids)
-        # 只有 INSERT 那一支写 `first_seen`，等于本次时刻的就是这一轮新建的行。
         from .media_folders import path_predicate
         scope, parameters = path_predicate(location, root)
-        new_ids = tuple(row[0] for row in connection.execute(
-            "SELECT a.id FROM asset a WHERE " + scope + " AND a.first_seen=? ORDER BY a.id", (*parameters, now)))
+        new_ids = tuple(sorted(discovered))
         reattached = len(record_rehome.reattach(connection, new_ids, now=now))
         acquired = len(wants.reconcile(connection, new_ids))
         folder_rules.apply_new(connection, new_ids)
         connection.commit()
-        gone = connection.execute(
+        gone = 0 if new_only else connection.execute(
             "SELECT COUNT(*) FROM asset a WHERE " + scope + " AND a.last_seen<?",
             (*parameters, now)).fetchone()[0]
     finally:
         connection.close()
-    checked = junk.isolate(db_path, roots=[(location, root)])
+    checked = junk.isolate(db_path, roots=[(location, root)], asset_ids=list(new_ids) if new_only else None)
     result = ScanResult(location, root, files, total, time.time() - started, gone,
                         tracks, orphans, skipped, new_ids, reattached, acquired,
                         checked['isolated'], checked['review'], len(conflicts))

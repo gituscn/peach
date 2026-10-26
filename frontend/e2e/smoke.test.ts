@@ -63,6 +63,7 @@ const ROUTES: readonly Route[] = [
   { path: '/performers?category=animation', body: (page) => [heading(page, '#index', '艺人'), indexEntries(page)] },
   { path: '/studios', body: (page) => [heading(page, '#index', '厂牌'), indexEntries(page)] },
   { path: '/agencies', body: (page) => [heading(page, '#index', '事务所'), indexEntries(page)] },
+  { path: '/series', body: (page) => [heading(page, '#index', '系列'), indexEntries(page)] },
   { path: '/tags', body: (page) => [heading(page, '#index', '标签'), indexEntries(page)] },
   {
     path: '/playlists',

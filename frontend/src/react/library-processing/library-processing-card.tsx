@@ -142,8 +142,8 @@ function Outcome(
         已取得的资料和预览已保留，不会自动继续这趟任务。
       </Note> : null}
       {state.archived ? <Note tone="neutral">上一趟的问题提示已归档，历史记录仍保留。</Note> : null}
-      {!processingActive(state) && (!!state.issue_count || state.status === 'failed') ? <div className="flex flex-wrap items-center gap-2">
-        {!!state.issue_count ? <Button variant="secondary" size="small" {...busyProps(!!exporter.busy)} onClick={() => void exporter.run('export',
+      {!processingActive(state) && (state.issue_count || state.status === 'failed') ? <div className="flex flex-wrap items-center gap-2">
+        {state.issue_count ? <Button variant="secondary" size="small" {...busyProps(!!exporter.busy)} onClick={() => void exporter.run('export',
           signal => exportProcessingIssues(state,signal), contents => {
             downloadIssueList(state.job_id!,contents); toast('已导出问题清单');
           })}>导出完整问题清单</Button> : null}
@@ -210,44 +210,29 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
       <Fieldset layout="stack" label="扫描与采集" footer={
         <>
           <LinkButton href="/sources" size="small" trailingIcon={RiArrowRightLine}>来源和凭证</LinkButton>
+          <LinkButton href="/settings/diagnostics" size="small" trailingIcon={RiArrowRightLine}>诊断与日志</LinkButton>
           {state.candidates
             ? <LinkButton href="/review" size="small" trailingIcon={RiArrowRightLine}>复核资料</LinkButton>
             : null}
-          {/* 两个入口并存，各自答的不是一个问题：这里是「重新跑一整批」，下面那条错误提示里
-              的「立即重试」只补上一趟没做完的那些。采集里网络超时几乎每趟都留下几项可
-              重试的，页脚要是让位给重试键，新入库的片子就再也没有入口被扫到。 */}
-          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} speedMode={state.speed_mode} onRun={run} />
+          {/* 日常同步保留独立入口，原任务的定向重试只处理该任务的失败项。 */}
+          <ProcessingActions scan busy={busy} metadataOnly={state?.metadata_only} speedMode={state.speed_mode}
+            pendingCount={state.new_asset_count} onRun={run} />
         </>
       }>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <FieldsetTitle>扫描与采集</FieldsetTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <FieldsetTitle>扫描与采集</FieldsetTitle>
+              {state.new_asset_count ? <Chip variant="caption" color="blue">
+                <span className="tabular-nums">{state.new_asset_count.toLocaleString()} 部待补全</span>
+              </Chip> : null}
+            </div>
             {hidden && (processingActive(state) || state.status === 'failed' || job.isError)
               ? <Button variant="secondary" size="small" onClick={() => setProcessingNoticeVisible(noticeKey, true)}>
                   显示进度浮窗
                 </Button> : null}
           </div>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border-button-default pt-4" data-new-assets="">
-            <div className="flex min-w-0 flex-1 basis-52 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-body-medium text-text-primary">新入库待处理</span>
-                <Chip variant="caption" color={state.new_asset_count ? 'blue' : 'neutral'}>
-                  <span className="tabular-nums">{(state.new_asset_count || 0).toLocaleString()} 部</span>
-                </Chip>
-              </div>
-              <p className="text-caption-1-regular text-text-secondary">
-                {busy && state.new_asset_count
-                  ? '当前任务结束后，可单独处理这批新影片。'
-                  : state.new_asset_count
-                  ? '单独补全这些影片的资料和预览。'
-                  : '扫描发现的新影片会显示在这里。'}
-              </p>
-            </div>
-            <Button variant="secondary" size="medium" trailingIcon={RiArrowRightLine}
-              className="shrink-0 max-[520px]:w-full" disabled={busy || !state.new_asset_count}
-              onClick={() => void run({stage:'collect',scope:'new'}).catch(() => {})}>仅处理新入库</Button>
-          </div>
           {state.status === 'paused' && !state.total
             ? <span className="self-start"><StatusLabel>已暂停</StatusLabel></span>
             : processingActive(state)

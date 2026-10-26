@@ -109,6 +109,8 @@ export interface ProcessingTraffic {
 export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signal?: AbortSignal, inventory?: string) => {
   const params = new URLSearchParams({ estimate: '1', stage: command.stage || 'all' });
   if (command.asset_ids) params.set('asset_ids', JSON.stringify(command.asset_ids));
+  if (command.scope) params.set('scope', command.scope);
+  if (command.incremental) params.set('incremental', '1');
   if (inventory) params.set('inventory', inventory);
   return apiGet<{ traffic: ProcessingTraffic }>(`${LIBRARY_PROCESSING_URL}?${params}`, signal);
 };
@@ -116,6 +118,7 @@ export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signa
 /** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
 export type ProcessingSpeed = 'low' | 'standard' | 'high';
 export interface LibraryProcessingCommand {
+  incremental?: boolean;
   scope?: 'new';
   stage?: 'scan' | 'collect' | 'previews' | 'metadata';
   asset_ids?: number[];

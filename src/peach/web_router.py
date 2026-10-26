@@ -201,7 +201,7 @@ def _get_facets(contract, args):
     filters = {key: args[key] for key in (
         'loc', 'creator', 'performer', 'studio', 'series', 'agency', 'tag', 'tag_match',
         'len', 'dur_min', 'dur_max', 'orient', 'region', 'exclude_vertical', 'q', 'thumb',
-        'library', 'folder', 'folder_recursive',
+        'library', 'folder', 'folder_recursive', 'year',
     ) if args.get(key)}
     scope_key += repr(sorted(filters.items()))
     compute = lambda: q_facets(  # noqa: E731

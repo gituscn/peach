@@ -16,7 +16,7 @@ const sprite = new Set(
 
 const PAGES: [IndexPageKind, string][] = [
   ['performers', ''], ['performers', '?scope=online'], ['creators', ''],
-  ['studios', ''], ['agencies', ''], ['tags', ''], ['tags', '?scope=online&view=cloud'],
+  ['studios', ''], ['agencies', ''], ['series', ''], ['tags', ''], ['tags', '?scope=online&view=cloud'],
 ];
 
 it.each(['cloud', 'alphabet'])('%s 标签占位按页大小预留正文与分页', mode => {
