@@ -212,7 +212,11 @@ class UpgradeRepairs:
                            'media_ids': sorted(set(failed + [row['id'] for row in plan['codes']]
                                                    + previous.get('media_ids', [])
                                                    + plan['text']['asset_ids'])),
-                           'queued': dict(previous.get('queued', {})), 'prior_revision': CATALOG_REVISION if prior else None}
+                           'queued': dict(previous.get('queued', {})),
+                           'deferred': list(previous.get('deferred', [])),
+                           'dispatch_complete': bool(previous.get('dispatch_complete')) and not plan['text']['asset_ids'],
+                           'text_only': prior is not None,
+                           'prior_revision': CATALOG_REVISION if prior else None}
                 connection.execute('INSERT INTO ledger_upgrade_repair(id,applied_at,result_json) VALUES(?,?,?)',
                                    (REVISION, str(time.time()), json.dumps(receipt, ensure_ascii=False)))
             atomic_write_text(self.receipt, json.dumps(receipt, ensure_ascii=False))
@@ -254,7 +258,8 @@ class UpgradeRepairs:
             maximum = connection.execute('SELECT coalesce(max(id),0) FROM entity').fetchone()[0]
             planned = [row for row in seed_followup.plan(connection, since_entity_id=maximum) if row.key not in seen]
             planners = (performer_alias_followup, studio_followup, performer_profile_followup,
-                        creator_identity_followup, avatar_followup) if _people_allowed(config) else ()
+                        creator_identity_followup, avatar_followup) if (
+                            not receipt.get('text_only') and _people_allowed(config)) else ()
             for planner in planners:
                 remaining = MAX_FOLLOWUPS - len(planned)
                 if remaining <= 0:

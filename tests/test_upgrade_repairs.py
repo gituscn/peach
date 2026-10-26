@@ -83,6 +83,31 @@ class UpgradeRepairTests(unittest.TestCase):
             planned=self.service._plan(receipt)
         self.assertEqual([row.key for row in planned],['upgrade-library:processing-v2:text-1:1'])
 
+    def test_text_only_dispatch_does_not_plan_unrelated_people(self):
+        from peach.settings_file import load_config
+        self.service.config=load_config(environ={'PEACH_DATA_ROOT':str(self.root)})
+        self.damaged_asset()
+        receipt={'queued':{},'media_ids':[1],'text_media_ids':[1],'text_only':True}
+        with patch('peach.library_processing._people_allowed',return_value=True), patch(
+                'peach.seed_followup.plan',return_value=[]), patch('peach.media_sources.cost_for',return_value='free'), patch(
+                'peach.performer_alias_followup.stock',side_effect=AssertionError('不能重放人物补修')):
+            planned=self.service._plan(receipt)
+        self.assertEqual([row.key for row in planned],['upgrade-library:processing-v2:text-1:1'])
+
+    def test_completed_catalog_dispatch_preserves_deferred_work_across_text_revision(self):
+        with patch.object(upgrade_repairs,'REVISION',upgrade_repairs.CATALOG_REVISION):
+            self.service.prepare()
+            receipt=upgrade_repairs._read(self.service.receipt)
+            receipt.update(queued={'old-work':99},media_ids=[42],deferred=[42],dispatch_complete=True)
+            self.service._save_receipt(receipt)
+        self.service.prepare()
+        receipt=upgrade_repairs._read(self.service.receipt)
+        self.assertTrue(receipt['text_only'])
+        self.assertTrue(receipt['dispatch_complete'])
+        self.assertEqual(receipt['queued'],{'old-work':99})
+        self.assertEqual(receipt['media_ids'],[42])
+        self.assertEqual(receipt['deferred'],[42])
+
     def test_text_rule_preserves_inherited_running_or_cancelled_media_work(self):
         from peach.settings_file import load_config
         self.service.config=load_config(environ={'PEACH_DATA_ROOT':str(self.root)})
