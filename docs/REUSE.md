@@ -4,6 +4,14 @@
 
 采用 RAAMENN 的 [PR #151](https://github.com/peach-mitao/peach/pull/151)，固定来源提交 `eb5f6b49210ed330c767166ea204103a8193250a`，许可证沿用本项目 AGPL-3.0-or-later。复用 SQLite 的 `SET NULL` 语义和删除触发器，在外键开关两种连接下维护父任务与根任务关联。当前迁移编号为 `0049`，只清空不存在的任务引用；任务内容、有效关联、活跃后继和媒体记录保留。隔离回归覆盖旧库升级、重放、批量删除回滚及跨任务类型后继，无新增依赖。
 
+## 馆藏任务取消、范围与问题导出
+
+取消复用 `ProcessingControl` 的本机原子记录、安全停点与 `BackgroundJob` 结算；`stopping` 等待在途工作退出，`cancelled` 保留结果并阻止自动恢复。安装暂停与用户暂停沿用原语义。新影片范围复用 `ScanResult.new_ids`、`filelock` 和原子 JSON，接回旧扫描检查点；启动时固定为已有的 `asset_ids` 请求，恢复不重新计算范围。退场资产仅退出当前重试集合，来源离线不按文件消失处理；归档只保存提示选择，不删除问题原文或任务历史。
+
+问题导出采用 kevin552216 的 [PR #172](https://github.com/peach-mitao/peach/pull/172) 中 `issue-export.ts` 的分页 JSON 下载思路，固定来源 head `d1803c28e0b1a2a086d9756a67b0ec313387db29`，AGPL-3.0-or-later。Peach 增加日志内容摘要、总数和页偏移校验，拒绝同任务恢复时混合两份记录；旧完整 `issues` 数组可分页读取，缺失或损坏日志不伪装成空清单。复用既有 `useAction`、AbortSignal 和 Blob 下载，不采用该 PR 的单片重抓、字段保护和来源策略改动，无新增依赖。
+
+状态文件写入沿用 `fsutil.atomic_write_text`。补入 FriendlyPasser 的 [PR #120](https://github.com/peach-mitao/peach/pull/120) 固定提交 `b586ff907aa01b48432e51b6101b7ce4bc7f8126` 的 Windows 读句柄验证，检查实际 WinError、读者关闭、完整 JSON 发布和临时文件清理；不增加另一套保存策略。
+
 ## 发布依赖接管来源
 
 依赖清单复用 Dependabot 的独立 PR 差集，版本与完整依赖图由当前清单和锁文件确定。相邻修改保留主线消费者并重算锁；npm vendor 与前端包使用项目入口重建，许可证和来源记录随资源分发。接管器分别识别应用与 amane 桥的清单，并以实际接管提交确认完成；普通 PR 引用不构成采用。

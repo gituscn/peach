@@ -589,6 +589,18 @@ class ProcessCommandTests(unittest.TestCase):
         self.assertEqual(rows[0][3], "failed")
         self.assertEqual(rows[1][3], "pending")
 
+    def test_user_cancel_returns_a_cancelled_receipt_without_dispatching_followups(self):
+        from peach.jobs import JobCancelled
+        from contextlib import closing
+        with mock.patch('peach.library_processing.process_library',side_effect=JobCancelled('用户停止任务')), \
+                redirect_stdout(io.StringIO()) as output:
+            code=cli.main(['process','--db',str(self.db)])
+        with closing(sqlite3.connect(self.db)) as connection:
+            rows=connection.execute('SELECT status,parent_run_id FROM task_run').fetchall()
+        self.assertEqual(code,130)
+        self.assertEqual(rows,[('cancelled',None)])
+        self.assertIn('已保存结果保留',output.getvalue())
+
 
 class ReplicationAssemblyTests(unittest.TestCase):
     """ADR-0023 第 3 阶段：整条复制链路按 `replication.enabled` 装配或完全不装配。"""

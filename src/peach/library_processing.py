@@ -2276,7 +2276,8 @@ def _checkpoint_key(row):
 class _LibraryCheckpoints:
     """只有预览登记或候选落盘成功才提交影片检查点。"""
 
-    def __init__(self, state, previous, database):
+    def __init__(self, state, previous, database, db_path):
+        self.db_path = db_path
         previous = previous or {}
         if previous.get('processing_rule') != upgrade_rules.PROCESSING:
             state['local_metadata'] = {}
@@ -2306,10 +2307,13 @@ class _LibraryCheckpoints:
     def commit_metadata(self, flush):
         if not self.pending_metadata:
             return
+        completed_ids = [int(key.split(':',1)[0]) for key in self.pending_metadata]
         self.completed['completed_metadata'].update(self.pending_metadata)
         self.pending_metadata.clear()
         self.state['completed_metadata'] = sorted(self.completed['completed_metadata'])
         flush(force=True)
+        from .library_new_assets import remember
+        remember(self.db_path, completed=completed_ids)
 
     def remaining_metadata(self, rows):
         return ((index, row) for index, row in enumerate(rows)
@@ -2598,7 +2602,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         _restore_processing_counts(state, resume_state)
         estimate = ProcessingEstimate(config, state, control)
         # 实体表的水位在开工前记一次：比它大的实体就是这一轮建出来的（`_entity_followups`）。
-        checkpoints = _LibraryCheckpoints(state, resume_state, database)
+        checkpoints = _LibraryCheckpoints(state, resume_state, database, db_path)
         entity_watermark = checkpoints.entity_watermark
         # 每行这一轮换上了几张封面，`(asset_id, 张数)`：换上了的作品，女优可能截得出更清楚的脸。
         covered = []
@@ -2824,11 +2828,13 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
         except Exception:
             state.update(status='failed', outcome='interrupted', error='处理被中断。核对媒体目录后重试。', completed_at=time.time())
             state.update(interrupted_state(control))
-            state['traffic'] = traffic.snapshot(finished=state.get('status') == 'failed')
+            state['traffic'] = traffic.snapshot(finished=state.get('status') in ('failed', 'cancelled'))
             _save(path, state)
             raise
         finally:
             # 被打断也把已经攒下的候选写全：文件里要么是上一份完整的，要么是这一份完整的。
             flush_candidates(force=True)
             remote.close()
+        from .library_new_assets import remember
+        remember(db_path, completed=[row['id'] for row in rows])
         return state

@@ -351,6 +351,23 @@ class _ServiceCase(unittest.TestCase):
 class IngestPathTests(_ServiceCase):
     """单条路径走的是扫描那段登记，不是第二套写法。"""
 
+    def test_new_video_queue_accepts_push_arrivals_without_readding_completed_paths(self):
+        from peach.library_new_assets import pending, remember
+        (self.media / 'new.mp4').write_bytes(b'video')
+        (self.media / 'photo.jpg').write_bytes(b'image')
+        options = dict(declared_roots=self.declared, mounts=self.mounts)
+        with mock.patch('peach.scan.time.strftime', return_value='2026-10-27 12:00:00'):
+            first = scan.ingest_path(self.db, 'local', self.ledger('local', 'new.mp4'), **options)
+            scan.ingest_path(self.db, 'local', self.ledger('local', 'photo.jpg'), **options)
+            self.assertEqual(pending(self.db), [first.asset_id])
+            remember(self.db, completed=[first.asset_id])
+            again = scan.ingest_path(self.db, 'local', self.ledger('local', 'new.mp4'), **options)
+            self.assertFalse(again.new)
+            self.assertEqual(pending(self.db), [])
+        (self.cloud / 'cloud.mp4').write_bytes(b'cloud video')
+        arrival = scan.ingest_path(self.db, '115', self.ledger('115', 'cloud.mp4'), **options)
+        self.assertEqual(pending(self.db), [arrival.asset_id])
+
     def test_one_file_lands_as_one_row_with_the_ledger_shape(self):
         (self.media / "创作者").mkdir()
         (self.media / "创作者" / "a.mp4").write_bytes(b"0" * 12)

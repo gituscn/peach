@@ -113,6 +113,7 @@ def _registered_paths(connection, location, root):
 
 def _upsert_records(connection, batch, registered, conflicts):
     rows = []
+    inserted = {}
     for location, path, *values in batch:
         key = str(PureWindowsPath(path)).casefold()
         if key in conflicts:
@@ -120,9 +121,19 @@ def _upsert_records(connection, batch, registered, conflicts):
             connection.executemany('UPDATE asset SET last_seen=? WHERE id=?',
                                    [(values[-1], asset_id) for asset_id in conflicts[key].asset_ids])
             continue
+        if key not in registered:
+            inserted.setdefault(location, []).append(path)
         stored = registered.setdefault(key, path)
         rows.append((location, stored, *values))
     connection.executemany(_UPSERT, rows)
+    ids = []
+    for location, paths in inserted.items():
+        for offset in range(0, len(paths), 900):
+            portion = paths[offset:offset+900]
+            ids.extend(row[0] for row in connection.execute(
+                'SELECT id FROM asset WHERE location=? AND path IN ('
+                + ','.join('?'*len(portion))+')', (location, *portion)))
+    return ids
 
 
 def medium_of(name: str) -> str:
@@ -361,15 +372,14 @@ def ingest_path(
         registered, conflicts = _registered_paths(connection, location, str(ledger_dir))
         if str(ledger_path).casefold() in conflicts:
             raise conflicts[str(ledger_path).casefold()]
-        _upsert_records(connection, [(location, str(ledger_path), name, medium,
+        inserted_ids = _upsert_records(connection, [(location, str(ledger_path), name, medium,
                                      stat.st_size, mtime, now, now)], registered, conflicts)
         stored_path = registered[str(ledger_path).casefold()]
         if here is not None:
             tracks = _record_directory_subtitles(connection, location, ledger_dir, here, conflicts, now)[0]
-        asset_id, first_seen = connection.execute(
-            "SELECT id,first_seen FROM asset WHERE location=? AND path=?",
-            (location, stored_path)).fetchone()
-        new = first_seen == now
+        asset_id = connection.execute("SELECT id FROM asset WHERE location=? AND path=?",
+                                     (location, stored_path)).fetchone()[0]
+        new = asset_id in inserted_ids
         reattached = len(record_rehome.reattach(connection, [asset_id] if new else [], now=now))
         acquired = len(wants.reconcile(connection, [asset_id] if new else []))
         folder_rules.apply_new(connection, [asset_id] if new else [])
@@ -377,6 +387,8 @@ def ingest_path(
     finally:
         connection.close()
     junk.isolate(db_path, asset_ids=[asset_id])
+    from .library_new_assets import remember
+    remember(db_path, inserted_ids)
     return IngestResult(location, str(ledger_path), True, stat.st_size, tracks,
                         asset_id=asset_id, new=new, reattached=reattached, acquired=acquired)
 
@@ -595,6 +607,7 @@ def _scan_location(
     video_dirs = set(previous.get('video_dirs', []))
     pending = _pending_directories(previous, walk_root)
     batch: list[tuple] = []
+    from .library_new_assets import remember
     # 文件批次提交后保存文件名游标；同目录的配对资料随断点保留。
     def save_directory(directory=None, cursor=None, here=None):
         artwork_parents = {path_module.dirname(value) for value in [*pending, *([directory] if directory else [])]
@@ -648,24 +661,30 @@ def _scan_location(
                 total += stat.st_size
                 progress(files, total)
                 if len(batch) >= BATCH_SIZE:
-                    _upsert_records(connection, batch, registered, conflicts)
+                    inserted_ids = _upsert_records(connection, batch, registered, conflicts)
                     connection.commit()
+                    remember(db_path, inserted_ids)
                     batch.clear()
                     save_directory(directory, name, here)
                     report(f"  {time.time() - started:5.0f}s  {files:,} 文件  "
                            f"{total / 1024 ** 4:.2f} TB")
+            inserted_ids = []
             if batch:
-                _upsert_records(connection, batch, registered, conflicts)
+                inserted_ids = _upsert_records(connection, batch, registered, conflicts)
                 batch.clear()
             directory_tracks, directory_orphans = _record_directory_subtitles(
                 connection, location, ledger_root.joinpath(*relative), here, conflicts, now)
             connection.commit()
+            remember(db_path, inserted_ids)
             tracks += directory_tracks
             orphans += directory_orphans
             save_directory()
         if batch:
-            _upsert_records(connection, batch, registered, conflicts)
+            inserted_ids = _upsert_records(connection, batch, registered, conflicts)
+        else:
+            inserted_ids = []
         connection.commit()
+        remember(db_path, inserted_ids)
         # 只有 INSERT 那一支写 `first_seen`，等于本次时刻的就是这一轮新建的行。
         from .media_folders import path_predicate
         scope, parameters = path_predicate(location, root)

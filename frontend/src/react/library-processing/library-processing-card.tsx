@@ -12,6 +12,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/base/buttons/button';
 import { LinkButton } from '@/components/base/buttons/link-button';
+import { Chip } from '@/components/base/badges/chip';
 
 import { apiSend, errorMessage } from '../../api';
 import { SCAN_CARD_TEXT } from '../../management';
@@ -33,6 +34,9 @@ import { setProcessingNoticeVisible, useProcessingNoticeVisibility } from './pro
 import { ProcessingActions } from './processing-actions';
 import { ProcessingProgress } from './processing-line';
 import { TrafficProgress } from './processing-traffic';
+import { ProcessingControls } from './processing-controls';
+import { downloadIssueList, exportProcessingIssues } from './issue-export';
+import { busyProps, useAction } from '../settings/use-action';
 
 /* 中文正文写成常量：JSX 里换行的文字会在接缝处多出一个空格，中文句子里看得见。
    卡片正文与首屏骨架共用 `SCAN_CARD_TEXT`（`management.ts`）。 */
@@ -67,10 +71,12 @@ function Outcome(
   },
 ) {
   const details = issueDetails(state);
+  const exporter = useAction();
+  const archive = useAction();
   const retryable = state.status === 'failed' && !!state.retryable_asset_ids?.length;
   const notes = notesLine(state.notes || {});
-  const failed = !!problem || state.status === 'failed';
-  const partial = !problem && processingHasPartialResult(state);
+  const failed = !!problem || (!state.archived && state.status === 'failed');
+  const partial = !problem && !state.archived && processingHasPartialResult(state);
   /* 同一份日志只印一处：失败提示带着问题清单时归清单，跑完只剩「7 天内不再问」时归那条提示。 */
   const logInList = failed && !!details?.log;
   const slow = slowItem(state);
@@ -132,6 +138,22 @@ function Outcome(
       {settled?.status === 'complete'
         ? <Note tone="success" title="处理完成">{receiptText(settled)}</Note>
         : null}
+      {settled?.status === 'cancelled' ? <Note tone="neutral" title="任务已停止">
+        已取得的资料和预览已保留，不会自动继续这趟任务。
+      </Note> : null}
+      {state.archived ? <Note tone="neutral">上一趟的问题提示已归档，历史记录仍保留。</Note> : null}
+      {!processingActive(state) && (!!state.issue_count || state.status === 'failed') ? <div className="flex flex-wrap items-center gap-2">
+        {!!state.issue_count ? <Button variant="secondary" size="small" {...busyProps(!!exporter.busy)} onClick={() => void exporter.run('export',
+          signal => exportProcessingIssues(state,signal), contents => {
+            downloadIssueList(state.job_id!,contents); toast('已导出问题清单');
+          })}>导出完整问题清单</Button> : null}
+        {!state.archived ? <Button variant="secondary" size="small" {...busyProps(!!archive.busy)}
+          onClick={() => void archive.run('archive',signal => apiSend<LibraryProcessingData>(LIBRARY_PROCESSING_URL,
+            {action:'archive',job_id:state.job_id},'POST',signal), next => {
+              queryClient.setQueryData(LIBRARY_PROCESSING_KEY,next); toast('已归档问题提示');
+            })}>归档提示</Button> : null}
+      </div> : null}
+      {exporter.error || archive.error ? <Note tone="warning">{exporter.error || archive.error}</Note> : null}
       {!processingActive(state) && notes
         /* 内边距与分隔节奏和上面的失败提示同一组：两块常常叠着出现，留白不一样一眼就看得出。 */
         ? <Note tone="neutral" className="gap-0 p-3"
@@ -206,6 +228,26 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
                 </Button> : null}
           </div>
           <p className="text-body-2-regular text-text-secondary">{SCAN_CARD_TEXT}</p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-border-button-default pt-4" data-new-assets="">
+            <div className="flex min-w-0 flex-1 basis-52 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-body-medium text-text-primary">新入库待处理</span>
+                <Chip variant="caption" color={state.new_asset_count ? 'blue' : 'neutral'}>
+                  <span className="tabular-nums">{(state.new_asset_count || 0).toLocaleString()} 部</span>
+                </Chip>
+              </div>
+              <p className="text-caption-1-regular text-text-secondary">
+                {busy && state.new_asset_count
+                  ? '当前任务结束后，可单独处理这批新影片。'
+                  : state.new_asset_count
+                  ? '单独补全这些影片的资料和预览。'
+                  : '扫描发现的新影片会显示在这里。'}
+              </p>
+            </div>
+            <Button variant="secondary" size="medium" trailingIcon={RiArrowRightLine}
+              className="shrink-0 max-[520px]:w-full" disabled={busy || !state.new_asset_count}
+              onClick={() => void run({stage:'collect',scope:'new'}).catch(() => {})}>仅处理新入库</Button>
+          </div>
           {state.status === 'paused' && !state.total
             ? <span className="self-start"><StatusLabel>已暂停</StatusLabel></span>
             : processingActive(state)
@@ -215,6 +257,7 @@ export function LibraryProcessingCard(props: LibraryProcessingProps) {
             {remainingTime(state)}
           </p> : null}
           {processingActive(state) ? <TrafficProgress traffic={state.traffic} /> : null}
+          {processingActive(state) ? <ProcessingControls state={state} /> : null}
         </div>
       </Fieldset>
       <Outcome state={state} problem={problem} settled={settled} onRetry={retry} toast={toast} />

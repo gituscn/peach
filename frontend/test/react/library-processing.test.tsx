@@ -37,6 +37,35 @@ notifyManager.setScheduler((notify) => notify());
 
 const LOG = 'C:\\peach-data\\state\\library-processing-one.issues.jsonl';
 
+it('运行时新入库数量仍可见，独立范围等待当前任务结束',async()=>{
+  await open({status:'running',job_id:'one',new_asset_count:12});
+  const host=await mount(card({toast:vi.fn()}));
+  expect(host.querySelector('[data-new-assets]')?.textContent).toContain('新入库待处理12 部');
+  expect(host.querySelector('[data-new-assets]')?.textContent).toContain('当前任务结束后，可单独处理这批新影片。');
+  expect(buttonNamed('仅处理新入库',host)?.disabled).toBe(true);
+});
+
+it('新入库入口只提交独立新范围，不触发全库扫描',async()=>{
+  const {calls}=await open({status:'idle',new_asset_count:2},
+    (method)=>method==='POST'?{status:'running',job_id:'new'}:{status:'idle',new_asset_count:2});
+  const host=await mount(card({toast:vi.fn()}));
+  await click(buttonNamed('仅处理新入库',host)!);
+  expect(calls.filter(call=>call.method==='POST').map(call=>call.body)).toEqual([{stage:'collect',scope:'new'}]);
+});
+
+it('停止请求绑定原任务，正在停止时保留进度并禁止重发',async()=>{
+  let state:LibraryProcessingData={status:'running',job_id:'one',candidates:3};
+  const {calls}=await open(state,(method)=>{
+    if(method==='POST') state={...state,status:'stopping'};
+    return state;
+  });
+  const host=await mount(card({toast:vi.fn()}));
+  await click(buttonNamed('停止任务',host)!);
+  expect(calls.filter(call=>call.method==='POST').map(call=>call.body)).toEqual([{action:'cancel',job_id:'one'}]);
+  expect(host.textContent).toContain('正在停止');
+  expect(buttonNamed('正在停止',host)?.disabled).toBe(true);
+});
+
 type Reply = (method: string, body: unknown) => LibraryProcessingData;
 
 /** 按方法应答同一个端点。用例拿 `calls` 数请求、看请求体。 */
@@ -485,16 +514,27 @@ it('暂停与继续使用同一个任务号，暂停不是完成，暂停时仍�
   expect(buttonNamed('暂停', host)).not.toBeNull();
 });
 
-it('首屏暂停状态在卡片保留进度，在任务面提供继续入口', async () => {
+it('首屏暂停状态在卡片和任务面保留进度与继续入口', async () => {
   await open({ status: 'paused', job_id: 'one', checked: 2, total: 10 });
   const host = await mount(card({ toast: vi.fn() }));
   const banner = await mount(notice({ toast: vi.fn(), mode: 'notice' }));
   expect(host.textContent).toContain('已暂停');
   expect(banner.textContent).toContain('已暂停');
-  expect(buttonNamed('继续', host)).toBeNull();
+  expect(buttonNamed('继续', host)).not.toBeNull();
   expect(buttonNamed('继续', banner)).not.toBeNull();
   expect(buttonNamed('标准', banner)).not.toBeNull();
   expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('2');
+});
+
+it('没有逐项问题的任务失败也能归档提示，保留历史任务号', async () => {
+  const state: LibraryProcessingData = { status:'failed', job_id:'one', error:'任务未能自动恢复' };
+  const served = await open(state, () => ({...state,archived:true}));
+  const host = await mount(card({toast:vi.fn()}));
+  expect(buttonNamed('导出完整问题清单',host)).toBeNull();
+  await click(buttonNamed('归档提示',host));
+  expect(served.posts()).toEqual([{action:'archive',job_id:'one'}]);
+  expect(host.textContent).toContain('历史记录仍保留');
+  expect(host.textContent).not.toContain('任务未能自动恢复');
 });
 
 it('模式切换失败保留服务端选中值和原位错误，可重试', async () => {

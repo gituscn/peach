@@ -1,5 +1,6 @@
 """统一处理任务的启动、只读状态查询与失败项重试。"""
 import json
+import hashlib
 
 from . import settings_file
 from .library_processing import (ALL_STAGES, COLLECT_STAGE, SCAN_STAGE, STAGES,
@@ -7,7 +8,7 @@ from .library_processing import (ALL_STAGES, COLLECT_STAGE, SCAN_STAGE, STAGES,
                                 decorate, issues_path, process_library, snapshot)
 from .processing_control import control_for, initial_estimate, valid_mode, mode_ratio
 
-ACTIVE = ('running', 'pausing', 'paused')
+ACTIVE = ('running', 'pausing', 'paused', 'stopping')
 
 #: 回给页面的状态字段：`frontend/src/react/library-processing/library-processing.ts` 的
 #: `LibraryProcessingData`，加上对应任务中心那一行的 `run_id`。状态文件里另有续跑用的 `local_metadata`（带完整媒体路径）、
@@ -21,7 +22,7 @@ PUBLIC_FIELDS = frozenset({
     'performer_profile_failed', 'error', 'issue_count', 'paused_count', 'issue_preview',
     'issues_log', 'issues_truncated', 'retryable_asset_ids', 'notes', 'current_asset_id',
     'current_asset_name', 'current_action', 'current_started_at', 'last_progress_at', 'stalled',
-    'waited_seconds', 'completed_at', 'current_source', 'skip_requested',
+    'waited_seconds', 'completed_at', 'current_source', 'skip_requested', 'archived', 'new_asset_count',
 })
 
 
@@ -32,6 +33,9 @@ def public_state(state):
 
 def _current(contract):
     live = contract.library_processing_job.snapshot()
+    thread = getattr(contract.library_processing_job, 'thread', None)
+    if live and live.get('status') == 'cancelled' and thread is not None and thread.is_alive():
+        return {**live, 'status':'stopping'}
     return live if live and live.get('status') in ACTIVE else snapshot(settings_file.active())
 
 
@@ -39,6 +43,8 @@ def q_library_processing(contract, _args):
     if _args.get('estimate') == '1':
         config = settings_file.active()
         body = {'stage': _args.get('stage') or ALL_STAGES}
+        if 'scope' in _args:
+            body['scope'] = _args['scope']
         if 'asset_ids' in _args:
             body['asset_ids'] = json.loads(_args['asset_ids'])
         _, asset_ids, stage = _processing_request(contract, config, {}, body)
@@ -54,6 +60,13 @@ def q_library_processing(contract, _args):
     state['metadata_only'] = metadata_only(settings_file.active().directory('state'))
     from .job_recovery import read
     recovery = read(contract.db_path, 'library-processing')
+    if control.job_id == state.get('job_id') and control.cancelled and state.get('status') in ACTIVE:
+        state.update(status='stopping', eta_seconds_min=None, eta_seconds_max=None)
+    if recovery.get('status') == 'cancelled' and recovery.get('job_id') == state.get('job_id'):
+        state.update(status='cancelled', outcome='cancelled', error='')
+    state['retryable_asset_ids'] = _remaining_retry_ids(contract, state)
+    from .library_new_assets import pending
+    state['new_asset_count'] = len(pending(contract.db_path))
     if state.get('status') not in ACTIVE and recovery.get('status') == 'blocked':
         state.update(status='failed', outcome='interrupted', error=f"任务未能自动恢复：{recovery.get('error') or '请重新发起任务'}")
     # 上一趟任务的状态文件里没有这个字段，而它那份完整清单还在磁盘上：按 job_id
@@ -77,7 +90,19 @@ def _request_skip(control, previous, body):
 
 def _control_action(contract, config, body):
     action = body['action']
-    if action not in ('pause', 'resume', 'set_speed', 'skip_current'):
+    if action == 'archive':
+        previous = _current(contract)
+        if not body.get('job_id') or body['job_id'] != previous.get('job_id'):
+            raise ValueError('任务已变化，请刷新页面后重试')
+        if previous.get('status') in ACTIVE:
+            raise ValueError('任务结束后才能归档提示')
+        from .library_processing import _save, state_path
+        saved = json.loads(state_path(config).read_text(encoding='utf-8'))
+        if saved.get('job_id') != body['job_id']:
+            raise ValueError('任务已变化，请刷新页面后重试')
+        _save(state_path(config), {**saved, 'archived':True})
+        return q_library_processing(contract, {})
+    if action not in ('pause', 'resume', 'set_speed', 'skip_current', 'cancel'):
         raise ValueError('处理动作无效')
     previous = _current(contract)
     job_id = body.get('job_id')
@@ -91,6 +116,24 @@ def _control_action(contract, config, body):
     control.refresh(force=True)
     if job_id:
         control.select_job(str(job_id))
+    if action == 'cancel':
+        control.request('cancel', str(job_id))
+        _announce_control(contract.library_processing_job, str(job_id), 'stopping')
+        live = contract.library_processing_job.snapshot()
+        thread = getattr(contract.library_processing_job, 'thread', None)
+        if not (live and thread is not None and thread.is_alive()) and not _writer_active(config):
+            from .job_recovery import finish
+            from .library_processing import _save, state_path
+            previous.update(status='cancelled', outcome='cancelled', stage='已停止', error='')
+            _save(state_path(config), previous)
+            finish(contract.db_path, 'library-processing', str(job_id), 'cancelled')
+            if previous.get('run_id') is not None:
+                contract.library_processing_job.runs.finish(previous['run_id'], 'cancelled')
+            contract.library_processing_job.update(str(job_id), **{
+                key:value for key,value in previous.items() if key!='job_id'})
+        return q_library_processing(contract, {})
+    if previous.get('status') == 'stopping':
+        raise ValueError('正在等待任务停止，请稍后重试')
     if action == 'skip_current':
         _request_skip(control, previous, body)
         return q_library_processing(contract, {})
@@ -151,18 +194,39 @@ def q_library_processing_issues(contract, args):
     job_id = str(args.get('job_id') or '')
     if not job_id or job_id != str(state.get('job_id') or ''):
         raise ValueError('任务已变化，请刷新页面后重试')
-    rows = []
     path = issues_path(settings_file.active(), job_id)
     if path.is_file():
-        for line in path.read_text(encoding='utf-8').splitlines():
-            try:
-                rows.append(json.loads(line))
-            except ValueError:
-                continue
+        raw = path.read_text(encoding='utf-8')
+        rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    else:
+        rows = []
+        if state.get('issue_count'):
+            from .library_processing import state_path
+            saved = json.loads(state_path(settings_file.active()).read_text(encoding='utf-8'))
+            rows = saved.get('issues', [])
+            if not rows:
+                raise ValueError('未取得完整问题记录，请导出诊断日志')
+        raw = json.dumps(rows, ensure_ascii=False)
+    revision = hashlib.sha256(raw.encode()).hexdigest()
+    if args.get('revision') and args['revision'] != revision:
+        raise ValueError('问题记录已变化，请重新导出')
     offset = max(0, int(args.get('offset') or 0))
     limit = max(1, min(200, int(args.get('limit') or 50)))
-    return {'job_id': job_id, 'total': len(rows), 'offset': offset,
+    return {'job_id': job_id, 'revision':revision, 'total': len(rows), 'offset': offset,
             'rows': rows[offset:offset + limit]}
+
+
+def _remaining_retry_ids(contract, previous):
+    ids = list(previous.get('retryable_asset_ids') or [])
+    if not ids:
+        return []
+    remaining = set()
+    with contract.database.read_connection() as connection:
+        for offset in range(0, len(ids), 900):
+            batch = ids[offset:offset+900]
+            remaining.update(row[0] for row in connection.execute(
+                'SELECT id FROM asset WHERE disposal IS NULL AND id IN ('+','.join('?'*len(batch))+')',batch))
+    return [value for value in ids if value in remaining]
 
 
 def _retry_ids(previous, body):
@@ -184,7 +248,7 @@ def _retry_ids(previous, body):
         return allowed
     chosen = []
     for value in requested:
-        if not isinstance(value, int) or value not in allowed:
+        if isinstance(value, bool) or not isinstance(value, int) or value not in allowed:
             raise ValueError('重试项目不属于原任务的失败集合')
         chosen.append(value)
     return chosen
@@ -196,6 +260,15 @@ def _processing_request(contract, config, previous, body):
         raise ValueError('请先添加媒体目录')
     if contract.db_path.resolve() != (config.directory('database') / 'ledger.db').resolve():
         raise ValueError('当前馆藏与媒体配置不一致')
+    body = dict(body or {})
+    if 'scope' in body:
+        if body['scope'] != 'new' or 'asset_ids' in body or 'retry' in body:
+            raise ValueError('新入库范围不能与其他处理范围同时使用')
+        from .library_new_assets import pending
+        ids = pending(contract.db_path)
+        if not ids:
+            raise ValueError('暂无待处理的新入库影片')
+        body['asset_ids'] = ids
     retry_ids = _retry_ids(previous, body)
     if 'asset_ids' in (body or {}) and body['asset_ids'] is None:
         raise ValueError('请选择有效的视频项目')
@@ -219,7 +292,12 @@ def w_library_processing(contract, body, *, resume=False):
     previous = _current(contract)
     if previous.get('status') in ACTIVE and not resume:
         return public_state(previous)
+    if (body or {}).get('retry') is not None:
+        previous['retryable_asset_ids'] = _remaining_retry_ids(contract, previous)
     retry_ids, asset_ids, stage = _processing_request(contract, config, previous, body)
+    if (body or {}).get('scope') == 'new':
+        from .library_new_assets import remember
+        remember(contract.db_path, asset_ids)
     if retry_ids is not None and not retry_ids:
         return public_state(previous)
     mode = valid_mode(control_for(config).mode if resume else

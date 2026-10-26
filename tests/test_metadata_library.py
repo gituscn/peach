@@ -2542,6 +2542,29 @@ class LibraryStatePersistenceTests(unittest.TestCase):
         self.assertEqual(list(self.path.parent.iterdir()), [self.path])
 
 
+    @unittest.skipUnless(os.name == 'nt', '需要 Windows 文件共享语义')
+    def test_state_save_waits_for_a_windows_reader_to_close(self):
+        from peach.library_processing import _save
+        replace = os.replace
+        reader = self.path.open(encoding='utf-8')
+        self.addCleanup(reader.close)
+        blocked = []
+        def replace_while_reading(source, destination):
+            try:
+                return replace(source, destination)
+            except PermissionError as error:
+                blocked.append(error)
+                reader.close()
+                raise
+        current = {**self.previous, 'processed':2}
+        with patch('os.replace', side_effect=replace_while_reading):
+            _save(self.path, current)
+        self.assertEqual(len(blocked),1)
+        self.assertIn(blocked[0].winerror,(5,32))
+        self.assertEqual(json.loads(self.path.read_text(encoding='utf-8')),current)
+        self.assertEqual(list(self.path.parent.iterdir()),[self.path])
+
+
 class LibraryWatchdogTests(unittest.TestCase):
     """扫描与采集任务的进度心跳、卡住提示、预算与失败项重试。"""
 
@@ -2643,13 +2666,20 @@ class LibraryWatchdogTests(unittest.TestCase):
         from peach.web_library_processing import q_library_processing, w_library_processing
         config = self._config(self.root / 'media')
         state = {'status': 'failed', 'job_id': 'old', 'requested_stage': 'all', 'checked': 2,
-                 'retryable_asset_ids': [7], 'asset_ids': [7, 8], 'completed_metadata': [8],
+                 'retryable_asset_ids': [7], 'asset_ids': [7, 8], 'completed_metadata': ['8:R:\\media\\b.mp4'],
                  'local_metadata': {'7': {'path': 'R:\\media\\secret\\a.mp4'}}, 'progress_seq': 3}
         state_path(config).parent.mkdir(parents=True, exist_ok=True)
         state_path(config).write_text(json.dumps(state), encoding='utf-8')
         contract = Mock()
         contract.db_path = self.root / 'database/ledger.db'
         contract.library_processing_job.snapshot.return_value = None
+        from peach.repository import LedgerDatabase
+        contract.db_path.parent.mkdir(exist_ok=True)
+        fresh_ledger(contract.db_path.parent)
+        contract.database = LedgerDatabase(contract.db_path)
+        with contract.database.write_transaction() as connection:
+            connection.execute("INSERT INTO asset(id,location,path,name,medium) "
+                               "VALUES(7,'local','R:\\media\\a.mp4','a.mp4','video')")
         with patch('peach.web_library_processing.settings_file.active', return_value=config):
             read = q_library_processing(contract, {})
             # 正在跑时再点一次开始，回的是当前任务，同样只回投影。

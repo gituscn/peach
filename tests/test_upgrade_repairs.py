@@ -411,12 +411,12 @@ class UpgradeRepairTests(unittest.TestCase):
         previous = {'processing_rule':'legacy', 'completed_previews':['asset:1'],
                     'completed_metadata':['asset:1'], 'local_metadata':{'asset:1':{'old':True}}}
         state = {'local_metadata':previous['local_metadata']}
-        checkpoints = library_processing._LibraryCheckpoints(state, previous, self.database)
+        checkpoints = library_processing._LibraryCheckpoints(state, previous, self.database, self.database.db_path)
         self.assertEqual(checkpoints.completed, {'completed_previews':set(), 'completed_metadata':set()})
         self.assertEqual(state['local_metadata'], {})
         self.assertEqual(state['processing_rule'], upgrade_rules.PROCESSING)
         previous['processing_rule'] = upgrade_rules.PROCESSING
-        checkpoints = library_processing._LibraryCheckpoints({}, previous, self.database)
+        checkpoints = library_processing._LibraryCheckpoints({}, previous, self.database, self.database.db_path)
         self.assertEqual(checkpoints.completed['completed_metadata'], {'asset:1'})
 
 
