@@ -1,5 +1,11 @@
 # 复用清单
 
+## 全屏视频比例
+
+采用 simon1561 的 [PR #155](https://github.com/peach-mitao/peach/pull/155)，固定来源提交 `7ee5f2d6e0da03983fe943cb8179bee69c4f5639`，许可沿用本项目 AGPL-3.0-or-later。全屏适配复用现有 CSS `object-fit: contain`，原生全屏、播放器全屏类、属性与 full-window 回退使用同一规则；页面外框、控件和媒体管线保持既有契约，无新增依赖。
+
+社区浏览器用例核对源码及构建样式，在 4:3、16:9 与手机竖屏下检查全屏及退出状态。Windows 由现有完整浏览器入口执行，macOS 的独立入口只加载画面比例用例，不重复运行 Windows 那一份。代码及样式资源替换即可生效，无存量数据转换；视口模拟不代替折叠屏实机验收。
+
 ## 叶子证书密钥标识与存量补签
 
 采用 peach-patcher 的 [PR #177](https://github.com/peach-mitao/peach/pull/177)，固定来源提交 `62927d4b975bdad3420ef214bc9330382a4233d6`，许可证沿用本项目 AGPL-3.0-or-later。运行期与两个 TLS 设置脚本复用 OpenSSL 的 [`subjectKeyIdentifier` 和 `authorityKeyIdentifier`](https://docs.openssl.org/3.0/man5/x509v3_config/#authority-key-identifier) 扩展，显式签入叶子证书；标准库 [`ssl.create_default_context`](https://docs.python.org/3.14/library/ssl.html#ssl.create_default_context) 的严格验证策略保持启用。现有签发工具随运行环境提供，无新增依赖。
