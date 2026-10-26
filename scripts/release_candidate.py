@@ -113,7 +113,7 @@ def seal(root: Path) -> dict:
     (root / "build/ci-artifacts").mkdir(parents=True, exist_ok=True)
     (root / "build/ci-artifacts/docker-release.json").write_text(json.dumps(groups["docker-release"]), encoding="utf-8")
     artifacts.transfer(root, "docker-release", "pull")
-    docker = json.loads(path.read_text(encoding="utf-8-sig"))
+    docker = json.loads(path.read_text(encoding="utf-8"))
     validate_docker(docker, build)
     candidate = {"format": 1, "identity": build, "jobs": jobs, "groups": groups, "docker": docker}
     artifacts.remote_json(root, artifacts.prefix(build) + "/release-candidate.json", candidate)

@@ -67,7 +67,7 @@ sudo /usr/bin/xattr -rd com.apple.quarantine "/Applications/Peach.app"
 
 安装镜像使用 APFS 文件系统，保留已签名资源的 Unicode 文件名及应用扩展属性。浅桃色背景固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
 
-版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版从只读审阅和依赖检查开始，重型验证前完成复核并冻结输入；集成、运行核验与定版按[发版检查](TESTING.md#每次发版检查)执行，打标签统一使用 `scripts/release_tag.py`。
+版本提交触发 Release 演练，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。标签核对同一提交的成功演练与摘要，发布已验收的相同文件。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版从只读审阅和依赖检查开始，重型验证前完成复核并冻结输入；集成、运行核验与定版按[发版检查](TESTING.md#每次发版检查)执行，打标签统一使用 `scripts/release_tag.py`。
 
 ### GitLab 发布与下载后端
 
@@ -720,7 +720,7 @@ Windows 托盘在取得单实例锁后启动独立监视器。监视器用 Win32
 - 标签流水线第一步就跑仓库根与 `frontend` 两份 npm 审计；新公布的高危漏洞会让已打出的标签什么也发不了。所以 `--bump --apply` 写文件前、`--ship` 在 Test 转绿之后打标签之前，都先用 `scripts/npm_audit.py` 的同一判据复查一次，有高危漏洞就停，版本文件与标签都不动。
 - 等 Test 期间能确定等不到结果的也立刻停，不耗到超时：GitLab 必需任务（`verify-linux`、`verify-windows`、`verify-macos`、`wheel-smoke`）已失败；任务排着队没人接，且带这些 tags 的 runner 都不在线或已暂停（读 runner 列表要维护者权限；读不到，或列表里查不到带这些 tags 的 runner 时，按排队满 5 分钟仍未开始判停）；推送 5 分钟后仍没有 Test 记录。报错写明任务名、tags 和已等时长。GitHub 只对自建 runner 任务做同样判断，托管 runner 排队照常等。处理好之后再跑一次 `--ship --apply` 接着走。
 - 中途停下（断网、CI 还在跑、超时）就再运行一次同一条命令：每一步都先看当前状态，已提交的不重复提交，已推送的不重复推送，Test 没绿绝不打标签。
-- 单独补打标签用 `python scripts/release_tag.py`：默认只检查本地与 GitHub master 一致、这个提交最新的 Test 全绿、`CHANGELOG.md` 有这个版本的一节、标签不存在；加 `--apply` 才创建 annotated tag 并只推送这个标签。适用于发布提交已推送、只差标签的情况。变更日志那一节是硬性要求，缺了先用 `--bump` 起草。版本标签不覆盖，下一版先改 `__version__`。推送失败留下本地标签时，先确认归属再人工处理，不强推。Release 工作流会再检查标签提交在 master 历史里、同一提交的 Test 已通过，然后构建、验收制品、创建预发布。打标签代表公开预发布，不等于替换本机生产入口。
+- 单独补打标签用 `python scripts/release_tag.py`：默认只检查本地与 GitHub master 一致、这个提交最新的 Test 全绿、`CHANGELOG.md` 有这个版本的一节、标签不存在；加 `--apply` 才创建 annotated tag 并只推送这个标签。适用于发布提交已推送、只差标签的情况。变更日志那一节是硬性要求，缺了先用 `--bump` 起草。版本标签不覆盖，下一版先改 `__version__`。推送失败留下本地标签时，先确认归属再人工处理，不强推。Release 工作流会再检查标签提交在 master 历史里、同一提交的 Test 已通过，然后核对成功演练的产物并创建预发布。打标签代表公开预发布，不等于替换本机生产入口。
 - 已确认的发布提交推送后，若 master 继续推进，用 `python scripts/release_tag.py --release-sha <完整提交 SHA>` 核对固定提交的发布计划，确认输出后加 `--apply` 补打标签。这个模式从选定提交读取版本与变更日志，并在创建标签前再次核对主线归属、同一提交最新的绿色 Test 和标签占用；只推送标签，保留当前 master。它不能与 `--bump`、`--ship` 或 `--verify-sha` 合用。
 - **什么时候该发**：`scripts/agent_worktree.py integrate` 不改版本号，只报当前值，并输出 `release` 字段（`scripts/changelog.py` 的 `due()`）。`due` 为真时提出发布，理由在 `why`。节奏是每周一次、条目攒够提前、破坏性变化和安全修复不等周期（`DUE_DAYS = 7`、`DUE_ENTRIES = 10`）。只数使用者看得见的变更条目，不数提交。`DUE_ENTRIES` 是没有样本时的保守起点，`due()` 每次都报出实际条目数与分组，积累几次真实发布后再校准。
 - **会话收尾提醒**：`scripts/release_due.py --hook-event` 挂在 Claude 的 `.claude/settings.json` 与 Codex 的 `.codex/hooks.json` 的 `Stop` 钩子上（两边约定一致：stdin 收 JSON、stdout 回 `systemMessage`、退出码 0）。只有在主检出、在 master、工作区干净、这个 master sha 还没问过，并且 `due` 为真时才输出一句，其余情况什么都不打印。已问记录在 `<Peach 数据目录>/state/release-due.json`，master 前进后才会再问。手工查看用不带参数的 `python scripts/release_due.py`，它只读，不改记录。

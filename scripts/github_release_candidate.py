@@ -9,10 +9,14 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from peach.user_agent import USER_AGENT
 
 REQUIRED_ARTIFACTS = {"desktop-candidate", "macos-candidate-arm64", "macos-candidate-x86_64", "docker-candidate"}
 REQUIRED_JOBS = {"Windows x64 独立测试包", "仅下载制品验收", "Linux amd64 镜像构建与验收",
@@ -31,7 +35,7 @@ class ArtifactRedirect(HTTPRedirectHandler):
 
 
 def request(repo: str, endpoint: str):
-    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Peach-release"}
+    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT}
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if os.environ.get("GITHUB_ACTIONS") == "true" and token:
         headers["Authorization"] = "Bearer " + token

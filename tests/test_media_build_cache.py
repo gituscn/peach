@@ -63,6 +63,13 @@ class MediaBuildCacheTests(unittest.TestCase):
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("input")
+            def native_command(command, **_kwargs):
+                self.assertNotEqual(command[0], "cmake")
+                return "native tool version"
+            with mock.patch.object(cache.subprocess, "check_output", side_effect=native_command):
+                native = cache.input_identity(root, "macos", "arm64")
+            self.assertIn("sdk", native["toolchain"])
+            self.assertIn("pkg-config", native["toolchain"])
             first = cache.input_identity(root, "macos", "arm64", toolchain={"sdk": "one"})
             self.assertNotEqual(first, cache.input_identity(root, "macos", "x86_64", toolchain={"sdk": "one"}))
             self.assertNotEqual(first, cache.input_identity(root, "macos", "arm64", toolchain={"sdk": "two"}))

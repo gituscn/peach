@@ -26,7 +26,9 @@ def input_identity(root: Path, target: str, arch: str, *, toolchain: dict | None
     if toolchain is None:
         commands = {"compiler": ["x86_64-w64-mingw32-gcc", "--version"], "cxx": ["x86_64-w64-mingw32-g++", "--version"]} if target == "windows" else {
             "compiler": ["clang", "--version"], "sdk": ["xcrun", "--show-sdk-version"]}
-        commands.update({name: [name, "--version"] for name in ("meson", "ninja", "cmake", "make")})
+        commands.update({name: [name, "--version"] for name in ("meson", "ninja", "make", "pkg-config")})
+        if target == "windows":
+            commands["cmake"] = ["cmake", "--version"]
         commands["nasm"] = ["nasm", "-v"]
         commands["clang"] = ["clang", "--version"]
         toolchain = {name: subprocess.check_output(command, text=True, encoding="utf-8").strip()
