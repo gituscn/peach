@@ -81,6 +81,13 @@ RECIPES = {
         "commands": (),
         "checks": (("uv", "lock", "--check"),),
     },
+    "amane": {
+        "label": "amane 桥的独立 Python 依赖",
+        "manifests": ("tools/amane-bridge/pyproject.toml", "tools/amane-bridge/uv.lock"),
+        "derived": (),
+        "commands": (),
+        "checks": (("uv", "lock", "--project", "tools/amane-bridge", "--check"),),
+    },
     "actions": {
         "label": "GitHub Actions 工作流",
         "manifests": (".github/workflows/",),

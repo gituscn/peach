@@ -386,6 +386,13 @@ class DependencyPolicyTests(unittest.TestCase):
                 adopt.bring_over("dep", ("package.json",), root=repo)
             self.assertEqual(caught.exception.files, ["package.json"])
 
+    def test_bridge_dependencies_are_isolated_from_application_dependencies(self):
+        key, recipe = adopt.recipe_for(["tools/amane-bridge/uv.lock"])
+        self.assertEqual(key, "amane")
+        self.assertEqual(recipe["checks"], (("uv", "lock", "--project", "tools/amane-bridge", "--check"),))
+        with self.assertRaises(RuntimeError):
+            adopt.recipe_for(["uv.lock", "tools/amane-bridge/uv.lock"])
+
     def test_adopting_every_open_pr_stops_at_a_conflict_and_resumes_after_it(self):
         """`--all-open` 一个 PR 一个提交；改到相邻行的那个停下报文件，解完再跑只剩收尾。
 
