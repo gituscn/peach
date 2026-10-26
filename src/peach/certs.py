@@ -77,7 +77,7 @@ def _openssl(*args: str, stdin: bytes | None = None) -> str:
 def subject_alt_names(cert: Path) -> tuple[set[str], set[str]]:
     """返回 (DNS 名字集合, IP 集合)。读不出来就当成空，调用方会据此重签。"""
     try:
-        text = _openssl("x509", "-in", str(cert), "-noout", "-ext", "subjectAltName")
+        text = _openssl("x509", "-in", str(cert), "-noout", "-text")
     except (RuntimeError, OSError):
         return set(), set()
     return set(_SAN_DNS.findall(text)), set(_SAN_IP.findall(text))
