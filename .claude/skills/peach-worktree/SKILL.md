@@ -24,7 +24,7 @@ description: Peach 代码任务开工，以及创建、提交、集成或回收�
 4. `ready` 前纳入当前 `master` 并验证最终内容。提交、声明与记录齐全后取得 `ready` 的实际结果。
 5. 协调者执行 `integrate --branch <分支>`，等成功退出并核对主线提交，再做适用重启和运行核验。锁忙交入口等待，不手工 merge 绕过，不把分支交接当成验收完成。
 
-主检出 master 的直接提交与手工 merge 由 hook 拒收。版本推进、标签与发布只走 `scripts/release_tag.py`，发布核对按运行文档与 `docs/TESTING.md`；发布时机采用 `release_due.py` 及集成入口的同一判据，不额外重复检查。
+主检出 master 的直接提交与手工 merge 由 hook 拒收。发布先完成 `docs/TESTING.md`「每次发版检查」的依赖升级批次，再通过 `scripts/release_tag.py` 定版、打标签与发布；更新清单不代表升级完成。发布时机采用 `release_due.py` 及集成入口的同一判据，不额外重复检查。
 
 ## 修复的升级生效范围
 
