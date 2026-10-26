@@ -1,19 +1,19 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "15bf6027-b413-4089-9e63-65d88f7bddc5", e._sentryDebugIdIdentifier = "sentry-dbid-15bf6027-b413-4089-9e63-65d88f7bddc5");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "593a49a9-1c90-44ef-9606-d822bbd9488f", e._sentryDebugIdIdentifier = "sentry-dbid-593a49a9-1c90-44ef-9606-d822bbd9488f");
 	} catch {}
 })();
 import { Button as e, Chip as t, DIRECTORY_TEMPLATE_ERROR as n, DUPLICATES_KEY as r, Fieldset as i, FieldsetTitle as a, IDLE_REPAIR as o, IconButton as s, Input as c, JUNK_KEY as l, LINKS_KEY as u, LINK_CHECK_KEY as d, LINK_KINDS as f, LINK_PRUNE_KEY as p, LOC as m, LibraryProcessingCard as h, MEDIA_REPAIR_KEY as g, MEDIA_REPAIR_URL as _, MEDIA_SOURCES_KEY as v, MEDIA_SOURCE_ICONS as y, Note as b, ORGANIZE_KEY as x, ORPHAN_RECORDS_KEY as S, Progress as C, QUALITY_GOALS_KEY as w, REPAIR_CARD_TEXT as T, REPAIR_LIBRARIES_KEY as E, RESOURCE_APPLY_KEY as D, RESOURCE_SCAN_KEY as O, RESULT_PANEL as ee, RESULT_SECTION as k, REVIEW_COUNTS_KEY as A, SOURCE_LABELS as j, Select as te, SelectItem as ne, SourceMark as M, StatusLabel as N, TRASH_KEY as re, TaskProgress as P, Wt as F, __toESM as ie, apiSend as ae, applyConfirmText as I, applyLeftovers as L, applyPlanText as R, applyText as oe, attachOrphan as se, baseName as z, busyProps as B, candidateText as ce, checkLine as le, confirmModal as V, entityFaceImg as ue, entityPath as de, errorMessage as H, esc as fe, fetchDuplicates as pe, fetchJunkSummary as me, fetchLinkCheck as U, fetchLinkPrune as he, fetchLinkStats as W, fetchMediaRepair as ge, fetchMediaSources as _e, fetchOrganize as ve, fetchOrganizeExample as ye, fetchOrphanRecords as be, fetchQualityGoals as xe, fetchRepairLibraries as Se, fetchResourceApply as Ce, fetchResourceScan as we, fetchReviewCounts as Te, fetchTrashSummary as Ee, firstGrapheme as De, fmtSize as Oe, hasChanges as ke, hasResourceRoots as Ae, junkBreakdown as je, missingToolText as Me, organizeOutcome as Ne, pickOrganizeFolder as Pe, planSummary as Fe, previewOrganize as Ie, pruneText as Le, purgeCount as Re, purgeOrphan as ze, queryClient as G, recordsText as Be, rememberTemplates as Ve, require_jsx_runtime as He, require_react as Ue, reviewSummary as We, scanLine as Ge, sourceMeta as Ke, spriteGlyph as K, startLinkCheck as qe, startLinkPrune as Je, startOrganize as Ye, startResourceApply as Xe, startResourceScan as Ze, statusLine as Qe, useAction as $e, useBackgroundJob as q, useMutation as et, useQuery as J, withOrganizeJob as tt } from "./peach-app.js";
-import { Page as nt } from "./peach-app.page-Irl_Wogd.js";
-import { ErrorExcerpt as rt } from "./peach-app.error-excerpt-GIDhsLJp.js";
-import { PLAIN_STAT_STRIP as it, PlainStat as Y, plainStatClass as X } from "./peach-app.stat-card-Q_AB9v0S.js";
-import { DataTable as at } from "./peach-app.data-table-CI9MJhw_.js";
-import { SiteMark as ot } from "./peach-app.site-mark-Cjd7g2Ii.js";
-import { LEGACY_AVATAR_IMG as st } from "./peach-app.legacy-avatar-CtPLcaNX.js";
-import { FolderSearchIcon as ct } from "./peach-app.folder-rows-C5-6TcQS.js";
-import { ConnectionStatus as lt } from "./peach-app.connection-status-BP0ylxDH.js";
-//#region src/react/media-repair/media-repair-card.tsx
+import { Page as nt } from "./peach-app.page-8O0Xao0B.js";
+import { ErrorExcerpt as rt } from "./peach-app.error-excerpt-DeVcv4q5.js";
+import { PLAIN_STAT_STRIP as it, PlainStat as Y, plainStatClass as X } from "./peach-app.stat-card-CzHMHp_P.js";
+import { DataTable as at } from "./peach-app.data-table-vvlsREiR.js";
+import { SiteMark as ot } from "./peach-app.site-mark-B-6CccRY.js";
+import { LEGACY_AVATAR_IMG as st } from "./peach-app.legacy-avatar-BREPiIcW.js";
+import { FolderSearchIcon as ct } from "./peach-app.folder-rows-qmSvC8go.js";
+import { ConnectionStatus as lt } from "./peach-app.connection-status-D5osXsr7.js";
+// src/react/media-repair/media-repair-card.tsx
 var Z = /* @__PURE__ */ ie(Ue(), 1), Q = He(), ut = (e) => y[e] || e, dt = (e) => G.setQueryData(g, e);
 function ft({ toast: t = () => {} }) {
 	let n = q({
@@ -107,8 +107,7 @@ function ft({ toast: t = () => {} }) {
 		})]
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/link-check-icon.tsx
+// src/react/data-cleanup/link-check-icon.tsx
 function pt({ className: e }) {
 	return /* @__PURE__ */ (0, Q.jsxs)("svg", {
 		"aria-hidden": !0,
@@ -135,8 +134,7 @@ function pt({ className: e }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/link-manager.tsx
+// src/react/data-cleanup/link-manager.tsx
 var mt = K("rotate-cw"), ht = "站点返回 404 或 410，确认这个地址不存在。", gt = "站点拒绝程序访问或一次临时故障都会落在这里。链接保留，可勾选后单独重试。", _t = "删除前会逐条重验一次；此操作不可撤销。", vt = "暂时无法读取进度，正在重新连接…", yt = (e) => Number(e || 0).toLocaleString();
 function bt({ label: e, value: t, note: n }) {
 	return /* @__PURE__ */ (0, Q.jsxs)("div", {
@@ -509,8 +507,7 @@ function St() {
 		})]
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/organize-card.tsx
+// src/react/data-cleanup/organize-card.tsx
 var Ct = (e, t) => `将整理「${e}」${t ? `的「${t}」及其子目录` : "上的文件名与目录"}，清理特殊符号与乱码，并按已填模板改名或移动。目标已存在的行会整行跳过。这一批可以从「回滚上一批」整批退回。`, wt = "将把上一批整理动过的文件退回整理前的名字与位置，数据库路径跟着退回。退回后这一批不再出现在这里。", Tt = 8;
 function Et({ plan: e }) {
 	return /* @__PURE__ */ (0, Q.jsxs)(Q.Fragment, { children: [/* @__PURE__ */ (0, Q.jsx)("ol", {
@@ -898,8 +895,7 @@ function Dt({ toast: t, failure: r }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/orphan-records-card.tsx
+// src/react/data-cleanup/orphan-records-card.tsx
 var Ot = K("play"), kt = () => G.invalidateQueries({
 	queryKey: S,
 	exact: !0
@@ -1075,8 +1071,7 @@ function Mt({ toast: t }) {
 		})
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/resource-sync-card.tsx
+// src/react/data-cleanup/resource-sync-card.tsx
 var Nt = K("git-compare"), Pt = K("rotate-cw"), Ft = "暂时无法读取进度，正在重新连接…", It = "清理失效条目", Lt = "inline-grid w-full grid-flow-col auto-cols-fr gap-4 max-plain-stat-pair:grid-flow-row max-plain-stat-pair:grid-cols-2 max-plain-stat-single:grid-cols-1", $ = (e) => Number(e || 0).toLocaleString();
 function Rt({ scan: e, partial: t = !1 }) {
 	let n = e.cache ?? {
@@ -1282,8 +1277,7 @@ function zt({ toast: t }) {
 		})]
 	});
 }
-//#endregion
-//#region src/react/data-cleanup/data-cleanup-page.tsx
+// src/react/data-cleanup/data-cleanup-page.tsx
 function Bt(e, t) {
 	return e.data === void 0 ? { figure: e.isError ? "读取失败" : "—" } : t(e.data);
 }
@@ -1408,7 +1402,6 @@ function Yt({ toast: e, failure: t, open: n }) {
 		Ae(u.data) ? /* @__PURE__ */ (0, Q.jsx)(zt, { toast: e }) : null
 	] });
 }
-//#endregion
 export { Yt as DataCleanupPage };
 
-//# debugId=15bf6027-b413-4089-9e63-65d88f7bddc5
+//# debugId=593a49a9-1c90-44ef-9606-d822bbd9488f

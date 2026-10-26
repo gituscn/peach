@@ -1,15 +1,15 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "06c562f8-dff5-4ca2-9b9b-5d9d451e5b46", e._sentryDebugIdIdentifier = "sentry-dbid-06c562f8-dff5-4ca2-9b9b-5d9d451e5b46");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "f727de20-db7c-4462-9342-1c639c6045cd", e._sentryDebugIdIdentifier = "sentry-dbid-f727de20-db7c-4462-9342-1c639c6045cd");
 	} catch {}
 })();
 import { $2ec61d1d4f780267$export$a8a3e93435678ff9 as e, $3a442827418ebe87$export$eb2fcfdbd7ba97d4 as t, $542a13ca2fa5b484$export$5b6b19405a83ff9d as n, $72abaeab4d80592f$export$78efe591171d7d45 as r, $bd263d78e9bf3c56$export$f5c9f3c2c4054eec as i, $ea3928288112382f$export$439d29a4e110a164 as a, $f2ff30fde7b014be$export$3ddf2d174ce01153 as o, $fe21c36db05242bb$export$a98f0dcb43a68a25 as s, $fe21c36db05242bb$export$d7b12c4107be0d61 as c, ACCENTS as l, ApiError as u, Button as d, ButtonLink as f, CLOUD_LOCATIONS as p, CLOUD_PROXY_HELP as m, CONFIGURATION_KEY as h, CONFIGURATION_URL as g, CREDENTIAL_STATE as _, Checkbox as v, Chip as y, Disclosure as b, ENTRY_LINKS_HELP as x, ENTRY_LINKS_HINT as S, EmptyState as ee, ErrorText as C, ExternalLink as w, FEED_SCHEDULE_KEY as T, FOLLOW_CREDENTIALS_KEY as E, FOLLOW_INITIAL_RANGE_OPTIONS as D, FOLLOW_SCHEDULE_KEY as O, Fact as k, FactList as te, FieldLabel as ne, Footer as A, Help as j, HintText as re, Input as M, LIBRARY_FOLDER_HELP as ie, LIBRARY_PROCESSING_KEY as ae, Label as oe, LinkButton as se, LoadingDots as ce, M6 as le, MEDIA_PROCESSING_KEY as ue, MEDIA_PROCESSING_URL as de, MEDIA_SOURCE_ICONS as fe, MENU_POPOVER_SURFACE as pe, Note as N, PICK_FOLDER_URL as me, POLICY_COLUMNS as he, POLICY_COVER_NOTE as ge, POLICY_MATRIX as _e, POLICY_SUMMARY as ve, PathLine as ye, PillTabList as be, Progress as xe, Rows as P, SEGMENT as Se, SEGMENTED_TRACK as Ce, SETTINGS_KEY as we, SETTINGS_URL as Te, Section as F, SectionSkeleton as Ee, SegmentedRadioGroup as De, Select as Oe, Select$1 as I, SelectItem as L, SettingsCard as ke, SettingsRow as R, SiteLabel as Ae, SourceLabel as z, SourceMark as je, Stack as B, StatusLabel as V, Switch as H, THUMBNAIL_JOBS_KEY as Me, TextField as Ne, TextFieldContext as Pe, __toESM as Fe, apiGet as U, apiSend as W, appSettingsStore as Ie, boundedPreference as Le, busyProps as G, cardClass as Re, cloudProxySkeleton as ze, cn as Be, confirmModal as Ve, credentialDone as He, credentialsSkeleton as Ue, cx as We, errorMessage as K, fetchConfiguration as Ge, fetchCredentials as Ke, fetchFeedSchedule as qe, fetchFollowSchedule as Je, fetchMediaProcessing as Ye, fetchSettings as Xe, fetchThumbnailJobs as Ze, fmtSize as Qe, indexersSkeleton as $e, javBrowserSkeleton as et, momentText as tt, overlayHost as nt, peachHistory$1 as rt, previewLibraryColor as it, providerIcon as at, queryClient as q, randomId as ot, rememberShape as J, require_jsx_runtime as st, require_react as ct, saveCredential as lt, schedulePollInterval as ut, settingsPath as dt, shellNavigate as ft, sortCx as pt, sourceDefaultCost as mt, useAction as Y, useClientUpdates as ht, useLibraryTints as gt, useMutation as _t, useQuery as X, useRunSchedule as vt, useSaveFollowSchedule as yt, useSaveSettings as bt, useSaveThumbnailMode as xt } from "./peach-app.js";
-import { CodeBlock as St } from "./peach-app.code-block-CuHUqiH3.js";
-import { FolderField as Ct, FolderFieldLine as wt, FolderRow as Tt, MEDIA_SOURCES as Et, MediaReadPolicy as Dt, MediaReadPolicyHelp as Ot, SourceSelect as kt, isCloudSource as At, sourceMark as jt, useFolderRows as Mt } from "./peach-app.folder-rows-C5-6TcQS.js";
-import { ConnectionStatus as Nt } from "./peach-app.connection-status-BP0ylxDH.js";
-import { SourceIcon as Pt } from "./peach-app.source-view-Bk_L5GHG.js";
-//#region src/react/settings/configuration-panel.ts
+import { CodeBlock as St } from "./peach-app.code-block-CtzIYGbl.js";
+import { FolderField as Ct, FolderFieldLine as wt, FolderRow as Tt, MEDIA_SOURCES as Et, MediaReadPolicy as Dt, MediaReadPolicyHelp as Ot, SourceSelect as kt, isCloudSource as At, sourceMark as jt, useFolderRows as Mt } from "./peach-app.folder-rows-qmSvC8go.js";
+import { ConnectionStatus as Nt } from "./peach-app.connection-status-D5osXsr7.js";
+import { SourceIcon as Pt } from "./peach-app.source-view-BycAFww2.js";
+// src/react/settings/configuration-panel.ts
 var Z = /* @__PURE__ */ Fe(ct(), 1), Ft = "flex flex-col gap-6";
 function Q(e) {
 	return e ? {
@@ -20,8 +20,7 @@ function Q(e) {
 		"aria-labelledby": e.labelledBy
 	} : { className: Ft };
 }
-//#endregion
-//#region src/react/settings/userscript-probe.ts
+// src/react/settings/userscript-probe.ts
 function It() {
 	let e = (0, Z.useRef)(null), [t, n] = (0, Z.useState)(0), [r, i] = (0, Z.useState)("checking");
 	return (0, Z.useEffect)(() => {
@@ -52,8 +51,7 @@ function It() {
 		}
 	};
 }
-//#endregion
-//#region src/react/settings/userscript-status.tsx
+// src/react/settings/userscript-status.tsx
 var $ = st();
 function Lt(e, t) {
 	let n = e.split(".").map(Number), r = t.split(".").map(Number);
@@ -138,8 +136,7 @@ function Rt({ enabled: e, release: t }) {
 		]
 	})] });
 }
-//#endregion
-//#region src/react/settings/jav-browser-settings.tsx
+// src/react/settings/jav-browser-settings.tsx
 var zt = "/api/configuration/jav-browser";
 function Bt({ receipt: e, refreshKey: t }) {
 	let n = X({
@@ -250,8 +247,7 @@ function Vt({ initial: e, receipt: t }) {
 		})] })]
 	});
 }
-//#endregion
-//#region src/react/settings/download-settings.tsx
+// src/react/settings/download-settings.tsx
 var Ht = "/api/configuration/downloads", Ut = "/api/configuration/downloads/check", Wt = "/api/configuration/downloads/folder", Gt = "/api/configuration/downloads/pikpak/login", Kt = "/api/configuration/downloads/pikpak/logout", qt = "/api/configuration/downloads/pikpak/browser-login", Jt = 2e3, Yt = at("pikpak");
 function Xt({ initial: e, receipt: t, panel: n, issues: r }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
@@ -704,8 +700,7 @@ function tn({ state: e, settle: t, receipt: n, username: r, setUsername: i }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/library-sharing-settings.tsx
+// src/react/settings/library-sharing-settings.tsx
 function nn({ initial: e, receipt: t }) {
 	let [n, r] = (0, Z.useState)(e), [i, a] = (0, Z.useState)(null), [o, s] = (0, Z.useState)(!1), [c, l] = (0, Z.useState)(!1), u = (0, Z.useMemo)(() => i ? JSON.stringify(i.data, null, 2) : "", [i]), f = Y(), p = (e) => void f.run("save", (t) => W("/api/configuration/library-sharing", {
 		enabled: e,
@@ -835,8 +830,7 @@ function nn({ initial: e, receipt: t }) {
 		] })
 	] });
 }
-//#endregion
-//#region src/react/settings/remote-reporting-settings.tsx
+// src/react/settings/remote-reporting-settings.tsx
 function rn({ value: e, onChange: t, busy: n = !1 }) {
 	return /* @__PURE__ */ (0, $.jsxs)($.Fragment, { children: [/* @__PURE__ */ (0, $.jsx)(P, { children: /* @__PURE__ */ (0, $.jsx)(R, {
 		label: "发送版本统计与错误诊断（推荐）",
@@ -877,8 +871,7 @@ function an({ initial: e, receipt: t }) {
 		children: /* @__PURE__ */ (0, $.jsx)(C, { children: i.error })
 	}) : null] });
 }
-//#endregion
-//#region src/react/settings/storage-settings.tsx
+// src/react/settings/storage-settings.tsx
 var on = "/api/configuration/storage", sn = 1500, cn = 864e5, ln = (e) => e instanceof u && e.body?.errors?.target || K(e);
 function un(e) {
 	if (e.free_bytes === null || e.total_bytes === null) return "未取得";
@@ -991,8 +984,7 @@ function dn({ initial: e, receipt: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/maintenance-settings.tsx
+// src/react/settings/maintenance-settings.tsx
 var fn = [
 	["6", "每 6 小时"],
 	["24", "每天"],
@@ -1176,8 +1168,7 @@ function _n({ uninstall: e, receipt: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/release-updates.tsx
+// src/react/settings/release-updates.tsx
 var vn = /* @__PURE__ */ new Set([
 	"downloading",
 	"verifying",
@@ -1344,8 +1335,7 @@ function xn({ initial: e, initialJob: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/upgrade-repairs.tsx
+// src/react/settings/upgrade-repairs.tsx
 var Sn = {
 	pending: "等待修复",
 	running: "正在修复",
@@ -1404,8 +1394,7 @@ function Cn() {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/general-settings.tsx
+// src/react/settings/general-settings.tsx
 function wn({ data: e, receipt: t, panel: n }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
 		...Q(n),
@@ -1481,8 +1470,7 @@ function Tn({ startup: e, receipt: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/restart-redirect.ts
+// src/react/restart-redirect.ts
 var En = 8e3, Dn = [
 	{
 		name: "机械硬盘，或内存 8 GB 以内",
@@ -1558,8 +1546,7 @@ function kn() {
 		})
 	});
 }
-//#endregion
-//#region src/react/settings/cloud-proxy-settings.tsx
+// src/react/settings/cloud-proxy-settings.tsx
 var An = "/api/configuration/cloud-proxies", jn = [
 	["direct", "直连"],
 	["system", "跟随系统"],
@@ -1791,8 +1778,7 @@ function Pn({ label: e, value: t, disabled: n, onChange: r }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/library-icon-picker.tsx
+// src/react/settings/library-icon-picker.tsx
 var Fn = [
 	["", "自动识别"],
 	["hard-drive", "磁盘"],
@@ -1905,8 +1891,7 @@ function Rn({ value: t, label: r, kind: i = "local", onChange: a }) {
 		})
 	})] });
 }
-//#endregion
-//#region src/react/settings/library-policy-settings.tsx
+// src/react/settings/library-policy-settings.tsx
 var zn = [
 	["probe", "读取视频信息"],
 	["metadata", "联网补资料"],
@@ -2090,8 +2075,7 @@ function Gn({ id: e, name: t, value: i, onChange: a }) {
 		})
 	})] });
 }
-//#endregion
-//#region src/react/settings/push-discovery-settings.tsx
+// src/react/settings/push-discovery-settings.tsx
 var Kn = "/api/configuration/push-discovery", qn = "/api/configuration/push-discovery/secret";
 function Jn({ initial: e, receipt: t }) {
 	let [n, r] = (0, Z.useState)(e), [i, a] = (0, Z.useState)(e.prefixes), [o, s] = (0, Z.useState)(""), c = Y(), l = n.media_roots, [u, f] = (0, Z.useState)(e), p = (e, n) => {
@@ -2269,8 +2253,7 @@ function Jn({ initial: e, receipt: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/media-settings.tsx
+// src/react/settings/media-settings.tsx
 var Yn = (e) => Et.find(([t]) => t === e)?.[1] ?? e, Xn = [...Et, ["smb", "SMB 共享"]], Zn = (e) => e.library_icon || In(e.transport === "smb" ? "smb" : e.location)[0], Qn = async (e) => (await W(me, { initial: e })).path, $n = (e) => ({
 	library_id: e.library_id,
 	library: e.library,
@@ -2749,8 +2732,7 @@ function sr({ data: e }) {
 		]
 	}) : null;
 }
-//#endregion
-//#region src/react/settings/service-preferences.tsx
+// src/react/settings/service-preferences.tsx
 var cr = [
 	["off", "关闭"],
 	["precise", "每 10 秒一张"],
@@ -2970,8 +2952,7 @@ function pr({ kind: e, status: t, title: n }) {
 		children: s
 	}) });
 }
-//#endregion
-//#region src/react/settings/media-processing-settings.tsx
+// src/react/settings/media-processing-settings.tsx
 function mr({ receipt: e }) {
 	let t = X({
 		queryKey: ue,
@@ -3077,29 +3058,14 @@ function hr({ receipt: e }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/boardui/components/base/textarea/textarea.tsx
+// src/react/boardui/components/base/textarea/textarea.tsx
 var gr = pt({
-	field: [
-		"relative flex w-full flex-col",
-		"rounded-2lg",
-		"bg-background-tertiary-default text-foreground-icon-tertiary",
-		"ring-2 ring-inset ring-transparent",
-		"transition-[background-color,box-shadow,color] duration-[var(--input-transition-ms)] ease"
-	].join(" "),
+	field: "relative flex w-full flex-col rounded-2lg bg-background-tertiary-default text-foreground-icon-tertiary ring-2 ring-inset ring-transparent transition-[background-color,box-shadow,color] duration-[var(--input-transition-ms)] ease",
 	fieldSize: {
 		medium: "p-2",
 		small: "px-1.5 py-2"
 	},
-	textarea: [
-		"block w-full min-w-0 bg-transparent border-0 outline-none m-0 p-0 px-1",
-		"font-sans text-body-regular text-text-primary",
-		"placeholder:text-text-tertiary",
-		"focus:placeholder:text-text-primary",
-		"disabled:text-input-disabled-text disabled:placeholder:text-input-disabled-text",
-		"disabled:cursor-not-allowed",
-		"aria-invalid:placeholder:text-text-error-placeholder"
-	].join(" "),
+	textarea: "block w-full min-w-0 bg-transparent border-0 outline-none m-0 p-0 px-1 font-sans text-body-regular text-text-primary placeholder:text-text-tertiary focus:placeholder:text-text-primary disabled:text-input-disabled-text disabled:placeholder:text-input-disabled-text disabled:cursor-not-allowed aria-invalid:placeholder:text-text-error-placeholder",
 	resize: {
 		none: "resize-none",
 		vertical: "resize-y"
@@ -3180,8 +3146,7 @@ function yr({ label: e, hint: t, tooltip: n, placeholder: r, rows: i, autoResize
 	});
 }
 yr.displayName = "Textarea";
-//#endregion
-//#region src/react/settings/code-pattern-settings.tsx
+// src/react/settings/code-pattern-settings.tsx
 var br = "^\\+{3}\\s*(?<code>FC2-PPV-\\d+)\n\\[(?<code>[A-Z]+-\\d+)\\]";
 function xr({ receipt: e }) {
 	let t = X({
@@ -3218,8 +3183,7 @@ function xr({ receipt: e }) {
 		}) })]
 	});
 }
-//#endregion
-//#region src/react/settings/password-pair.tsx
+// src/react/settings/password-pair.tsx
 function Sr({ label: e, password: t, confirmation: n, onPassword: r, onConfirmation: i, disabled: a = !1, passwordError: o, passwordHint: s, confirmationError: c, confirmationInvalid: l = !1 }) {
 	return /* @__PURE__ */ (0, $.jsxs)($.Fragment, { children: [/* @__PURE__ */ (0, $.jsx)(M, {
 		id: "access-password",
@@ -3249,8 +3213,7 @@ function Sr({ label: e, password: t, confirmation: n, onPassword: r, onConfirmat
 		hint: a ? void 0 : c
 	})] });
 }
-//#endregion
-//#region src/react/settings/access-settings.tsx
+// src/react/settings/access-settings.tsx
 var Cr = {
 	legacy: "当前使用系统生成的访问口令。改设自己的密码，或关闭登录要求。",
 	locked: "访问设置无法读取，请在本机检查配置文件。",
@@ -3328,8 +3291,7 @@ function wr({ initial: e, receipt: t }) {
 		}) }) : null]
 	});
 }
-//#endregion
-//#region src/react/components/configuration-fields.tsx
+// src/react/components/configuration-fields.tsx
 function Tr({ id: e, label: t, value: n, onChange: r, options: i, isDisabled: a, isInvalid: o, children: s }) {
 	let l = `${e}-label`;
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
@@ -3373,8 +3335,7 @@ function Er({ prefix: e, suffix: t, ...n }) {
 		trailingIcon: t ? r : void 0
 	});
 }
-//#endregion
-//#region src/react/settings/port-settings.tsx
+// src/react/settings/port-settings.tsx
 var Dr = [{
 	value: "0.0.0.0",
 	label: "同一局域网的设备"
@@ -3512,8 +3473,7 @@ function kr({ label: e, value: t, receipt: n }) {
 		}) : null]
 	});
 }
-//#endregion
-//#region src/react/settings/peach-proxy-fields.tsx
+// src/react/settings/peach-proxy-fields.tsx
 var Ar = [
 	["environment", "跟随环境"],
 	["direct", "直连"],
@@ -3548,8 +3508,7 @@ function Mr({ id: e, value: t, onChange: n, saved: r = !1, error: i }) {
 		hint: i
 	});
 }
-//#endregion
-//#region src/react/settings/tunnel-settings.tsx
+// src/react/settings/tunnel-settings.tsx
 var Nr = 2e3, Pr = [["quick", "临时链接"], ["named", "命名隧道"]], Fr = {
 	quick: "临时预览用，地址随机，重启后会变。启动前要先设置访问密码。",
 	named: "使用你在 Cloudflare 绑定的固定域名。启动前要先设置访问密码。"
@@ -3663,8 +3622,7 @@ function Ir({ revision: e, initial: t, receipt: n }) {
 		})]
 	});
 }
-//#endregion
-//#region src/react/settings/network-settings.tsx
+// src/react/settings/network-settings.tsx
 function Lr({ data: e, receipt: t, panel: n, issues: r }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
 		...Q(n),
@@ -3736,8 +3694,7 @@ function Rr({ initial: e, receipt: t }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/follow-manage/credentials.tsx
+// src/react/follow-manage/credentials.tsx
 var zr = "将清除这个来源在本机和共享副本中的登录凭据。", Br = "其他系统用户可以读取此凭据文件。请在运行 Peach 的 Mac 或 Linux 电脑上，将文件权限设为仅当前用户可读写（0600）。";
 function Vr(e, t) {
 	return (e.shared_fields || []).includes(t) ? "来自共享，留空表示不改" : e.fields.includes(t) ? "已保存，留空表示不改" : "未填写";
@@ -3939,8 +3896,7 @@ function Gr({ data: e, readOnly: t, toast: n, embedded: r = !1 }) {
 		}), s]
 	});
 }
-//#endregion
-//#region src/react/settings/entry-links-settings.tsx
+// src/react/settings/entry-links-settings.tsx
 function Kr({ initial: e, receipt: t }) {
 	let [n, r] = (0, Z.useState)(e.sites), i = Y(), a = (e, t) => r((n) => n.map((n) => n.key === e ? {
 		...n,
@@ -3979,8 +3935,7 @@ function Kr({ initial: e, receipt: t }) {
 		}) })]
 	});
 }
-//#endregion
-//#region src/react/settings/indexer-settings.tsx
+// src/react/settings/indexer-settings.tsx
 var qr = "/api/configuration/indexers";
 function Jr({ receipt: e }) {
 	let t = X({
@@ -4136,8 +4091,7 @@ function Zr({ initial: e, receipt: t }) {
 		})] })]
 	});
 }
-//#endregion
-//#region src/react/settings/source-settings.tsx
+// src/react/settings/source-settings.tsx
 function Qr({ data: e, receipt: t, panel: n, issues: r }) {
 	let i = X({
 		queryKey: E,
@@ -4176,8 +4130,7 @@ function Qr({ data: e, receipt: t, panel: n, issues: r }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/settings/configuration-shape.ts
+// src/react/settings/configuration-shape.ts
 function $r(e) {
 	let t = e.downloads;
 	if (!t) return null;
@@ -4225,8 +4178,7 @@ function ti(e) {
 		uninstallHelp: !!e.uninstall?.available
 	};
 }
-//#endregion
-//#region src/react/settings/configuration-page.tsx
+// src/react/settings/configuration-page.tsx
 function ni({ receipt: e, reopenTutorial: t, section: n = "", diagnostics: r }) {
 	let i = X({
 		queryKey: h,
@@ -4431,7 +4383,6 @@ function ai({ data: e, receipt: t, reopenTutorial: n, section: r, diagnostics: i
 		})] }, e))]
 	});
 }
-//#endregion
 export { ni as ConfigurationPage };
 
-//# debugId=06c562f8-dff5-4ca2-9b9b-5d9d451e5b46
+//# debugId=f727de20-db7c-4462-9342-1c639c6045cd

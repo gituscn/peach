@@ -1,19 +1,19 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "4f918827-8c83-4ae3-969f-b4898ef398a6", e._sentryDebugIdIdentifier = "sentry-dbid-4f918827-8c83-4ae3-969f-b4898ef398a6");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "703ef35e-7864-4659-ba20-a2c656be68d4", e._sentryDebugIdIdentifier = "sentry-dbid-703ef35e-7864-4659-ba20-a2c656be68d4");
 	} catch {}
 })();
-import { createPaginatedRowModel as e } from "./peach-app.createPaginatedRowModel-DKa1ysea.js";
-import { createSortedRowModel as t, useTableSelection as n } from "./peach-app.use-table-selection-Bi_E2zbh.js";
+import { createPaginatedRowModel as e } from "./peach-app.createPaginatedRowModel-BaoO3AFa.js";
+import { createSortedRowModel as t, useTableSelection as n } from "./peach-app.use-table-selection-CLiE6jgl.js";
 import { $2ec61d1d4f780267$export$a8a3e93435678ff9 as r, $542a13ca2fa5b484$export$5b6b19405a83ff9d as i, $76d00c5a4edb230a$export$76ccd210b9029917 as a, $76d00c5a4edb230a$export$816b5d811295e6bc as o, $76d00c5a4edb230a$export$b59bdbef9ce70de2 as s, $76d00c5a4edb230a$export$f6f0c3fe4ec306ea as c, $76d00c5a4edb230a$export$f850895b287ef28e as l, $b4f18e3395fe64d7$export$3d96ec278d3efce4 as u, $b4f18e3395fe64d7$export$3e41faf802a29e71 as d, $b4f18e3395fe64d7$export$b2539bed5023c21c as f, $ea3928288112382f$export$439d29a4e110a164 as p, $l as m, Button as h, ButtonLink as ee, Bx as g, Checkbox as _, ChevronSortDown as te, Chip as v, DataTableFooter as y, DataTableFrame as ne, DataTableSort as b, EmptyFocusButton as x, EmptyState as S, ErrorText as C, ExternalLink as w, FEEDS_KEY as T, FOLLOW_CREDENTIALS_KEY as re, FOLLOW_MANAGE_KEY as E, FOLLOW_MANAGE_NAV as D, FOLLOW_RESOLVE_KEY as O, FieldLabel as k, Help as A, Input as j, LoadingDots as M, M6 as N, MENU_ITEM as P, MENU_ITEM_INTERACTIVE as F, MENU_POPOVER_SURFACE as I, ModalFrame as L, Note as R, P7 as z, SORT_DEFAULT_DIR as B, SelectionDock as V, SelectionPopover as H, SiteLabel as U, Switch as ie, Table as ae, TableColumnControls as oe, TableColumnResizer as se, TableSelectionHeader as ce, TagManager as le, TaskProgress as W, Wt as ue, Xf as de, __toESM as fe, addAlias as pe, addSource as me, avatarInner as he, busyProps as G, cardClass as K, checkFeeds as q, columnVisibilityFeature as ge, confirmModal as _e, createColumnHelper as ve, credentialDone as ye, cx as J, dZ as be, errorHeadline as xe, errorMessage as Y, feedIntervalText as X, fetchCredentials as Se, fetchFeeds as Ce, fetchFollow as we, fetchResolveJob as Te, fetchSuggestions as Ee, flexRender as De, followFeedByName as Oe, followSuggestKey as ke, groupByAuthor as Ae, isBroken as je, isLayout as Me, keepSelected as Ne, localTime as Pe, lookupFeedActor as Fe, mapLimit as Ie, pageSizeOf as Le, pageWindow as Re, pv as ze, queryClient as Be, reloadFollowManage as Ve, removeAlias as He, removeFeed as Ue, renameAliasGroup as We, require_jsx_runtime as Ge, require_react as Ke, resolveFollowSort as qe, rowPaginationFeature as Je, rowSelectionFeature as Ye, rowSortingFeature as Xe, setFeedEnabled as Ze, startCheck as Qe, startResolve as $e, tableFeatures as et, useAction as tt, useBackgroundJob as nt, useMutation as rt, useQuery as it, useTable as at, useTablePreferences as ot } from "./peach-app.js";
-import { Page as st } from "./peach-app.page-Irl_Wogd.js";
-import { STAT_STRIP_SIX as ct } from "./peach-app.stat-card-Q_AB9v0S.js";
-import { LEGACY_AVATAR_IMG as lt } from "./peach-app.legacy-avatar-CtPLcaNX.js";
-import { PillAriaTabList as ut } from "./peach-app.pill-aria-tab-list-CJ47JigD.js";
-import { AuthorAvatar as dt, SourceIcon as ft } from "./peach-app.source-view-Bk_L5GHG.js";
-import { SourceList as pt } from "./peach-app.source-list-B2yIEqVl.js";
-//#region src/react/follow-manage/add-source.tsx
+import { Page as st } from "./peach-app.page-8O0Xao0B.js";
+import { STAT_STRIP_SIX as ct } from "./peach-app.stat-card-CzHMHp_P.js";
+import { LEGACY_AVATAR_IMG as lt } from "./peach-app.legacy-avatar-BREPiIcW.js";
+import { PillAriaTabList as ut } from "./peach-app.pill-aria-tab-list-Clralw3f.js";
+import { AuthorAvatar as dt, SourceIcon as ft } from "./peach-app.source-view-BycAFww2.js";
+import { SourceList as pt } from "./peach-app.source-list-CCoPlUwi.js";
+// src/react/follow-manage/add-source.tsx
 var Z = /* @__PURE__ */ fe(Ke(), 1), Q = Ge(), mt = J(P, F, "text-body-2-medium"), ht = "粘贴来源链接，或输入创作者名、id…", gt = "添加创作者关注", _t = "查找中（首次按名字查要下载创作者索引，可能几十秒）", vt = "识别中", yt = "站内没有查到来源", bt = "/settings/subscriptions", xt = (e, t) => `${e}:${t.url}`;
 function St({ field: e, menu: t, options: n, active: r, busy: a, onPick: o, onClose: s }) {
 	return (0, Z.useEffect)(() => {
@@ -368,8 +368,7 @@ function Tt({ data: e, credentials: t, readOnly: n, toast: r }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/follow-manage/add-feed.tsx
+// src/react/follow-manage/add-feed.tsx
 var Et = "输入女优名，到 JavDB 找她的演员页", Dt = "添加 JAV 订阅";
 function Ot(e, t) {
 	let n = /* @__PURE__ */ new Map();
@@ -510,8 +509,7 @@ function At({ readOnly: e, toast: t, onAdded: n }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/follow-manage/alias-rename-dialog.tsx
+// src/react/follow-manage/alias-rename-dialog.tsx
 function jt({ group: e, close: t, receipt: n }) {
 	return /* @__PURE__ */ (0, Q.jsx)(L, {
 		isOpen: !!e,
@@ -589,8 +587,7 @@ function Mt({ group: e, close: t, receipt: n }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/follow-manage/alias-manager.tsx
+// src/react/follow-manage/alias-manager.tsx
 var Nt = (e) => `将移除别名「${e}」，对应来源恢复为独立创作者组。`, Pt = et({
 	rowSelectionFeature: Ye,
 	rowSortingFeature: Xe,
@@ -1188,8 +1185,7 @@ function Ut({ groups: e, suggestions: t, sources: r = [], readOnly: i, toast: u 
 		]
 	});
 }
-//#endregion
-//#region src/react/follow-manage/feed-sources.tsx
+// src/react/follow-manage/feed-sources.tsx
 var Wt = et({
 	rowPaginationFeature: Je,
 	rowSelectionFeature: Ye,
@@ -1680,8 +1676,7 @@ function tn({ readOnly: e, toast: t, onAdd: n, selection: r }) {
 		})
 	});
 }
-//#endregion
-//#region src/react/follow-manage/follow-manage-page.tsx
+// src/react/follow-manage/follow-manage-page.tsx
 var nn = (e) => D.some(([t]) => t === e);
 function rn({ term: e, figure: t, unit: n }) {
 	return /* @__PURE__ */ (0, Q.jsxs)("div", {
@@ -1893,7 +1888,6 @@ function an(e) {
 		}) })
 	] });
 }
-//#endregion
 export { an as FollowManagePage };
 
-//# debugId=4f918827-8c83-4ae3-969f-b4898ef398a6
+//# debugId=703ef35e-7864-4659-ba20-a2c656be68d4

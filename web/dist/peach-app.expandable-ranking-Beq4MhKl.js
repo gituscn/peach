@@ -1,17 +1,16 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "1d145860-18b0-4d5f-a44a-69dd60a675da", e._sentryDebugIdIdentifier = "sentry-dbid-1d145860-18b0-4d5f-a44a-69dd60a675da");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "94510268-cd38-48ae-a83d-aca22df32d2f", e._sentryDebugIdIdentifier = "sentry-dbid-94510268-cd38-48ae-a83d-aca22df32d2f");
 	} catch {}
 })();
 import { MotionConfigContext as e, WithPromise as t, __commonJSMin as n, __exportAll as r, __toESM as i, asNumber as a, calcGeneratorVelocity as o, cancelFrame as s, cardClass as c, clsx as l, collectMotionValues as u, cx as d, f1 as f, frame as p, interpolate as m, isMotionValue as h, max as g, min as _, motion as v, motionValue as y, require_jsx_runtime as b, require_react as x, require_react_dom as S, require_with_selector as C, resolveStartTime as w, spring as T, time as E, useConstant as D, useIsomorphicLayoutEffect as O, useReducedMotion as k } from "./peach-app.js";
-//#region node_modules/motion-dom/dist/es/utils/transform.mjs
+// node_modules/motion-dom/dist/es/utils/transform.mjs
 function A(...e) {
 	let t = !Array.isArray(e[0]), n = t ? 0 : -1, r = e[0 + n], i = e[1 + n], a = e[2 + n], o = e[3 + n], s = m(i, a, o);
 	return t ? s(r) : s;
 }
-//#endregion
-//#region node_modules/motion-dom/dist/es/animation/FollowAnimation.mjs
+// node_modules/motion-dom/dist/es/animation/FollowAnimation.mjs
 var j = /* @__PURE__ */ new Set(), M = ({ timestamp: e }) => {
 	j.forEach((t) => t.tick(e));
 }, N = class extends t {
@@ -50,8 +49,7 @@ var j = /* @__PURE__ */ new Set(), M = ({ timestamp: e }) => {
 		this.state = "idle", this.driver ? this.driver.stop() : (j.delete(this), j.size || s(M));
 	}
 };
-//#endregion
-//#region node_modules/motion-dom/dist/es/value/utils/follow.mjs
+// node_modules/motion-dom/dist/es/value/utils/follow.mjs
 function ee(e, t, n) {
 	let r = e.get(), i = null, o, s = typeof r == "string" ? r.replace(/[\d.-]/g, "") : void 0, c = (e) => o(s ? e + s : e), l = () => e.events.animationStart?.notify(), u = () => {
 		i &&= (i.stop(), null), e.animation = void 0;
@@ -92,16 +90,14 @@ function ee(e, t, n) {
 function te(e, t) {
 	return t ? e + t : e;
 }
-//#endregion
-//#region node_modules/motion-dom/dist/es/value/spring-value.mjs
+// node_modules/motion-dom/dist/es/value/spring-value.mjs
 function ne(e, t, n) {
 	return ee(e, t, {
 		...n,
 		type: T
 	});
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/utils/use-motion-value-event.mjs
+// node_modules/framer-motion/dist/es/utils/use-motion-value-event.mjs
 var P = /* @__PURE__ */ i(x(), 1);
 function re(e, t, n) {
 	(0, P.useInsertionEffect)(() => e.on(t, n), [
@@ -110,8 +106,7 @@ function re(e, t, n) {
 		n
 	]);
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-motion-value.mjs
+// node_modules/framer-motion/dist/es/value/use-motion-value.mjs
 function ie(t) {
 	let n = D(() => y(t)), { isStatic: r } = (0, P.useContext)(e);
 	if (r) {
@@ -120,8 +115,7 @@ function ie(t) {
 	}
 	return n;
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-combine-values.mjs
+// node_modules/framer-motion/dist/es/value/use-combine-values.mjs
 function ae(e, t) {
 	let n = ie(t()), r = () => n.set(t());
 	return r(), O(() => {
@@ -131,15 +125,13 @@ function ae(e, t) {
 		};
 	}), n;
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-computed.mjs
+// node_modules/framer-motion/dist/es/value/use-computed.mjs
 function oe(e) {
 	u.current = [], e();
 	let t = ae(u.current, e);
 	return u.current = void 0, t;
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-transform.mjs
+// node_modules/framer-motion/dist/es/value/use-transform.mjs
 function se(e, t, n, r) {
 	if (typeof e == "function") return oe(e);
 	if (n !== void 0 && !Array.isArray(n) && typeof t != "function") return le(e, t, n, r);
@@ -178,26 +170,22 @@ function le(e, t, n, r) {
 	for (let o of i) a[o] = se(e, t, n[o], r);
 	return a;
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-follow-value.mjs
+// node_modules/framer-motion/dist/es/value/use-follow-value.mjs
 function ue(t, n, r) {
 	let { isStatic: i } = (0, P.useContext)(e), a = () => h(t) ? t.get() : t;
 	if (i) return se(a);
 	let o = ie(a());
 	return (0, P.useInsertionEffect)(() => r(o, t, n), [o, JSON.stringify(n)]), o;
 }
-//#endregion
-//#region node_modules/framer-motion/dist/es/value/use-spring.mjs
+// node_modules/framer-motion/dist/es/value/use-spring.mjs
 function de(e, t = {}) {
 	return ue(e, t, ne);
 }
-//#endregion
-//#region node_modules/d3-array/src/ascending.js
+// node_modules/d3-array/src/ascending.js
 function fe(e, t) {
 	return e < t ? -1 : e > t ? 1 : e >= t ? 0 : NaN;
 }
-//#endregion
-//#region node_modules/d3-array/src/bisector.js
+// node_modules/d3-array/src/bisector.js
 function pe(e) {
 	let t = e, n = e;
 	e.length === 1 && (t = (t, n) => e(t) - n, n = me(e));
@@ -229,8 +217,7 @@ function pe(e) {
 function me(e) {
 	return (t, n) => fe(e(t), n);
 }
-//#endregion
-//#region node_modules/d3-array/src/number.js
+// node_modules/d3-array/src/number.js
 function he(e) {
 	return e === null ? NaN : +e;
 }
@@ -241,12 +228,10 @@ function* ge(e, t) {
 		for (let r of e) (r = t(r, ++n, e)) != null && (r = +r) >= r && (yield r);
 	}
 }
-//#endregion
-//#region node_modules/d3-array/src/bisect.js
+// node_modules/d3-array/src/bisect.js
 var _e = pe(fe), ve = _e.right;
 _e.left, pe(he).center;
-//#endregion
-//#region node_modules/internmap/src/index.js
+// node_modules/internmap/src/index.js
 var ye = class extends Map {
 	constructor(e, t = Ce) {
 		if (super(), Object.defineProperties(this, {
@@ -282,8 +267,7 @@ function Se({ _intern: e, _key: t }, n) {
 function Ce(e) {
 	return typeof e == "object" && e ? e.valueOf() : e;
 }
-//#endregion
-//#region node_modules/d3-array/src/ticks.js
+// node_modules/d3-array/src/ticks.js
 var we = Math.sqrt(50), Te = Math.sqrt(10), Ee = Math.sqrt(2);
 function De(e, t, n) {
 	var r, i = -1, a, o, s;
@@ -307,8 +291,7 @@ function ke(e, t, n) {
 	var r = Math.abs(t - e) / Math.max(0, n), i = 10 ** Math.floor(Math.log(r) / Math.LN10), a = r / i;
 	return a >= we ? i *= 10 : a >= Te ? i *= 5 : a >= Ee && (i *= 2), t < e ? -i : i;
 }
-//#endregion
-//#region node_modules/d3-array/src/quickselect.js
+// node_modules/d3-array/src/quickselect.js
 function Ae(e, t, n = 0, r = e.length - 1, i = fe) {
 	for (; r > n;) {
 		if (r - n > 600) {
@@ -328,8 +311,7 @@ function je(e, t, n) {
 	let r = e[t];
 	e[t] = e[n], e[n] = r;
 }
-//#endregion
-//#region node_modules/d3-array/src/quantile.js
+// node_modules/d3-array/src/quantile.js
 function Me(e, t, n) {
 	if (e = Float64Array.from(ge(e, n)), r = e.length) {
 		if ((t = +t) <= 0 || r < 2) return _(e);
@@ -346,21 +328,18 @@ function Ne(e, t, n = he) {
 		return o + (+n(e[a + 1], a + 1, e) - o) * (i - a);
 	}
 }
-//#endregion
-//#region node_modules/d3-array/src/range.js
+// node_modules/d3-array/src/range.js
 function Pe(e, t, n) {
 	e = +e, t = +t, n = (i = arguments.length) < 2 ? (t = e, e = 0, 1) : i < 3 ? 1 : +n;
 	for (var r = -1, i = Math.max(0, Math.ceil((t - e) / n)) | 0, a = Array(i); ++r < i;) a[r] = e + r * n;
 	return a;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/excludeEventProps.js
+// node_modules/recharts/es6/util/excludeEventProps.js
 var Fe = /* @__PURE__ */ i(S()), Ie = /* @__PURE__ */ "dangerouslySetInnerHTML.onCopy.onCopyCapture.onCut.onCutCapture.onPaste.onPasteCapture.onCompositionEnd.onCompositionEndCapture.onCompositionStart.onCompositionStartCapture.onCompositionUpdate.onCompositionUpdateCapture.onFocus.onFocusCapture.onBlur.onBlurCapture.onChange.onChangeCapture.onBeforeInput.onBeforeInputCapture.onInput.onInputCapture.onReset.onResetCapture.onSubmit.onSubmitCapture.onInvalid.onInvalidCapture.onLoad.onLoadCapture.onError.onErrorCapture.onKeyDown.onKeyDownCapture.onKeyPress.onKeyPressCapture.onKeyUp.onKeyUpCapture.onAbort.onAbortCapture.onCanPlay.onCanPlayCapture.onCanPlayThrough.onCanPlayThroughCapture.onDurationChange.onDurationChangeCapture.onEmptied.onEmptiedCapture.onEncrypted.onEncryptedCapture.onEnded.onEndedCapture.onLoadedData.onLoadedDataCapture.onLoadedMetadata.onLoadedMetadataCapture.onLoadStart.onLoadStartCapture.onPause.onPauseCapture.onPlay.onPlayCapture.onPlaying.onPlayingCapture.onProgress.onProgressCapture.onRateChange.onRateChangeCapture.onSeeked.onSeekedCapture.onSeeking.onSeekingCapture.onStalled.onStalledCapture.onSuspend.onSuspendCapture.onTimeUpdate.onTimeUpdateCapture.onVolumeChange.onVolumeChangeCapture.onWaiting.onWaitingCapture.onAuxClick.onAuxClickCapture.onClick.onClickCapture.onContextMenu.onContextMenuCapture.onDoubleClick.onDoubleClickCapture.onDrag.onDragCapture.onDragEnd.onDragEndCapture.onDragEnter.onDragEnterCapture.onDragExit.onDragExitCapture.onDragLeave.onDragLeaveCapture.onDragOver.onDragOverCapture.onDragStart.onDragStartCapture.onDrop.onDropCapture.onMouseDown.onMouseDownCapture.onMouseEnter.onMouseLeave.onMouseMove.onMouseMoveCapture.onMouseOut.onMouseOutCapture.onMouseOver.onMouseOverCapture.onMouseUp.onMouseUpCapture.onSelect.onSelectCapture.onTouchCancel.onTouchCancelCapture.onTouchEnd.onTouchEndCapture.onTouchMove.onTouchMoveCapture.onTouchStart.onTouchStartCapture.onPointerDown.onPointerDownCapture.onPointerMove.onPointerMoveCapture.onPointerUp.onPointerUpCapture.onPointerCancel.onPointerCancelCapture.onPointerEnter.onPointerEnterCapture.onPointerLeave.onPointerLeaveCapture.onPointerOver.onPointerOverCapture.onPointerOut.onPointerOutCapture.onGotPointerCapture.onGotPointerCaptureCapture.onLostPointerCapture.onLostPointerCaptureCapture.onScroll.onScrollCapture.onWheel.onWheelCapture.onAnimationStart.onAnimationStartCapture.onAnimationEnd.onAnimationEndCapture.onAnimationIteration.onAnimationIterationCapture.onTransitionEnd.onTransitionEndCapture".split(".");
 function Le(e) {
 	return typeof e == "string" && Ie.includes(e);
 }
-//#endregion
-//#region node_modules/recharts/es6/util/svgPropertiesNoEvents.js
+// node_modules/recharts/es6/util/svgPropertiesNoEvents.js
 var Re = /* @__PURE__ */ new Set(/* @__PURE__ */ "aria-activedescendant.aria-atomic.aria-autocomplete.aria-busy.aria-checked.aria-colcount.aria-colindex.aria-colspan.aria-controls.aria-current.aria-describedby.aria-details.aria-disabled.aria-errormessage.aria-expanded.aria-flowto.aria-haspopup.aria-hidden.aria-invalid.aria-keyshortcuts.aria-label.aria-labelledby.aria-level.aria-live.aria-modal.aria-multiline.aria-multiselectable.aria-orientation.aria-owns.aria-placeholder.aria-posinset.aria-pressed.aria-readonly.aria-relevant.aria-required.aria-roledescription.aria-rowcount.aria-rowindex.aria-rowspan.aria-selected.aria-setsize.aria-sort.aria-valuemax.aria-valuemin.aria-valuenow.aria-valuetext.className.color.height.id.lang.max.media.method.min.name.style.target.width.role.tabIndex.accentHeight.accumulate.additive.alignmentBaseline.allowReorder.alphabetic.amplitude.arabicForm.ascent.attributeName.attributeType.autoReverse.azimuth.baseFrequency.baselineShift.baseProfile.bbox.begin.bias.by.calcMode.capHeight.clip.clipPath.clipPathUnits.clipRule.colorInterpolation.colorInterpolationFilters.colorProfile.colorRendering.contentScriptType.contentStyleType.cursor.cx.cy.d.decelerate.descent.diffuseConstant.direction.display.divisor.dominantBaseline.dur.dx.dy.edgeMode.elevation.enableBackground.end.exponent.externalResourcesRequired.fill.fillOpacity.fillRule.filter.filterRes.filterUnits.floodColor.floodOpacity.focusable.fontFamily.fontSize.fontSizeAdjust.fontStretch.fontStyle.fontVariant.fontWeight.format.from.fx.fy.g1.g2.glyphName.glyphOrientationHorizontal.glyphOrientationVertical.glyphRef.gradientTransform.gradientUnits.hanging.horizAdvX.horizOriginX.href.ideographic.imageRendering.in2.in.intercept.k1.k2.k3.k4.k.kernelMatrix.kernelUnitLength.kerning.keyPoints.keySplines.keyTimes.lengthAdjust.letterSpacing.lightingColor.limitingConeAngle.local.markerEnd.markerHeight.markerMid.markerStart.markerUnits.markerWidth.mask.maskContentUnits.maskUnits.mathematical.mode.numOctaves.offset.opacity.operator.order.orient.orientation.origin.overflow.overlinePosition.overlineThickness.paintOrder.panose1.pathLength.patternContentUnits.patternTransform.patternUnits.pointerEvents.pointsAtX.pointsAtY.pointsAtZ.preserveAlpha.preserveAspectRatio.primitiveUnits.r.radius.refX.refY.renderingIntent.repeatCount.repeatDur.requiredExtensions.requiredFeatures.restart.result.rotate.rx.ry.seed.shapeRendering.slope.spacing.specularConstant.specularExponent.speed.spreadMethod.startOffset.stdDeviation.stemh.stemv.stitchTiles.stopColor.stopOpacity.strikethroughPosition.strikethroughThickness.string.stroke.strokeDasharray.strokeDashoffset.strokeLinecap.strokeLinejoin.strokeMiterlimit.strokeOpacity.strokeWidth.surfaceScale.systemLanguage.tableValues.targetX.targetY.textAnchor.textDecoration.textLength.textRendering.to.transform.u1.u2.underlinePosition.underlineThickness.unicode.unicodeBidi.unicodeRange.unitsPerEm.vAlphabetic.values.vectorEffect.version.vertAdvY.vertOriginX.vertOriginY.vHanging.vIdeographic.viewTarget.visibility.vMathematical.widths.wordSpacing.writingMode.x1.x2.x.xChannelSelector.xHeight.xlinkActuate.xlinkArcrole.xlinkHref.xlinkRole.xlinkShow.xlinkTitle.xlinkType.xmlBase.xmlLang.xmlns.xmlnsXlink.xmlSpace.y1.y2.y.yChannelSelector.z.zoomAndPan.ref.key.angle".split("."));
 function ze(e) {
 	return typeof e == "string" && Re.has(e);
@@ -382,8 +361,7 @@ function He(e) {
 	}
 	return typeof e == "object" && !Array.isArray(e) ? Ve(e) : null;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/svgPropertiesAndEvents.js
+// node_modules/recharts/es6/util/svgPropertiesAndEvents.js
 function Ue(e) {
 	var t = {};
 	for (var n in e) Object.prototype.hasOwnProperty.call(e, n) && (ze(n) || Be(n) || Le(n)) && (t[n] = e[n]);
@@ -392,8 +370,7 @@ function Ue(e) {
 function We(e) {
 	return e == null ? null : /*#__PURE__*/ (0, P.isValidElement)(e) ? Ue(e.props) : typeof e == "object" && !Array.isArray(e) ? Ue(e) : null;
 }
-//#endregion
-//#region node_modules/recharts/es6/container/Surface.js
+// node_modules/recharts/es6/container/Surface.js
 var Ge = [
 	"children",
 	"width",
@@ -478,13 +455,11 @@ var F = /*#__PURE__*/ P.forwardRef((e, t) => {
 	var n = e.children, r = e.className, i = $e(e, Ze), a = l("recharts-layer", r);
 	return /*#__PURE__*/ P.createElement("g", Qe({ className: a }, Ue(i), { ref: t }), n);
 });
-//#endregion
-//#region node_modules/es-toolkit/dist/_internal/isUnsafeProperty.mjs
+// node_modules/es-toolkit/dist/_internal/isUnsafeProperty.mjs
 function tt(e) {
 	return e === "__proto__";
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/isDeepKey.mjs
+// node_modules/es-toolkit/dist/compat/_internal/isDeepKey.mjs
 var nt = /\.|(\[(?:[^[\]]*|(["'])(?:(?!\2)[^\\]|\\.)*?\2)\])/;
 function rt(e) {
 	switch (typeof e) {
@@ -494,18 +469,15 @@ function rt(e) {
 		default: return !1;
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/toKey.mjs
+// node_modules/es-toolkit/dist/compat/_internal/toKey.mjs
 function it(e) {
 	return typeof e == "string" || typeof e == "symbol" ? e : Object.is(e?.valueOf?.(), -0) ? "-0" : String(e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isSymbol.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isSymbol.mjs
 function at(e) {
 	return typeof e == "symbol" || e instanceof Symbol;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/toString.mjs
+// node_modules/es-toolkit/dist/compat/util/toString.mjs
 function ot(e) {
 	return e == null ? "" : st(e);
 }
@@ -516,8 +488,7 @@ function st(e) {
 	let t = e + "";
 	return t === "0" && Object.is(Number(e), -0) ? "-0" : t;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/toPath.mjs
+// node_modules/es-toolkit/dist/compat/util/toPath.mjs
 function ct(e) {
 	if (Array.isArray(e)) return e.map(it);
 	if (typeof e == "symbol") return [e];
@@ -547,8 +518,7 @@ function ct(e) {
 	}
 	return i && t.push(i), t;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/object/get.mjs
+// node_modules/es-toolkit/dist/compat/object/get.mjs
 function lt(e, t, n) {
 	if (e == null) return n;
 	switch (typeof t) {
@@ -580,8 +550,7 @@ function ut(e, t, n) {
 	}
 	return r === void 0 ? n : r;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/round.js
+// node_modules/recharts/es6/util/round.js
 var dt = 4;
 function ft(e) {
 	var t = 10 ** (arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : dt), n = Math.round(e * t) / t;
@@ -594,8 +563,7 @@ function pt(e) {
 		return typeof i == "string" ? e + i + n : i === void 0 ? e + n : e + ft(i) + n;
 	}, "");
 }
-//#endregion
-//#region node_modules/recharts/es6/util/DataUtils.js
+// node_modules/recharts/es6/util/DataUtils.js
 var mt = (e) => e === 0 ? 0 : e > 0 ? 1 : -1, ht = (e) => typeof e == "number" && e != +e, gt = (e) => typeof e == "string" && e.length > 1 && e.indexOf("%") === e.length - 1, I = (e) => (typeof e == "number" || e instanceof Number) && !ht(e), _t = (e) => I(e) || typeof e == "string", vt = 0, yt = (e) => {
 	var t = ++vt;
 	return `${e || ""}${t}`;
@@ -626,8 +594,7 @@ function wt(e) {
 	return e != null;
 }
 function Tt() {}
-//#endregion
-//#region node_modules/recharts/es6/cartesian/cartesianViewBoxToTrapezoid.js
+// node_modules/recharts/es6/cartesian/cartesianViewBoxToTrapezoid.js
 function Et(e) {
 	if (e) return {
 		x: e.x,
@@ -638,8 +605,7 @@ function Et(e) {
 		height: e.height
 	};
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/getCartesianPosition.js
+// node_modules/recharts/es6/cartesian/getCartesianPosition.js
 function Dt(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -785,18 +751,15 @@ var Mt = (e) => {
 function Pt(e) {
 	return e == null ? !1 : typeof e == "object" || Nt.includes(e);
 }
-//#endregion
-//#region node_modules/recharts/es6/context/legendPortalContext.js
+// node_modules/recharts/es6/context/legendPortalContext.js
 var Ft = /*#__PURE__*/ (0, P.createContext)(null), It = () => (0, P.useContext)(Ft);
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/constant.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/constant.js
 function z(e) {
 	return function() {
 		return e;
 	};
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/math.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/math.js
 var Lt = Math.cos, Rt = Math.sin, zt = Math.sqrt, Bt = Math.PI;
 Bt / 2;
 var Vt = 2 * Bt, Ht = Math.PI, Ut = 2 * Ht, Wt = 1e-6, Gt = Ut - Wt;
@@ -858,8 +821,7 @@ var Jt = class {
 	}
 };
 Jt.prototype;
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/path.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/path.js
 function Yt(e) {
 	let t = 3;
 	return e.digits = function(n) {
@@ -877,8 +839,7 @@ Array.prototype.slice;
 function Xt(e) {
 	return typeof e == "object" && "length" in e ? e : Array.from(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/linear.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/linear.js
 function Zt(e) {
 	this._context = e;
 }
@@ -908,16 +869,14 @@ Zt.prototype = {
 function Qt(e) {
 	return new Zt(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/point.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/point.js
 function $t(e) {
 	return e[0];
 }
 function en(e) {
 	return e[1];
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/line.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/line.js
 function tn(e, t) {
 	var n = z(!0), r = null, i = Qt, a = null, o = Yt(s);
 	e = typeof e == "function" ? e : e === void 0 ? $t : z(e), t = typeof t == "function" ? t : t === void 0 ? en : z(t);
@@ -938,8 +897,7 @@ function tn(e, t) {
 		return arguments.length ? (e == null ? r = a = null : a = i(r = e), s) : r;
 	}, s;
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/area.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/area.js
 function nn(e, t, n) {
 	var r = null, i = z(!0), a = null, o = Qt, s = null, c = Yt(l);
 	e = typeof e == "function" ? e : e === void 0 ? $t : z(+e), t = typeof t == "function" ? t : z(t === void 0 ? 0 : +t), n = typeof n == "function" ? n : n === void 0 ? en : z(+n);
@@ -986,8 +944,7 @@ function nn(e, t, n) {
 		return arguments.length ? (e == null ? a = s = null : s = o(a = e), l) : a;
 	}, l;
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/bump.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/bump.js
 var rn = class {
 	constructor(e, t) {
 		this._context = e, this._x = t;
@@ -1021,8 +978,7 @@ function an(e) {
 function on(e) {
 	return new rn(e, !1);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/symbol/circle.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/symbol/circle.js
 var sn = { draw(e, t) {
 	let n = zt(t / Bt);
 	e.moveTo(n, 0), e.arc(0, 0, n, 0, Vt);
@@ -1050,8 +1006,7 @@ var sn = { draw(e, t) {
 	let n = zt(t / Cn), r = n / 2, i = n * Sn, a = r, o = n * Sn + n, s = -a, c = o;
 	e.moveTo(r, i), e.lineTo(a, o), e.lineTo(s, c), e.lineTo(bn * r - xn * i, xn * r + bn * i), e.lineTo(bn * a - xn * o, xn * a + bn * o), e.lineTo(bn * s - xn * c, xn * s + bn * c), e.lineTo(bn * r + xn * i, bn * i - xn * r), e.lineTo(bn * a + xn * o, bn * o - xn * a), e.lineTo(bn * s + xn * c, bn * c - xn * s), e.closePath();
 } };
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/symbol.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/symbol.js
 function Tn(e, t) {
 	let n = null, r = Yt(i);
 	e = typeof e == "function" ? e : z(e || sn), t = typeof t == "function" ? t : z(t === void 0 ? 64 : +t);
@@ -1067,11 +1022,9 @@ function Tn(e, t) {
 		return arguments.length ? (n = e ?? null, i) : n;
 	}, i;
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/noop.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/noop.js
 function En() {}
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/basis.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/basis.js
 function Dn(e, t, n) {
 	e._context.bezierCurveTo((2 * e._x0 + e._x1) / 3, (2 * e._y0 + e._y1) / 3, (e._x0 + 2 * e._x1) / 3, (e._y0 + 2 * e._y1) / 3, (e._x0 + 4 * e._x1 + t) / 6, (e._y0 + 4 * e._y1 + n) / 6);
 }
@@ -1112,8 +1065,7 @@ On.prototype = {
 function kn(e) {
 	return new On(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/basisClosed.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/basisClosed.js
 function An(e) {
 	this._context = e;
 }
@@ -1153,8 +1105,7 @@ An.prototype = {
 function jn(e) {
 	return new An(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/basisOpen.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/basisOpen.js
 function Mn(e) {
 	this._context = e;
 }
@@ -1193,8 +1144,7 @@ Mn.prototype = {
 function Nn(e) {
 	return new Mn(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/linearClosed.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/linearClosed.js
 function Pn(e) {
 	this._context = e;
 }
@@ -1214,8 +1164,7 @@ Pn.prototype = {
 function Fn(e) {
 	return new Pn(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/monotone.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/monotone.js
 function In(e) {
 	return e < 0 ? -1 : 1;
 }
@@ -1301,8 +1250,7 @@ function Un(e) {
 function Wn(e) {
 	return new Vn(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/natural.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/natural.js
 function Gn(e) {
 	this._context = e;
 }
@@ -1339,8 +1287,7 @@ function Kn(e) {
 function qn(e) {
 	return new Gn(e);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/curve/step.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/curve/step.js
 function Jn(e, t) {
 	this._context = e, this._t = t;
 }
@@ -1381,19 +1328,16 @@ function Xn(e) {
 function Zn(e) {
 	return new Jn(e, 1);
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/offset/none.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/offset/none.js
 function Qn(e, t) {
 	if ((o = e.length) > 1) for (var n = 1, r, i, a = e[t[0]], o, s = a.length; n < o; ++n) for (i = a, a = e[t[n]], r = 0; r < s; ++r) a[r][1] += a[r][0] = isNaN(i[r][1]) ? i[r][0] : i[r][1];
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/order/none.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/order/none.js
 function $n(e) {
 	for (var t = e.length, n = Array(t); --t >= 0;) n[t] = t;
 	return n;
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/stack.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/stack.js
 function er(e, t) {
 	return e[t];
 }
@@ -1419,8 +1363,7 @@ function nr() {
 		return arguments.length ? (n = e ?? Qn, i) : n;
 	}, i;
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/offset/expand.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/offset/expand.js
 function rr(e, t) {
 	if ((r = e.length) > 0) {
 		for (var n, r, i = 0, a = e[0].length, o; i < a; ++i) {
@@ -1430,8 +1373,7 @@ function rr(e, t) {
 		Qn(e, t);
 	}
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/offset/silhouette.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/offset/silhouette.js
 function ir(e, t) {
 	if ((i = e.length) > 0) {
 		for (var n = 0, r = e[t[0]], i, a = r.length; n < a; ++n) {
@@ -1441,8 +1383,7 @@ function ir(e, t) {
 		Qn(e, t);
 	}
 }
-//#endregion
-//#region node_modules/victory-vendor/node_modules/d3-shape/src/offset/wiggle.js
+// node_modules/victory-vendor/node_modules/d3-shape/src/offset/wiggle.js
 function ar(e, t) {
 	if ((o = e.length) > 0 && (a = (i = e[t[0]]).length) > 0) {
 		for (var n = 0, r = 1, i, a, o; r < a; ++r) {
@@ -1458,8 +1399,7 @@ function ar(e, t) {
 		i[r - 1][1] += i[r - 1][0] = n, Qn(e, t);
 	}
 }
-//#endregion
-//#region node_modules/recharts/es6/shape/Symbols.js
+// node_modules/recharts/es6/shape/Symbols.js
 var or = [
 	"type",
 	"size",
@@ -1576,8 +1516,7 @@ var hr = {
 	})) : null;
 };
 br.registerSymbol = yr;
-//#endregion
-//#region node_modules/recharts/es6/util/types.js
+// node_modules/recharts/es6/util/types.js
 var xr = (e) => "radius" in e && "startAngle" in e && "endAngle" in e, Sr = (e, t) => {
 	if (!e || typeof e == "function" || typeof e == "boolean") return null;
 	var n = e;
@@ -1594,8 +1533,7 @@ var xr = (e) => "radius" in e && "startAngle" in e && "endAngle" in e, Sr = (e, 
 		Le(i) && typeof a == "function" && (r ||= {}, r[i] = Cr(a, t, n));
 	}), r;
 };
-//#endregion
-//#region node_modules/recharts/es6/util/resolveDefaultProps.js
+// node_modules/recharts/es6/util/resolveDefaultProps.js
 function Tr(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -1643,8 +1581,7 @@ function Ar(e, t) {
 	var n = Er({}, e), r = t;
 	return Object.keys(t).reduce((e, t) => (e[t] === void 0 && r[t] !== void 0 && (e[t] = r[t]), e), n);
 }
-//#endregion
-//#region node_modules/recharts/es6/component/DefaultLegendContent.js
+// node_modules/recharts/es6/component/DefaultLegendContent.js
 function jr() {
 	return jr = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -1809,8 +1746,7 @@ var Hr = (e) => {
 		style: a
 	}, /*#__PURE__*/ P.createElement(Vr, jr({}, t, { payload: n })));
 };
-//#endregion
-//#region node_modules/es-toolkit/dist/array/uniqBy.mjs
+// node_modules/es-toolkit/dist/array/uniqBy.mjs
 function Ur(e, t) {
 	let n = /* @__PURE__ */ new Map();
 	for (let r = 0; r < e.length; r++) {
@@ -1819,67 +1755,55 @@ function Ur(e, t) {
 	}
 	return Array.from(n.values());
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/function/ary.mjs
+// node_modules/es-toolkit/dist/function/ary.mjs
 function Wr(e, t) {
 	return function(...n) {
 		return e.apply(this, n.slice(0, t));
 	};
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/function/identity.mjs
+// node_modules/es-toolkit/dist/function/identity.mjs
 function Gr(e) {
 	return e;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isLength.mjs
+// node_modules/es-toolkit/dist/predicate/isLength.mjs
 function Kr(e) {
 	return Number.isSafeInteger(e) && e >= 0;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isArrayLike.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isArrayLike.mjs
 function qr(e) {
 	return e != null && typeof e != "function" && Kr(e.length);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/object/property.mjs
+// node_modules/es-toolkit/dist/compat/object/property.mjs
 function Jr(e) {
 	return function(t) {
 		return lt(t, e);
 	};
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isPrimitive.mjs
+// node_modules/es-toolkit/dist/predicate/isPrimitive.mjs
 function Yr(e) {
 	return e == null || typeof e != "object" && typeof e != "function";
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isTypedArray.mjs
+// node_modules/es-toolkit/dist/predicate/isTypedArray.mjs
 function Xr(e) {
 	return ArrayBuffer.isView(e) && !(e instanceof DataView);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/getSymbols.mjs
+// node_modules/es-toolkit/dist/compat/_internal/getSymbols.mjs
 function Zr(e) {
 	return Object.getOwnPropertySymbols(e).filter((t) => Object.prototype.propertyIsEnumerable.call(e, t));
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/getTag.mjs
+// node_modules/es-toolkit/dist/compat/_internal/getTag.mjs
 function Qr(e) {
 	return e == null ? e === void 0 ? "[object Undefined]" : "[object Null]" : Object.prototype.toString.call(e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/tags.mjs
+// node_modules/es-toolkit/dist/compat/_internal/tags.mjs
 var $r = "[object RegExp]", ei = "[object String]", ti = "[object Number]", ni = "[object Boolean]", ri = "[object Arguments]", ii = "[object Symbol]", ai = "[object Date]", oi = "[object Map]", si = "[object Set]", ci = "[object Array]", li = "[object Function]", ui = "[object ArrayBuffer]", di = "[object Object]", fi = "[object Error]", pi = "[object DataView]", mi = "[object Uint8Array]", hi = "[object Uint8ClampedArray]", gi = "[object Uint16Array]", _i = "[object Uint32Array]", vi = "[object BigUint64Array]", yi = "[object Int8Array]", bi = "[object Int16Array]", xi = "[object Int32Array]", Si = "[object BigInt64Array]", Ci = "[object Float32Array]", wi = "[object Float64Array]", Ti = typeof globalThis == "object" && globalThis || typeof window == "object" && window || typeof self == "object" && self || typeof global == "object" && global || (function() {
 	return this;
 })();
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isBuffer.mjs
+// node_modules/es-toolkit/dist/predicate/isBuffer.mjs
 function Ei(e) {
 	return Ti.Buffer !== void 0 && Ti.Buffer.isBuffer(e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/object/cloneDeepWith.mjs
+// node_modules/es-toolkit/dist/object/cloneDeepWith.mjs
 function Di(e, t) {
 	return Oi(e, void 0, e, /* @__PURE__ */ new Map(), t);
 }
@@ -1987,23 +1911,19 @@ function Ai(e) {
 		default: return !1;
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/object/cloneDeep.mjs
+// node_modules/es-toolkit/dist/object/cloneDeep.mjs
 function ji(e) {
 	return Oi(e, void 0, e, /* @__PURE__ */ new Map(), void 0);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/eq.mjs
+// node_modules/es-toolkit/dist/compat/util/eq.mjs
 function Mi(e, t) {
 	return e === t || Number.isNaN(e) && Number.isNaN(t);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isObject.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isObject.mjs
 function Ni(e) {
 	return e !== null && (typeof e == "object" || typeof e == "function");
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isMatchWith.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isMatchWith.mjs
 function Pi(e, t, n) {
 	return typeof n == "function" ? Fi(e, t, function e(t, r, i, a, o, s) {
 		let c = n(t, r, i, a, o, s);
@@ -2070,18 +1990,15 @@ function Ri(e, t, n, r) {
 function zi(e, t, n, r) {
 	return t.size === 0 || e instanceof Set && Ri([...e], [...t], n, r);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isMatch.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isMatch.mjs
 function Bi(e, t) {
 	return Pi(e, t, () => void 0);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/matches.mjs
+// node_modules/es-toolkit/dist/compat/predicate/matches.mjs
 function Vi(e) {
 	return e = ji(e), (t) => Bi(t, e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/object/cloneDeepWith.mjs
+// node_modules/es-toolkit/dist/compat/object/cloneDeepWith.mjs
 function Hi(e, t) {
 	return Di(e, (n, r, i, a) => {
 		let o = t?.(n, r, i, a);
@@ -2107,13 +2024,11 @@ function Hi(e, t) {
 		}
 	});
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/object/cloneDeep.mjs
+// node_modules/es-toolkit/dist/compat/object/cloneDeep.mjs
 function Ui(e) {
 	return Hi(e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/isIndex.mjs
+// node_modules/es-toolkit/dist/compat/_internal/isIndex.mjs
 var Wi = /^(?:0|[1-9]\d*)$/;
 function Gi(e, t = 2 ** 53 - 1) {
 	switch (typeof e) {
@@ -2122,13 +2037,11 @@ function Gi(e, t = 2 ** 53 - 1) {
 		case "string": return Wi.test(e);
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/isArguments.mjs
+// node_modules/es-toolkit/dist/compat/predicate/isArguments.mjs
 function Ki(e) {
 	return typeof e == "object" && !!e && Qr(e) === "[object Arguments]";
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/object/has.mjs
+// node_modules/es-toolkit/dist/compat/object/has.mjs
 function qi(e, t) {
 	let n;
 	if (n = Array.isArray(t) ? t : typeof t == "string" && rt(t) && !(t in Object(e)) ? ct(t) : [t], n.length === 0) return !1;
@@ -2140,8 +2053,7 @@ function qi(e, t) {
 	}
 	return !0;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/predicate/matchesProperty.mjs
+// node_modules/es-toolkit/dist/compat/predicate/matchesProperty.mjs
 function Ji(e, t) {
 	switch (typeof e) {
 		case "object":
@@ -2154,8 +2066,7 @@ function Ji(e, t) {
 		return r === void 0 ? qi(n, e) : t === void 0 ? r === void 0 : Bi(r, t);
 	};
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/iteratee.mjs
+// node_modules/es-toolkit/dist/compat/util/iteratee.mjs
 function Yi(e) {
 	if (e == null) return Gr;
 	switch (typeof e) {
@@ -2164,23 +2075,19 @@ function Yi(e) {
 		default: return Jr(e);
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/normalizeZero.mjs
+// node_modules/es-toolkit/dist/compat/_internal/normalizeZero.mjs
 function Xi(e) {
 	return e === 0 ? 0 : e;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/array/uniqBy.mjs
+// node_modules/es-toolkit/dist/compat/array/uniqBy.mjs
 function Zi(e, t = Gr) {
 	return qr(e) ? Ur(Array.from(e), Wr(Yi(t), 1)).map(Xi) : [];
 }
-//#endregion
-//#region node_modules/recharts/es6/util/payload/getUniqPayload.js
+// node_modules/recharts/es6/util/payload/getUniqPayload.js
 function Qi(e, t, n) {
 	return t === !0 ? Zi(e, n) : typeof t == "function" ? Zi(e, t) : e;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/RechartsReduxContext.js
+// node_modules/recharts/es6/state/RechartsReduxContext.js
 var $i = /*#__PURE__*/ (0, P.createContext)(null), ea = (e) => e, B = () => {
 	var e = (0, P.useContext)($i);
 	return e ? e.store.dispatch : ea;
@@ -2191,8 +2098,7 @@ function V(e) {
 	} : ta, [t, e]);
 	return (0, Xe.useSyncExternalStoreWithSelector)(t ? t.subscription.addNestedSub : na, t ? t.store.getState : ta, t ? t.store.getState : ta, n, ra);
 }
-//#endregion
-//#region node_modules/reselect/dist/reselect.mjs
+// node_modules/reselect/dist/reselect.mjs
 function ia(e, t = `expected a function, instead received ${typeof e}`) {
 	if (typeof e != "function") throw TypeError(t);
 }
@@ -2300,8 +2206,7 @@ function ga(e, ...t) {
 	return Object.assign(r, { withTypes: () => r }), r;
 }
 var H = /* @__PURE__ */ ga(ha);
-//#endregion
-//#region node_modules/es-toolkit/dist/array/flatten.mjs
+// node_modules/es-toolkit/dist/array/flatten.mjs
 function _a(e, t = 1) {
 	let n = [], r = Math.floor(t), i = (e, t) => {
 		for (let a = 0; a < e.length; a++) {
@@ -2311,13 +2216,11 @@ function _a(e, t = 1) {
 	};
 	return i(e, 0), n;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/isIterateeCall.mjs
+// node_modules/es-toolkit/dist/compat/_internal/isIterateeCall.mjs
 function va(e, t, n) {
 	return Ni(n) && (typeof t == "number" && qr(n) && Gi(t) && t < n.length || typeof t == "string" && t in n) ? Mi(n[t], e) : !1;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/_internal/compareValues.mjs
+// node_modules/es-toolkit/dist/compat/_internal/compareValues.mjs
 function ya(e) {
 	return typeof e == "symbol" ? 1 : e === null ? 2 : e === void 0 ? 3 : e === e ? 0 : 4;
 }
@@ -2335,8 +2238,7 @@ var ba = (e, t, n) => {
 function Ca(e, t) {
 	return Array.isArray(e) ? !1 : typeof e == "number" || typeof e == "boolean" || e == null || at(e) ? !0 : typeof e == "string" && (Sa.test(e) || !xa.test(e)) || t != null && Object.hasOwn(t, e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/array/orderBy.mjs
+// node_modules/es-toolkit/dist/compat/array/orderBy.mjs
 function wa(e, t, n, r) {
 	if (e == null) return [];
 	n = r ? void 0 : n, Array.isArray(e) || (e = qr(e) ? Array.from(e) : Object.values(e)), Array.isArray(t) || (t = t == null ? [null] : [t]), t.length === 0 && (t = [null]), Array.isArray(n) || (n = n == null ? [] : [n]), n = n.map((e) => String(e));
@@ -2362,25 +2264,21 @@ function wa(e, t, n, r) {
 		return 0;
 	}).map((e) => e.original);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/array/sortBy.mjs
+// node_modules/es-toolkit/dist/compat/array/sortBy.mjs
 function Ta(e, ...t) {
 	let n = t.length;
 	return n > 1 && va(e, t[0], t[1]) ? t = [] : n > 2 && va(t[0], t[1], t[2]) && (t = [t[0]]), wa(e, _a(t), ["asc"]);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/legendSelectors.js
+// node_modules/recharts/es6/state/selectors/legendSelectors.js
 var Ea = (e) => e.legend.settings, Da = (e) => e.legend.size, Oa = H([(e) => e.legend.payload, Ea], (e, t) => {
 	var n = t.itemSorter, r = e.flat(1);
 	return n ? Ta(r, n) : r;
 });
-//#endregion
-//#region node_modules/recharts/es6/context/legendPayloadContext.js
+// node_modules/recharts/es6/context/legendPayloadContext.js
 function ka() {
 	return V(Oa);
 }
-//#endregion
-//#region node_modules/recharts/es6/util/useElementOffset.js
+// node_modules/recharts/es6/util/useElementOffset.js
 function Aa(e, t) {
 	return Fa(e) || Pa(e, t) || Ma(e, t) || ja();
 }
@@ -2461,8 +2359,7 @@ function za() {
 		(e = i.current) == null || e.disconnect();
 	}, []), [n, o];
 }
-//#endregion
-//#region node_modules/redux/dist/redux.mjs
+// node_modules/redux/dist/redux.mjs
 function Ba(e) {
 	return `Minified Redux error #${e}; visit https://redux.js.org/Errors?code=${e} for the full message or use the non-minified dev environment for full errors. `;
 }
@@ -2599,8 +2496,7 @@ function Ya(...e) {
 function Xa(e) {
 	return Wa(e) && "type" in e && typeof e.type == "string";
 }
-//#endregion
-//#region node_modules/immer/dist/immer.mjs
+// node_modules/immer/dist/immer.mjs
 var Za = Symbol.for("immer-nothing"), Qa = Symbol.for("immer-draftable"), $a = Symbol.for("immer-state");
 function eo(e, ...t) {
 	throw Error(`[Immer] minified error nr: ${e}. Full error at: https://bit.ly/3cXEKWf`);
@@ -2966,7 +2862,7 @@ var hs = class {
 	}
 	finishDraft(e, t) {
 		let n = e && e[$a];
-		(!n || !n.isManual_) && eo(9);
+		n && n.isManual_ || eo(9);
 		let { scope_: r } = n;
 		return Wo(r, t), Yo(void 0, r);
 	}
@@ -3020,8 +2916,7 @@ function vs(e) {
 }
 globalThis.Iterator?.from;
 var ys = new hs().produce, U = (e) => e;
-//#endregion
-//#region node_modules/redux-thunk/dist/redux-thunk.mjs
+// node_modules/redux-thunk/dist/redux-thunk.mjs
 function bs(e) {
 	return ({ dispatch: t, getState: n }) => (r) => (i) => typeof i == "function" ? i(t, n, e) : r(i);
 }
@@ -3572,8 +3467,7 @@ var pc = async (e, t) => {
 function Mc(e) {
 	return `Minified Redux Toolkit error #${e}; visit https://redux-toolkit.js.org/Errors?code=${e} for the full message or use the non-minified dev environment for full errors. `;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/layoutSlice.js
+// node_modules/recharts/es6/state/layoutSlice.js
 var Nc = Gs({
 	name: "chartLayout",
 	initialState: {
@@ -3603,21 +3497,18 @@ var Nc = Gs({
 		}
 	}
 }), Pc = Nc.actions, Fc = Pc.setMargin, Ic = Pc.setLayout, Lc = Pc.setChartSize, Rc = Pc.setScale, zc = Nc.reducer;
-//#endregion
-//#region node_modules/recharts/es6/util/getSliced.js
+// node_modules/recharts/es6/util/getSliced.js
 function Bc(e, t, n) {
 	return Array.isArray(e) && e && t + n !== 0 ? e.slice(t, n + 1) : e;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/isWellBehavedNumber.js
+// node_modules/recharts/es6/util/isWellBehavedNumber.js
 function G(e) {
 	return Number.isFinite(e);
 }
 function Vc(e) {
 	return typeof e == "number" && e > 0 && Number.isFinite(e);
 }
-//#endregion
-//#region node_modules/recharts/es6/util/ChartUtils.js
+// node_modules/recharts/es6/util/ChartUtils.js
 function Hc(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -3841,8 +3732,7 @@ var fl = (e, t) => {
 	if (t === "horizontal") return e.relativeX;
 	if (t === "vertical") return e.relativeY;
 }, pl = (e, t) => t === "centric" ? e.angle : e.radius, ml = (e) => e.layout.width, hl = (e) => e.layout.height, gl = (e) => e.layout.scale, _l = (e) => e.layout.margin, vl = H((e) => e.cartesianAxis.xAxis, (e) => Object.values(e)), yl = H((e) => e.cartesianAxis.yAxis, (e) => Object.values(e)), bl = "data-recharts-item-index";
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/selectChartOffsetInternal.js
+// node_modules/recharts/es6/state/selectors/selectChartOffsetInternal.js
 function xl(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -3944,8 +3834,7 @@ var jl = H([
 	y: I(e.y) ? e.y : t.top + t.height + t.brushBottom - (n?.bottom || 0),
 	width: I(e.width) ? e.width : t.width
 }));
-//#endregion
-//#region node_modules/es-toolkit/dist/function/debounce.mjs
+// node_modules/es-toolkit/dist/function/debounce.mjs
 function Rl(e, t, { signal: n, edges: r } = {}) {
 	let i, a = null, o = r != null && r.includes("leading"), s = r == null || r.includes("trailing"), c = () => {
 		a !== null && (e.apply(i, a), i = void 0, a = null);
@@ -3969,8 +3858,7 @@ function Rl(e, t, { signal: n, edges: r } = {}) {
 	};
 	return h.schedule = d, h.cancel = p, h.flush = m, n?.addEventListener("abort", p, { once: !0 }), h;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/function/debounce.mjs
+// node_modules/es-toolkit/dist/compat/function/debounce.mjs
 function zl(e, t = 0, n = {}) {
 	typeof n != "object" && (n = {});
 	let { leading: r = !1, trailing: i = !0, maxWait: a } = n, o = [, ,];
@@ -3982,8 +3870,7 @@ function zl(e, t = 0, n = {}) {
 	};
 	return u.cancel = l.cancel, u.flush = () => (l.flush(), s), u;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/function/throttle.mjs
+// node_modules/es-toolkit/dist/compat/function/throttle.mjs
 function Bl(e, t = 0, n = {}) {
 	let { leading: r = !0, trailing: i = !0 } = n;
 	return zl(e, t, {
@@ -3992,8 +3879,7 @@ function Bl(e, t = 0, n = {}) {
 		trailing: i
 	});
 }
-//#endregion
-//#region node_modules/recharts/es6/util/LogUtils.js
+// node_modules/recharts/es6/util/LogUtils.js
 var Vl = function(e, t) {
 	var n = [...arguments].slice(2);
 	if (typeof console < "u" && console.warn && (t === void 0 && console.warn("LogUtils requires an error message argument"), !e)) {
@@ -4039,8 +3925,7 @@ function Yl(e) {
 		height: a
 	};
 }
-//#endregion
-//#region node_modules/recharts/es6/component/ResponsiveContainer.js
+// node_modules/recharts/es6/component/ResponsiveContainer.js
 var Xl = [
 	"aspect",
 	"initialDimension",
@@ -4493,8 +4378,7 @@ function td(e, t) {
 	} else if (!ed(e[n], t[n])) return !1;
 	return !0;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/selectLegendArea.js
+// node_modules/recharts/es6/state/selectors/selectLegendArea.js
 var nd = H([
 	ml,
 	hl,
@@ -4505,8 +4389,7 @@ var nd = H([
 	width: Math.max(e - (n.left || 0) - (n.right || 0), 0),
 	height: Math.max(t - (n.top || 0) - (n.bottom || 0), 0)
 }));
-//#endregion
-//#region node_modules/recharts/es6/cartesian/cartesianPositionToCSSTranslate.js
+// node_modules/recharts/es6/cartesian/cartesianPositionToCSSTranslate.js
 function rd(e, t) {
 	return e === "start" && t === "start" ? "" : `translate(${e === "inherit" ? "0" : {
 		start: "0",
@@ -4518,8 +4401,7 @@ function rd(e, t) {
 		end: "-100%"
 	}[t] ?? "0"})`;
 }
-//#endregion
-//#region node_modules/recharts/es6/component/Legend.js
+// node_modules/recharts/es6/component/Legend.js
 var id = ["contextPayload"];
 function ad() {
 	return ad = Object.assign ? Object.assign.bind() : function(e) {
@@ -4651,7 +4533,7 @@ function Cd(e, t, n) {
 }
 function wd(e, t, n, r, i, a) {
 	var o = t.layout, s = t.align, c = t.verticalAlign, l, u;
-	return (!e || (e.left === void 0 || e.left === null) && (e.right === void 0 || e.right === null)) && (l = s === "center" && o === "vertical" ? { left: ((r || 0) - a.width) / 2 } : s === "right" ? { right: n && n.right || 0 } : { left: n && n.left || 0 }), (!e || (e.top === void 0 || e.top === null) && (e.bottom === void 0 || e.bottom === null)) && (u = c === "middle" ? { top: ((i || 0) - a.height) / 2 } : c === "bottom" ? { bottom: n && n.bottom || 0 } : { top: n && n.top || 0 }), pd(pd({}, l), u);
+	return e && (e.left !== void 0 && e.left !== null || e.right !== void 0 && e.right !== null) || (l = s === "center" && o === "vertical" ? { left: ((r || 0) - a.width) / 2 } : s === "right" ? { right: n && n.right || 0 } : { left: n && n.left || 0 }), e && (e.top !== void 0 && e.top !== null || e.bottom !== void 0 && e.bottom !== null) || (u = c === "middle" ? { top: ((i || 0) - a.height) / 2 } : c === "bottom" ? { bottom: n && n.bottom || 0 } : { top: n && n.top || 0 }), pd(pd({}, l), u);
 }
 function Td(e) {
 	var t = e.align, n = e.layout, r = e.verticalAlign, i = e.itemSorter, a = e.position, o = e.offset, s = B();
@@ -4753,8 +4635,7 @@ function kd(e) {
 }
 var Ad = /*#__PURE__*/ P.memo(kd, td);
 Ad.displayName = "Legend";
-//#endregion
-//#region node_modules/recharts/es6/component/DefaultTooltipContent.js
+// node_modules/recharts/es6/component/DefaultTooltipContent.js
 function jd() {
 	return jd = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -4977,8 +4858,7 @@ var $d = {
 	devToolsEnabled: !0,
 	isSsr: !(typeof window < "u" && window.document && window.document.createElement && window.setTimeout)
 };
-//#endregion
-//#region node_modules/recharts/es6/util/usePrefersReducedMotion.js
+// node_modules/recharts/es6/util/usePrefersReducedMotion.js
 function ef(e, t) {
 	return of(e) || af(e, t) || nf(e, t) || tf();
 }
@@ -5034,8 +4914,7 @@ function sf() {
 		}
 	}, []), t;
 }
-//#endregion
-//#region node_modules/recharts/es6/component/TooltipBoundingBox.js
+// node_modules/recharts/es6/component/TooltipBoundingBox.js
 function cf(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -5180,8 +5059,7 @@ function bf(e) {
 	}, e.children);
 }
 var xf = /*#__PURE__*/ P.memo(bf), Sf = () => V((e) => e.rootProps.accessibilityLayer) ?? !0;
-//#endregion
-//#region node_modules/recharts/es6/shape/Curve.js
+// node_modules/recharts/es6/shape/Curve.js
 function Cf() {
 	return Cf = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -5374,8 +5252,7 @@ var qf = (e, t, n, r, i, a) => `M${e},${i}v${r}M${a},${t}h${n}`, Jf = (e) => {
 		d: qf(n, i, d, p, o, c)
 	}));
 };
-//#endregion
-//#region node_modules/recharts/es6/util/cursor/getCursorRectangle.js
+// node_modules/recharts/es6/util/cursor/getCursorRectangle.js
 function Yf(e, t, n, r) {
 	var i = r / 2;
 	return {
@@ -5502,8 +5379,7 @@ function sp(e) {
 	var t = (0, P.useContext)(op);
 	return (0, P.useMemo)(() => e ?? t, [e, t]);
 }
-//#endregion
-//#region node_modules/recharts/es6/animation/AnimationHandle.js
+// node_modules/recharts/es6/animation/AnimationHandle.js
 function cp(e, t, n) {
 	return (t = lp(t)) in e ? Object.defineProperty(e, t, {
 		value: n,
@@ -5606,8 +5482,7 @@ var gp = class {
 		};
 	}
 };
-//#endregion
-//#region node_modules/recharts/es6/animation/JavascriptAnimate.js
+// node_modules/recharts/es6/animation/JavascriptAnimate.js
 function yp(e, t) {
 	return wp(e) || Cp(e, t) || xp(e, t) || bp();
 }
@@ -5687,14 +5562,12 @@ function Op(e) {
 		c
 	]), u(Number(h));
 }
-//#endregion
-//#region node_modules/recharts/es6/util/useAnimationId.js
+// node_modules/recharts/es6/util/useAnimationId.js
 function kp(e) {
 	var t = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : "animation-", n = (0, P.useRef)(yt(t)), r = (0, P.useRef)(e);
 	return r.current !== e && (n.current = yt(t), r.current = e), n.current;
 }
-//#endregion
-//#region node_modules/recharts/es6/animation/util.js
+// node_modules/recharts/es6/animation/util.js
 var Ap = (e) => e.replace(/([A-Z])/g, (e) => `-${e.toLowerCase()}`), jp = (e, t, n) => e.map((e) => `${Ap(e)} ${t}ms ${n}`).join(","), Mp = ["radius"], Np = ["radius"], Pp, Fp, Ip, Lp, Rp, zp, Bp, Vp, Hp, Up;
 function Wp(e, t) {
 	var n = Object.keys(e);
@@ -5955,8 +5828,7 @@ var am = (e, t, n, r, i) => {
 		}));
 	});
 };
-//#endregion
-//#region node_modules/recharts/es6/util/PolarUtils.js
+// node_modules/recharts/es6/util/PolarUtils.js
 function cm(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -6065,8 +5937,7 @@ var pm = Math.PI / 180, mm = (e) => e * Math.PI / 180, hm = (e) => e * 180 / Mat
 		angle: xm(f, t)
 	}) : null;
 };
-//#endregion
-//#region node_modules/recharts/es6/util/cursor/getRadialCursorPoints.js
+// node_modules/recharts/es6/util/cursor/getRadialCursorPoints.js
 function Cm(e) {
 	var t = e.cx, n = e.cy, r = e.radius, i = e.startAngle, a = e.endAngle;
 	return {
@@ -6078,8 +5949,7 @@ function Cm(e) {
 		endAngle: a
 	};
 }
-//#endregion
-//#region node_modules/recharts/es6/shape/Sector.js
+// node_modules/recharts/es6/shape/Sector.js
 var wm, Tm, Em, Dm, Om, km, Am;
 function jm() {
 	return jm = Object.assign ? Object.assign.bind() : function(e) {
@@ -6273,8 +6143,7 @@ var Nm = (e, t) => mt(t - e) * Math.min(Math.abs(t - e), 359.999), Pm = (e) => {
 		d: g
 	}));
 };
-//#endregion
-//#region node_modules/recharts/es6/util/cursor/getCursorPoints.js
+// node_modules/recharts/es6/util/cursor/getCursorPoints.js
 function zm(e, t, n) {
 	if (e === "horizontal") return [{
 		x: t.x,
@@ -6304,26 +6173,22 @@ function zm(e, t, n) {
 		return Cm(t);
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/toNumber.mjs
+// node_modules/es-toolkit/dist/compat/util/toNumber.mjs
 function Bm(e) {
 	return at(e) ? NaN : Number(e);
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/util/toFinite.mjs
+// node_modules/es-toolkit/dist/compat/util/toFinite.mjs
 function Vm(e) {
 	return e ? (e = Bm(e), e === Infinity || e === -Infinity ? (e < 0 ? -1 : 1) * Number.MAX_VALUE : e === e ? e : 0) : e === 0 ? e : 0;
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/compat/math/range.mjs
+// node_modules/es-toolkit/dist/compat/math/range.mjs
 function Hm(e, t, n) {
 	n && typeof n != "number" && va(e, t, n) && (t = n = void 0), e = Vm(e), t === void 0 ? (t = e, e = 0) : t = Vm(t), n = n === void 0 ? e < t ? 1 : -1 : Vm(n);
 	let r = Math.max(Math.ceil((t - e) / (n || 1)), 0), i = Array(r);
 	for (let t = 0; t < r; t++) i[t] = e, e += n;
 	return i;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/dataSelectors.js
+// node_modules/recharts/es6/state/selectors/dataSelectors.js
 var Um = (e) => e.chartData, Wm = H([Um], (e) => {
 	var t = e.chartData == null ? 0 : e.chartData.length - 1;
 	return {
@@ -6342,8 +6207,7 @@ var Um = (e) => e.chartData, Wm = H([Um], (e) => {
 	var t = e.chartData, n = e.dataStartIndex, r = e.dataEndIndex;
 	return t == null ? [] : t.slice(n, r + 1);
 });
-//#endregion
-//#region node_modules/recharts/es6/util/isDomainSpecifiedByUser.js
+// node_modules/recharts/es6/util/isDomainSpecifiedByUser.js
 function Xm(e, t) {
 	return th(e) || eh(e, t) || Qm(e, t) || Zm();
 }
@@ -6446,9 +6310,8 @@ function ah(e, t, n) {
 		}
 	}
 }
-//#endregion
-//#region node_modules/recharts/es6/util/scale/util/arithmetic.js
-var J = /* @__PURE__ */ i((/* @__PURE__ */ n(((e, t) => {
+// node_modules/recharts/es6/util/scale/util/arithmetic.js
+var J = /* @__PURE__ */ i((/* @__PURE__ */ n(((e, t, n) => {
 	(function(e) {
 		var n = 1e9, r = {
 			precision: 20,
@@ -6821,7 +6684,7 @@ var J = /* @__PURE__ */ i((/* @__PURE__ */ n(((e, t) => {
 		r = j(r), r.default = r.Decimal = r, d = new r(1), typeof define == "function" && define.amd ? define(function() {
 			return r;
 		}) : t !== void 0 && t.exports ? t.exports = r : (e ||= typeof self < "u" && self && self.self == self ? self : Function("return this")(), e.Decimal = r);
-	})(e);
+	})(n);
 })))());
 function oh(e) {
 	return e === 0 ? 1 : Math.floor(new J.default(e).abs().log(10).toNumber()) + 1;
@@ -6830,8 +6693,7 @@ function sh(e, t, n) {
 	for (var r = new J.default(e), i = 0, a = []; r.lt(t) && i < 1e5;) a.push(r.toNumber()), r = r.add(n), i++;
 	return a;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/scale/getNiceTickValues.js
+// node_modules/recharts/es6/util/scale/getNiceTickValues.js
 function ch(e, t) {
 	return ph(e) || fh(e, t) || uh(e, t) || lh();
 }
@@ -6996,14 +6858,12 @@ var mh = (e) => {
 }, Ph = (e, t) => {
 	if (e && t) return e != null && e.reversed ? [t[1], t[0]] : t;
 };
-//#endregion
-//#region node_modules/recharts/es6/util/getAxisTypeBasedOnLayout.js
+// node_modules/recharts/es6/util/getAxisTypeBasedOnLayout.js
 function Fh(e, t, n) {
 	if (n !== "auto") return n;
 	if (e != null) return Jc(e, t) ? "category" : "number";
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/polarAxisSelectors.js
+// node_modules/recharts/es6/state/selectors/polarAxisSelectors.js
 function Ih(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -7126,13 +6986,11 @@ var Vh = {
 		};
 	}
 }), X = (e, t) => t, eg = (e, t, n) => n;
-//#endregion
-//#region node_modules/recharts/es6/util/stacks/getStackSeriesIdentifier.js
+// node_modules/recharts/es6/util/stacks/getStackSeriesIdentifier.js
 function tg(e) {
 	return e?.id;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineDisplayedStackedData.js
+// node_modules/recharts/es6/state/selectors/combiners/combineDisplayedStackedData.js
 function ng(e, t, n) {
 	var r = t.chartData, i = r === void 0 ? [] : r, a = n.allowDuplicatedCategory, o = n.dataKey, s = /* @__PURE__ */ new Map();
 	return e.forEach((e) => {
@@ -7146,16 +7004,13 @@ function ng(e, t, n) {
 		}
 	}), Array.from(s.values());
 }
-//#endregion
-//#region node_modules/recharts/es6/state/types/StackedGraphicalItem.js
+// node_modules/recharts/es6/state/types/StackedGraphicalItem.js
 function rg(e) {
 	return "stackId" in e && e.stackId != null && e.dataKey != null;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/numberDomainEqualityCheck.js
+// node_modules/recharts/es6/state/selectors/numberDomainEqualityCheck.js
 var ig = (e, t) => e === t ? !0 : e == null || t == null ? !1 : e[0] === t[0] && e[1] === t[1];
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/arrayEqualityCheck.js
+// node_modules/recharts/es6/state/selectors/arrayEqualityCheck.js
 function ag(e, t) {
 	return Array.isArray(e) && Array.isArray(t) && e.length === 0 && t.length === 0 ? !0 : e === t;
 }
@@ -7166,14 +7021,12 @@ function og(e, t) {
 	}
 	return !1;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/selectTooltipAxisType.js
+// node_modules/recharts/es6/state/selectors/selectTooltipAxisType.js
 var sg = (e) => {
 	var t = q(e);
 	return t === "horizontal" ? "xAxis" : t === "vertical" ? "yAxis" : t === "centric" ? "angleAxis" : "radiusAxis";
 }, cg = (e) => e.tooltip.settings.axisId;
-//#endregion
-//#region node_modules/recharts/es6/util/scale/RechartsScale.js
+// node_modules/recharts/es6/util/scale/RechartsScale.js
 function lg(e) {
 	if (e != null) {
 		var t = e.ticks, n = e.bandwidth, r = e.range(), i = [Math.min(...r), Math.max(...r)];
@@ -7213,8 +7066,7 @@ function lg(e) {
 		};
 	}
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineCheckedDomain.js
+// node_modules/recharts/es6/state/selectors/combiners/combineCheckedDomain.js
 var ug = (e, t) => {
 	if (t != null) switch (e) {
 		case "linear":
@@ -7229,8 +7081,7 @@ var ug = (e, t) => {
 		default: return t;
 	}
 };
-//#endregion
-//#region node_modules/d3-scale/src/init.js
+// node_modules/d3-scale/src/init.js
 function dg(e, t) {
 	switch (arguments.length) {
 		case 0: break;
@@ -7251,8 +7102,7 @@ function fg(e, t) {
 	}
 	return this;
 }
-//#endregion
-//#region node_modules/d3-scale/src/ordinal.js
+// node_modules/d3-scale/src/ordinal.js
 var pg = Symbol("implicit");
 function mg() {
 	var e = new ye(), t = [], n = [], r = pg;
@@ -7277,8 +7127,7 @@ function mg() {
 		return mg(t, n).unknown(r);
 	}, dg.apply(i, arguments), i;
 }
-//#endregion
-//#region node_modules/d3-scale/src/band.js
+// node_modules/d3-scale/src/band.js
 function hg() {
 	var e = mg().unknown(void 0), t = e.domain, n = e.range, r = 0, i = 1, a, o, s = !1, c = 0, l = 0, u = .5;
 	delete e.unknown;
@@ -7323,8 +7172,7 @@ function gg(e) {
 function _g() {
 	return gg(hg.apply(null, arguments).paddingInner(1));
 }
-//#endregion
-//#region node_modules/d3-color/src/define.js
+// node_modules/d3-color/src/define.js
 function vg(e, t, n) {
 	e.prototype = t.prototype = n, n.constructor = e;
 }
@@ -7333,8 +7181,7 @@ function yg(e, t) {
 	for (var r in t) n[r] = t[r];
 	return n;
 }
-//#endregion
-//#region node_modules/d3-color/src/color.js
+// node_modules/d3-color/src/color.js
 function bg() {}
 var xg = .7, Sg = 1 / xg, Cg = "\\s*([+-]?\\d+)\\s*", wg = "\\s*([+-]?(?:\\d*\\.)?\\d+(?:[eE][+-]?\\d+)?)\\s*", Tg = "\\s*([+-]?(?:\\d*\\.)?\\d+(?:[eE][+-]?\\d+)?)%\\s*", Eg = /^#([0-9a-f]{3,8})$/, Dg = RegExp(`^rgb\\(${Cg},${Cg},${Cg}\\)$`), Og = RegExp(`^rgb\\(${Tg},${Tg},${Tg}\\)$`), kg = RegExp(`^rgba\\(${Cg},${Cg},${Cg},${wg}\\)$`), Ag = RegExp(`^rgba\\(${Tg},${Tg},${Tg},${wg}\\)$`), jg = RegExp(`^hsl\\(${wg},${Tg},${Tg}\\)$`), Mg = RegExp(`^hsla\\(${wg},${Tg},${Tg},${wg}\\)$`), Ng = {
 	aliceblue: 15792383,
@@ -7620,11 +7467,9 @@ function t_(e) {
 function n_(e, t, n) {
 	return (e < 60 ? t + (n - t) * e / 60 : e < 180 ? n : e < 240 ? t + (n - t) * (240 - e) / 60 : t) * 255;
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/constant.js
+// node_modules/d3-interpolate/src/constant.js
 var r_ = (e) => () => e;
-//#endregion
-//#region node_modules/d3-interpolate/src/color.js
+// node_modules/d3-interpolate/src/color.js
 function i_(e, t) {
 	return function(n) {
 		return e + n * t;
@@ -7644,8 +7489,7 @@ function s_(e, t) {
 	var n = t - e;
 	return n ? i_(e, n) : r_(isNaN(e) ? t : e);
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/rgb.js
+// node_modules/d3-interpolate/src/rgb.js
 var c_ = (function e(t) {
 	var n = o_(t);
 	function r(e, t) {
@@ -7656,8 +7500,7 @@ var c_ = (function e(t) {
 	}
 	return r.gamma = e, r;
 })(1);
-//#endregion
-//#region node_modules/d3-interpolate/src/numberArray.js
+// node_modules/d3-interpolate/src/numberArray.js
 function l_(e, t) {
 	t ||= [];
 	var n = e ? Math.min(t.length, e.length) : 0, r = t.slice(), i;
@@ -7669,8 +7512,7 @@ function l_(e, t) {
 function u_(e) {
 	return ArrayBuffer.isView(e) && !(e instanceof DataView);
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/array.js
+// node_modules/d3-interpolate/src/array.js
 function d_(e, t) {
 	for (var n = t ? t.length : 0, r = e ? Math.min(n, e.length) : 0, i = Array(r), a = Array(n), o = 0; o < r; ++o) i[o] = b_(e[o], t[o]);
 	for (; o < n; ++o) a[o] = t[o];
@@ -7679,33 +7521,29 @@ function d_(e, t) {
 		return a;
 	};
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/date.js
+// node_modules/d3-interpolate/src/date.js
 function f_(e, t) {
 	var n = /* @__PURE__ */ new Date();
 	return e = +e, t = +t, function(r) {
 		return n.setTime(e * (1 - r) + t * r), n;
 	};
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/number.js
+// node_modules/d3-interpolate/src/number.js
 function p_(e, t) {
 	return e = +e, t = +t, function(n) {
 		return e * (1 - n) + t * n;
 	};
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/object.js
+// node_modules/d3-interpolate/src/object.js
 function m_(e, t) {
 	var n = {}, r = {}, i;
-	for (i in (typeof e != "object" || !e) && (e = {}), (typeof t != "object" || !t) && (t = {}), t) i in e ? n[i] = b_(e[i], t[i]) : r[i] = t[i];
+	for (i in typeof e == "object" && e || (e = {}), typeof t == "object" && t || (t = {}), t) i in e ? n[i] = b_(e[i], t[i]) : r[i] = t[i];
 	return function(e) {
 		for (i in n) r[i] = n[i](e);
 		return r;
 	};
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/string.js
+// node_modules/d3-interpolate/src/string.js
 var h_ = /[-+]?(?:\d+\.?\d*|\.?\d+)(?:[eE][-+]?\d+)?/g, g_ = new RegExp(h_.source, "g");
 function __(e) {
 	return function() {
@@ -7728,21 +7566,18 @@ function y_(e, t) {
 		return s.join("");
 	});
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/value.js
+// node_modules/d3-interpolate/src/value.js
 function b_(e, t) {
 	var n = typeof t, r;
 	return t == null || n === "boolean" ? r_(t) : (n === "number" ? p_ : n === "string" ? (r = Rg(t)) ? (t = r, c_) : y_ : t instanceof Rg ? c_ : t instanceof Date ? f_ : u_(t) ? l_ : Array.isArray(t) ? d_ : typeof t.valueOf != "function" && typeof t.toString != "function" || isNaN(t) ? m_ : p_)(e, t);
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/round.js
+// node_modules/d3-interpolate/src/round.js
 function x_(e, t) {
 	return e = +e, t = +t, function(n) {
 		return Math.round(e * (1 - n) + t * n);
 	};
 }
-//#endregion
-//#region node_modules/d3-interpolate/src/piecewise.js
+// node_modules/d3-interpolate/src/piecewise.js
 function S_(e, t) {
 	t === void 0 && (t = e, e = b_);
 	for (var n = 0, r = t.length - 1, i = t[0], a = Array(r < 0 ? 0 : r); n < r;) a[n] = e(i, i = t[++n]);
@@ -7751,20 +7586,17 @@ function S_(e, t) {
 		return a[t](e - t);
 	};
 }
-//#endregion
-//#region node_modules/d3-scale/src/constant.js
+// node_modules/d3-scale/src/constant.js
 function C_(e) {
 	return function() {
 		return e;
 	};
 }
-//#endregion
-//#region node_modules/d3-scale/src/number.js
+// node_modules/d3-scale/src/number.js
 function w_(e) {
 	return +e;
 }
-//#endregion
-//#region node_modules/d3-scale/src/continuous.js
+// node_modules/d3-scale/src/continuous.js
 var T_ = [0, 1];
 function E_(e) {
 	return e;
@@ -7827,8 +7659,7 @@ function M_() {
 function N_() {
 	return M_()(E_, E_);
 }
-//#endregion
-//#region node_modules/d3-format/src/formatDecimal.js
+// node_modules/d3-format/src/formatDecimal.js
 function P_(e) {
 	return Math.abs(e = Math.round(e)) >= 1e21 ? e.toLocaleString("en").replace(/,/g, "") : e.toString(10);
 }
@@ -7837,21 +7668,18 @@ function F_(e, t) {
 	var n = (e = t ? e.toExponential(t - 1) : e.toExponential()).indexOf("e"), r = e.slice(0, n);
 	return [r.length > 1 ? r[0] + r.slice(2) : r, +e.slice(n + 1)];
 }
-//#endregion
-//#region node_modules/d3-format/src/exponent.js
+// node_modules/d3-format/src/exponent.js
 function I_(e) {
 	return e = F_(Math.abs(e)), e ? e[1] : NaN;
 }
-//#endregion
-//#region node_modules/d3-format/src/formatGroup.js
+// node_modules/d3-format/src/formatGroup.js
 function L_(e, t) {
 	return function(n, r) {
 		for (var i = n.length, a = [], o = 0, s = e[0], c = 0; i > 0 && s > 0 && (c + s + 1 > r && (s = Math.max(1, r - c)), a.push(n.substring(i -= s, i + s)), !((c += s + 1) > r));) s = e[o = (o + 1) % e.length];
 		return a.reverse().join(t);
 	};
 }
-//#endregion
-//#region node_modules/d3-format/src/formatNumerals.js
+// node_modules/d3-format/src/formatNumerals.js
 function R_(e) {
 	return function(t) {
 		return t.replace(/[0-9]/g, function(t) {
@@ -7859,8 +7687,7 @@ function R_(e) {
 		});
 	};
 }
-//#endregion
-//#region node_modules/d3-format/src/formatSpecifier.js
+// node_modules/d3-format/src/formatSpecifier.js
 var z_ = /^(?:(.)?([<>=^]))?([+\-( ])?([$#])?(0)?(\d+)?(,)?(\.\d+)?(~)?([a-z%])?$/i;
 function B_(e) {
 	if (!(t = z_.exec(e))) throw Error("invalid format: " + e);
@@ -7885,8 +7712,7 @@ function V_(e) {
 V_.prototype.toString = function() {
 	return this.fill + this.align + this.sign + this.symbol + (this.zero ? "0" : "") + (this.width === void 0 ? "" : Math.max(1, this.width | 0)) + (this.comma ? "," : "") + (this.precision === void 0 ? "" : "." + Math.max(0, this.precision | 0)) + (this.trim ? "~" : "") + this.type;
 };
-//#endregion
-//#region node_modules/d3-format/src/formatTrim.js
+// node_modules/d3-format/src/formatTrim.js
 function H_(e) {
 	out: for (var t = e.length, n = 1, r = -1, i; n < t; ++n) switch (e[n]) {
 		case ".":
@@ -7901,8 +7727,7 @@ function H_(e) {
 	}
 	return r > 0 ? e.slice(0, r) + e.slice(i + 1) : e;
 }
-//#endregion
-//#region node_modules/d3-format/src/formatPrefixAuto.js
+// node_modules/d3-format/src/formatPrefixAuto.js
 var U_;
 function W_(e, t) {
 	var n = F_(e, t);
@@ -7910,16 +7735,14 @@ function W_(e, t) {
 	var r = n[0], i = n[1], a = i - (U_ = Math.max(-8, Math.min(8, Math.floor(i / 3))) * 3) + 1, o = r.length;
 	return a === o ? r : a > o ? r + Array(a - o + 1).join("0") : a > 0 ? r.slice(0, a) + "." + r.slice(a) : "0." + Array(1 - a).join("0") + F_(e, Math.max(0, t + a - 1))[0];
 }
-//#endregion
-//#region node_modules/d3-format/src/formatRounded.js
+// node_modules/d3-format/src/formatRounded.js
 function G_(e, t) {
 	var n = F_(e, t);
 	if (!n) return e + "";
 	var r = n[0], i = n[1];
 	return i < 0 ? "0." + Array(-i).join("0") + r : r.length > i + 1 ? r.slice(0, i + 1) + "." + r.slice(i + 1) : r + Array(i - r.length + 2).join("0");
 }
-//#endregion
-//#region node_modules/d3-format/src/formatTypes.js
+// node_modules/d3-format/src/formatTypes.js
 var K_ = {
 	"%": (e, t) => (e * 100).toFixed(t),
 	b: (e) => Math.round(e).toString(2),
@@ -7935,13 +7758,11 @@ var K_ = {
 	X: (e) => Math.round(e).toString(16).toUpperCase(),
 	x: (e) => Math.round(e).toString(16)
 };
-//#endregion
-//#region node_modules/d3-format/src/identity.js
+// node_modules/d3-format/src/identity.js
 function q_(e) {
 	return e;
 }
-//#endregion
-//#region node_modules/d3-format/src/locale.js
+// node_modules/d3-format/src/locale.js
 var J_ = Array.prototype.map, Y_ = [
 	"y",
 	"z",
@@ -8013,8 +7834,7 @@ function X_(e) {
 		formatPrefix: u
 	};
 }
-//#endregion
-//#region node_modules/d3-format/src/defaultLocale.js
+// node_modules/d3-format/src/defaultLocale.js
 var Z_, Q_, $_;
 ev({
 	thousands: ",",
@@ -8024,23 +7844,19 @@ ev({
 function ev(e) {
 	return Z_ = X_(e), Q_ = Z_.format, $_ = Z_.formatPrefix, Z_;
 }
-//#endregion
-//#region node_modules/d3-format/src/precisionFixed.js
+// node_modules/d3-format/src/precisionFixed.js
 function tv(e) {
 	return Math.max(0, -I_(Math.abs(e)));
 }
-//#endregion
-//#region node_modules/d3-format/src/precisionPrefix.js
+// node_modules/d3-format/src/precisionPrefix.js
 function nv(e, t) {
 	return Math.max(0, Math.max(-8, Math.min(8, Math.floor(I_(t) / 3))) * 3 - I_(Math.abs(e)));
 }
-//#endregion
-//#region node_modules/d3-format/src/precisionRound.js
+// node_modules/d3-format/src/precisionRound.js
 function rv(e, t) {
 	return e = Math.abs(e), t = Math.abs(t) - e, Math.max(0, I_(t) - I_(e)) + 1;
 }
-//#endregion
-//#region node_modules/d3-scale/src/tickFormat.js
+// node_modules/d3-scale/src/tickFormat.js
 function iv(e, t, n, r) {
 	var i = ke(e, t, n), a;
 	switch (r = B_(r ?? ",f"), r.type) {
@@ -8059,8 +7875,7 @@ function iv(e, t, n, r) {
 	}
 	return Q_(r);
 }
-//#endregion
-//#region node_modules/d3-scale/src/linear.js
+// node_modules/d3-scale/src/linear.js
 function av(e) {
 	var t = e.domain;
 	return e.ticks = function(e) {
@@ -8088,8 +7903,7 @@ function ov() {
 		return j_(e, ov());
 	}, dg.apply(e, arguments), av(e);
 }
-//#endregion
-//#region node_modules/d3-scale/src/identity.js
+// node_modules/d3-scale/src/identity.js
 function sv(e) {
 	var t;
 	function n(e) {
@@ -8103,15 +7917,13 @@ function sv(e) {
 		return sv(e).unknown(t);
 	}, e = arguments.length ? Array.from(e, w_) : [0, 1], av(n);
 }
-//#endregion
-//#region node_modules/d3-scale/src/nice.js
+// node_modules/d3-scale/src/nice.js
 function cv(e, t) {
 	e = e.slice();
 	var n = 0, r = e.length - 1, i = e[n], a = e[r], o;
 	return a < i && (o = n, n = r, r = o, o = i, i = a, a = o), e[n] = t.floor(i), e[r] = t.ceil(a), e;
 }
-//#endregion
-//#region node_modules/d3-scale/src/log.js
+// node_modules/d3-scale/src/log.js
 function lv(e) {
 	return Math.log(e);
 }
@@ -8178,8 +7990,7 @@ function vv() {
 	let e = _v(M_()).domain([1, 10]);
 	return e.copy = () => j_(e, vv()).base(e.base()), dg.apply(e, arguments), e;
 }
-//#endregion
-//#region node_modules/d3-scale/src/symlog.js
+// node_modules/d3-scale/src/symlog.js
 function yv(e) {
 	return function(t) {
 		return Math.sign(t) * Math.log1p(Math.abs(t / e));
@@ -8202,8 +8013,7 @@ function Sv() {
 		return j_(e, Sv()).constant(e.constant());
 	}, dg.apply(e, arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/pow.js
+// node_modules/d3-scale/src/pow.js
 function Cv(e) {
 	return function(t) {
 		return t < 0 ? -((-t) ** +e) : t ** +e;
@@ -8233,8 +8043,7 @@ function Dv() {
 function Ov() {
 	return Dv.apply(null, arguments).exponent(.5);
 }
-//#endregion
-//#region node_modules/d3-scale/src/radial.js
+// node_modules/d3-scale/src/radial.js
 function kv(e) {
 	return Math.sign(e) * e * e;
 }
@@ -8265,8 +8074,7 @@ function jv() {
 		return jv(e.domain(), t).round(n).clamp(e.clamp()).unknown(r);
 	}, dg.apply(i, arguments), av(i);
 }
-//#endregion
-//#region node_modules/d3-scale/src/quantile.js
+// node_modules/d3-scale/src/quantile.js
 function Mv() {
 	var e = [], t = [], n = [], r;
 	function i() {
@@ -8295,8 +8103,7 @@ function Mv() {
 		return Mv().domain(e).range(t).unknown(r);
 	}, dg.apply(a, arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/quantize.js
+// node_modules/d3-scale/src/quantize.js
 function Nv() {
 	var e = 0, t = 1, n = 1, r = [.5], i = [0, 1], a;
 	function o(e) {
@@ -8322,8 +8129,7 @@ function Nv() {
 		return Nv().domain([e, t]).range(i).unknown(a);
 	}, dg.apply(av(o), arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/threshold.js
+// node_modules/d3-scale/src/threshold.js
 function Pv() {
 	var e = [.5], t = [0, 1], n, r = 1;
 	function i(i) {
@@ -8342,8 +8148,7 @@ function Pv() {
 		return Pv().domain(e).range(t).unknown(n);
 	}, dg.apply(i, arguments);
 }
-//#endregion
-//#region node_modules/d3-time/src/interval.js
+// node_modules/d3-time/src/interval.js
 var Fv = /* @__PURE__ */ new Date(), Iv = /* @__PURE__ */ new Date();
 function Lv(e, t, n, r) {
 	function i(t) {
@@ -8369,8 +8174,7 @@ function Lv(e, t, n, r) {
 		}
 	}), n && (i.count = (t, r) => (Fv.setTime(+t), Iv.setTime(+r), e(Fv), e(Iv), Math.floor(n(Fv, Iv))), i.every = (e) => (e = Math.floor(e), !isFinite(e) || !(e > 0) ? null : e > 1 ? i.filter(r ? (t) => r(t) % e === 0 : (t) => i.count(0, t) % e === 0) : i)), i;
 }
-//#endregion
-//#region node_modules/d3-time/src/millisecond.js
+// node_modules/d3-time/src/millisecond.js
 var Rv = Lv(() => {}, (e, t) => {
 	e.setTime(+e + t);
 }, (e, t) => t - e);
@@ -8379,16 +8183,14 @@ Rv.every = (e) => (e = Math.floor(e), !isFinite(e) || !(e > 0) ? null : e > 1 ? 
 }, (t, n) => {
 	t.setTime(+t + n * e);
 }, (t, n) => (n - t) / e) : Rv), Rv.range;
-//#endregion
-//#region node_modules/d3-time/src/duration.js
+// node_modules/d3-time/src/duration.js
 var zv = 1e3, Bv = zv * 60, Vv = Bv * 60, Hv = Vv * 24, Uv = Hv * 7, Wv = Hv * 30, Gv = Hv * 365, Kv = Lv((e) => {
 	e.setTime(e - e.getMilliseconds());
 }, (e, t) => {
 	e.setTime(+e + t * zv);
 }, (e, t) => (t - e) / zv, (e) => e.getUTCSeconds());
 Kv.range;
-//#endregion
-//#region node_modules/d3-time/src/minute.js
+// node_modules/d3-time/src/minute.js
 var qv = Lv((e) => {
 	e.setTime(e - e.getMilliseconds() - e.getSeconds() * zv);
 }, (e, t) => {
@@ -8401,8 +8203,7 @@ var Jv = Lv((e) => {
 	e.setTime(+e + t * Bv);
 }, (e, t) => (t - e) / Bv, (e) => e.getUTCMinutes());
 Jv.range;
-//#endregion
-//#region node_modules/d3-time/src/hour.js
+// node_modules/d3-time/src/hour.js
 var Yv = Lv((e) => {
 	e.setTime(e - e.getMilliseconds() - e.getSeconds() * zv - e.getMinutes() * Bv);
 }, (e, t) => {
@@ -8415,8 +8216,7 @@ var Xv = Lv((e) => {
 	e.setTime(+e + t * Vv);
 }, (e, t) => (t - e) / Vv, (e) => e.getUTCHours());
 Xv.range;
-//#endregion
-//#region node_modules/d3-time/src/day.js
+// node_modules/d3-time/src/day.js
 var Zv = Lv((e) => e.setHours(0, 0, 0, 0), (e, t) => e.setDate(e.getDate() + t), (e, t) => (t - e - (t.getTimezoneOffset() - e.getTimezoneOffset()) * Bv) / Hv, (e) => e.getDate() - 1);
 Zv.range;
 var Qv = Lv((e) => {
@@ -8431,8 +8231,7 @@ var $v = Lv((e) => {
 	e.setUTCDate(e.getUTCDate() + t);
 }, (e, t) => (t - e) / Hv, (e) => Math.floor(e / Hv));
 $v.range;
-//#endregion
-//#region node_modules/d3-time/src/week.js
+// node_modules/d3-time/src/week.js
 function ey(e) {
 	return Lv((t) => {
 		t.setDate(t.getDate() - (t.getDay() + 7 - e) % 7), t.setHours(0, 0, 0, 0);
@@ -8451,8 +8250,7 @@ function cy(e) {
 }
 var ly = cy(0), uy = cy(1), dy = cy(2), fy = cy(3), py = cy(4), my = cy(5), hy = cy(6);
 ly.range, uy.range, dy.range, fy.range, py.range, my.range, hy.range;
-//#endregion
-//#region node_modules/d3-time/src/month.js
+// node_modules/d3-time/src/month.js
 var gy = Lv((e) => {
 	e.setDate(1), e.setHours(0, 0, 0, 0);
 }, (e, t) => {
@@ -8465,8 +8263,7 @@ var _y = Lv((e) => {
 	e.setUTCMonth(e.getUTCMonth() + t);
 }, (e, t) => t.getUTCMonth() - e.getUTCMonth() + (t.getUTCFullYear() - e.getUTCFullYear()) * 12, (e) => e.getUTCMonth());
 _y.range;
-//#endregion
-//#region node_modules/d3-time/src/year.js
+// node_modules/d3-time/src/year.js
 var vy = Lv((e) => {
 	e.setMonth(0, 1), e.setHours(0, 0, 0, 0);
 }, (e, t) => {
@@ -8487,8 +8284,7 @@ yy.every = (e) => !isFinite(e = Math.floor(e)) || !(e > 0) ? null : Lv((t) => {
 }, (t, n) => {
 	t.setUTCFullYear(t.getUTCFullYear() + n * e);
 }), yy.range;
-//#endregion
-//#region node_modules/d3-time/src/ticks.js
+// node_modules/d3-time/src/ticks.js
 function by(e, t, n, r, i, a) {
 	let o = [
 		[
@@ -8598,8 +8394,7 @@ function by(e, t, n, r, i, a) {
 	return [s, c];
 }
 var [xy, Sy] = by(yy, _y, ly, $v, Xv, Jv), [Cy, wy] = by(vy, gy, ty, Zv, Yv, qv);
-//#endregion
-//#region node_modules/d3-time-format/src/locale.js
+// node_modules/d3-time-format/src/locale.js
 function Ty(e) {
 	if (0 <= e.y && e.y < 100) {
 		var t = new Date(-1, e.m, e.d, e.H, e.M, e.S, e.L);
@@ -9082,8 +8877,7 @@ function Ub(e) {
 function Wb(e) {
 	return Math.floor(e / 1e3);
 }
-//#endregion
-//#region node_modules/d3-time-format/src/defaultLocale.js
+// node_modules/d3-time-format/src/defaultLocale.js
 var Gb, Kb, qb;
 Jb({
 	dateTime: "%x, %X",
@@ -9140,8 +8934,7 @@ Jb({
 function Jb(e) {
 	return Gb = Oy(e), Kb = Gb.format, Gb.parse, qb = Gb.utcFormat, Gb.utcParse, Gb;
 }
-//#endregion
-//#region node_modules/d3-scale/src/time.js
+// node_modules/d3-scale/src/time.js
 function Yb(e) {
 	return new Date(e);
 }
@@ -9164,7 +8957,7 @@ function Zb(e, t, n, r, i, a, o, s, c, l) {
 		return t == null ? x : l(t);
 	}, u.nice = function(e) {
 		var n = f();
-		return (!e || typeof e.range != "function") && (e = t(n[0], n[n.length - 1], e ?? 10)), e ? f(cv(n, e)) : u;
+		return e && typeof e.range == "function" || (e = t(n[0], n[n.length - 1], e ?? 10)), e ? f(cv(n, e)) : u;
 	}, u.copy = function() {
 		return j_(u, Zb(e, t, n, r, i, a, o, s, c, l));
 	}, u;
@@ -9172,13 +8965,11 @@ function Zb(e, t, n, r, i, a, o, s, c, l) {
 function Qb() {
 	return dg.apply(Zb(Cy, wy, vy, gy, ty, Zv, Yv, qv, Kv, Kb).domain([new Date(2e3, 0, 1), new Date(2e3, 0, 2)]), arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/utcTime.js
+// node_modules/d3-scale/src/utcTime.js
 function $b() {
 	return dg.apply(Zb(xy, Sy, yy, _y, ly, Qv, Xv, Jv, Kv, qb).domain([Date.UTC(2e3, 0, 1), Date.UTC(2e3, 0, 2)]), arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/sequential.js
+// node_modules/d3-scale/src/sequential.js
 function ex() {
 	var e = 0, t = 1, n, r, i, a, o = E_, s = !1, c;
 	function l(e) {
@@ -9233,8 +9024,7 @@ function ax() {
 function ox() {
 	return ax.apply(null, arguments).exponent(.5);
 }
-//#endregion
-//#region node_modules/d3-scale/src/sequentialQuantile.js
+// node_modules/d3-scale/src/sequentialQuantile.js
 function sx() {
 	var e = [], t = E_;
 	function n(n) {
@@ -9255,8 +9045,7 @@ function sx() {
 		return sx(t).domain(e);
 	}, fg.apply(n, arguments);
 }
-//#endregion
-//#region node_modules/d3-scale/src/diverging.js
+// node_modules/d3-scale/src/diverging.js
 function cx() {
 	var e = 0, t = .5, n = 1, r = 1, i, a, o, s, c, l = E_, u, d = !1, f;
 	function p(e) {
@@ -9324,8 +9113,7 @@ function fx() {
 function px() {
 	return fx.apply(null, arguments).exponent(.5);
 }
-//#endregion
-//#region node_modules/victory-vendor/es/d3-scale.js
+// node_modules/victory-vendor/es/d3-scale.js
 var mx = /* @__PURE__ */ r({
 	scaleBand: () => hg,
 	scaleDiverging: () => lx,
@@ -9356,8 +9144,7 @@ var mx = /* @__PURE__ */ r({
 	scaleUtc: () => $b,
 	tickFormat: () => iv
 });
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineConfiguredScale.js
+// node_modules/recharts/es6/state/selectors/combiners/combineConfiguredScale.js
 function hx(e) {
 	var t = mx;
 	if (e in t && typeof t[e] == "function") return t[e]();
@@ -9374,8 +9161,7 @@ function gx(e, t, n) {
 function _x(e, t, n, r) {
 	if (n != null && r != null) return typeof e.scale == "function" ? gx(e.scale, n, r) : gx(t, n, r);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineRealScaleType.js
+// node_modules/recharts/es6/state/selectors/combiners/combineRealScaleType.js
 function vx(e) {
 	return `scale${Ct(e)}`;
 }
@@ -9389,8 +9175,7 @@ var bx = (e, t, n) => {
 		if (typeof r == "string") return yx(r) ? r : "point";
 	}
 };
-//#endregion
-//#region node_modules/recharts/es6/util/scale/createCategoricalInverse.js
+// node_modules/recharts/es6/util/scale/createCategoricalInverse.js
 function xx(e, t) {
 	for (var n = 0, r = e.length, i = e[0] < e[e.length - 1]; n < r;) {
 		var a = Math.floor((n + r) / 2);
@@ -9410,13 +9195,11 @@ function Sx(e, t) {
 		};
 	}
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineInverseScaleFunction.js
+// node_modules/recharts/es6/state/selectors/combiners/combineInverseScaleFunction.js
 function Cx(e) {
 	if (e != null) return "invert" in e && typeof e.invert == "function" ? e.invert.bind(e) : Sx(e, void 0);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/axisSelectors.js
+// node_modules/recharts/es6/state/selectors/axisSelectors.js
 function wx(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -10210,8 +9993,7 @@ H([(e, t, n) => e.renderedTicks[t]?.[n]], (e) => {
 		return r?.value;
 	};
 });
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/selectTooltipEventType.js
+// node_modules/recharts/es6/state/selectors/selectTooltipEventType.js
 var UC = (e) => e.options.defaultTooltipEventType, WC = (e) => e.options.validateTooltipEventTypes;
 function GC(e, t, n) {
 	if (e == null) return t;
@@ -10224,8 +10006,7 @@ function KC(e, t) {
 function qC(e) {
 	return V((t) => KC(t, e));
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineActiveLabel.js
+// node_modules/recharts/es6/state/selectors/combiners/combineActiveLabel.js
 var JC = (e, t) => {
 	var n, r = Number(t);
 	if (!(ht(r) || t == null)) return r >= 0 ? e == null || (n = e[r]) == null ? void 0 : n.value : void 0;
@@ -10315,8 +10096,7 @@ var JC = (e, t) => {
 		}
 	}
 }), QC = ZC.actions, $C = QC.addTooltipEntrySettings, ew = QC.replaceTooltipEntrySettings, tw = QC.removeTooltipEntrySettings, nw = QC.setTooltipSettingsState, rw = QC.setActiveMouseOverItemIndex, iw = QC.mouseLeaveItem, aw = QC.mouseLeaveChart, ow = QC.setActiveClickItemIndex, sw = QC.setMouseOverAxisIndex, cw = QC.setMouseClickAxisIndex, lw = QC.setSyncInteraction, uw = QC.setKeyboardInteraction, dw = ZC.reducer;
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineTooltipInteractionState.js
+// node_modules/recharts/es6/state/selectors/combiners/combineTooltipInteractionState.js
 function fw(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -10385,8 +10165,7 @@ var yw = (e, t, n, r) => {
 	};
 	return pw(pw({}, XC), {}, { coordinate: i.coordinate });
 };
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineActiveTooltipIndex.js
+// node_modules/recharts/es6/state/selectors/combiners/combineActiveTooltipIndex.js
 function bw(e) {
 	if (typeof e == "number") return Number.isFinite(e) ? e : void 0;
 	if (e instanceof Date) {
@@ -10441,8 +10220,7 @@ var Cw = (e, t, n, r) => {
 	}
 	return e.tooltipItemPayloads.filter((e) => e.settings?.graphicalItemId === i);
 }, Ew = (e) => e.options.tooltipPayloadSearcher, Dw = (e) => e.tooltip;
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineTooltipPayload.js
+// node_modules/recharts/es6/state/selectors/combiners/combineTooltipPayload.js
 function Ow(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -10711,8 +10489,7 @@ var zw = (e, t, n, r, i, a, o) => {
 		return Array.from(new Set(t));
 	}
 });
-//#endregion
-//#region node_modules/recharts/es6/context/useTooltipAxis.js
+// node_modules/recharts/es6/context/useTooltipAxis.js
 function vT(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -10760,8 +10537,7 @@ var CT = () => V(gS), wT = () => {
 	var e = CT(), t = V(aT), n = V(iT);
 	return ll(!e || !n ? void 0 : yT(yT({}, e), {}, { scale: n }), t);
 };
-//#endregion
-//#region node_modules/recharts/es6/util/getActiveCoordinate.js
+// node_modules/recharts/es6/util/getActiveCoordinate.js
 function TT(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -10961,8 +10737,7 @@ var NT = (e, t, n, r, i) => {
 	var t = Object.keys(e).map((e) => parseInt(e, 10)).concat(Object.values(Y));
 	return Array.from(new Set(t)).sort((e, t) => e - t);
 }, { memoizeOptions: { resultEqualityCheck: og } });
-//#endregion
-//#region node_modules/recharts/es6/state/zIndexSlice.js
+// node_modules/recharts/es6/state/zIndexSlice.js
 function $T(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -11056,8 +10831,7 @@ var sE = Gs({
 		}
 	}
 }), cE = sE.actions, lE = cE.registerZIndexPortal, uE = cE.unregisterZIndexPortal, dE = cE.registerZIndexPortalElement, fE = cE.unregisterZIndexPortalElement, pE = sE.reducer;
-//#endregion
-//#region node_modules/recharts/es6/zIndex/ZIndexLayer.js
+// node_modules/recharts/es6/zIndex/ZIndexLayer.js
 function mE(e) {
 	var t = e.zIndex, n = e.children, r = Du() && t !== void 0 && t !== 0, i = Fl(), a = (0, P.useRef)(void 0), o = (0, P.useRef)(/* @__PURE__ */ new Set()), s = B(), c = V((e) => ZT(e, t, i));
 	if ((0, P.useLayoutEffect)(() => {
@@ -11089,8 +10863,7 @@ function mE(e) {
 	var l = c ?? a.current;
 	return l ? /*#__PURE__*/ (0, Fe.createPortal)(n, l) : null;
 }
-//#endregion
-//#region node_modules/recharts/es6/component/Cursor.js
+// node_modules/recharts/es6/component/Cursor.js
 function hE() {
 	return hE = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -11187,8 +10960,7 @@ function CE(e) {
 		chartName: i
 	}));
 }
-//#endregion
-//#region node_modules/recharts/es6/context/tooltipPortalContext.js
+// node_modules/recharts/es6/context/tooltipPortalContext.js
 var wE = /*#__PURE__*/ (0, P.createContext)(null), TE = () => (0, P.useContext)(wE), EE = (/* @__PURE__ */ i((/* @__PURE__ */ n(((e, t) => {
 	var n = Object.prototype.hasOwnProperty, r = "~";
 	function i() {}
@@ -11266,7 +11038,7 @@ var wE = /*#__PURE__*/ (0, P.createContext)(null), TE = () => (0, P.useContext)(
 		if (!this._events[a]) return this;
 		if (!t) return s(this, a), this;
 		var o = this._events[a];
-		if (o.fn) o.fn === t && (!i || o.once) && (!n || o.context === n) && s(this, a);
+		if (o.fn) o.fn !== t || i && !o.once || n && o.context !== n || s(this, a);
 		else {
 			for (var c = 0, l = [], u = o.length; c < u; c++) (o[c].fn !== t || i && !o[c].once || n && o[c].context !== n) && l.push(o[c]);
 			l.length ? this._events[a] = l.length === 1 ? l[0] : l : s(this, a);
@@ -11293,8 +11065,7 @@ var wE = /*#__PURE__*/ (0, P.createContext)(null), TE = () => (0, P.useContext)(
 		e.eventEmitter ??= Symbol("rechartsEventEmitter");
 	} }
 }), ME = jE.reducer, NE = jE.actions.createEventEmitter;
-//#endregion
-//#region node_modules/recharts/es6/synchronisation/syncSelectors.js
+// node_modules/recharts/es6/synchronisation/syncSelectors.js
 function PE(e) {
 	return e.tooltip.syncInteraction;
 }
@@ -11518,8 +11289,7 @@ function ZE(e, t, n, r, i, a) {
 		f
 	]);
 }
-//#endregion
-//#region node_modules/recharts/es6/component/Tooltip.js
+// node_modules/recharts/es6/component/Tooltip.js
 function QE(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -11694,12 +11464,10 @@ function pD(e) {
 		index: D
 	}));
 }
-//#endregion
-//#region node_modules/recharts/es6/component/Cell.js
+// node_modules/recharts/es6/component/Cell.js
 var mD = (e) => null;
 mD.displayName = "Cell";
-//#endregion
-//#region node_modules/recharts/es6/util/LRUCache.js
+// node_modules/recharts/es6/util/LRUCache.js
 function hD(e, t, n) {
 	return (t = gD(t)) in e ? Object.defineProperty(e, t, {
 		value: n,
@@ -11745,8 +11513,7 @@ var vD = class {
 		return this.cache.size;
 	}
 };
-//#endregion
-//#region node_modules/recharts/es6/util/DOMUtils.js
+// node_modules/recharts/es6/util/DOMUtils.js
 function yD(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -11985,8 +11752,7 @@ function nO(e) {
 	var t = tO(e.slice(5, -1));
 	return t === JD ? "" : t;
 }
-//#endregion
-//#region node_modules/recharts/es6/component/Text.js
+// node_modules/recharts/es6/component/Text.js
 var rO = [
 	"x",
 	"y",
@@ -12210,8 +11976,7 @@ var vO = (e, t, n, r) => e.reduce((e, i) => {
 	}));
 });
 DO.displayName = "Text";
-//#endregion
-//#region node_modules/recharts/es6/component/Label.js
+// node_modules/recharts/es6/component/Label.js
 var OO = ["labelRef"], kO = ["content"];
 function AO(e, t) {
 	if (e == null) return {};
@@ -12474,8 +12239,7 @@ function tk(e) {
 	var t = e.label;
 	return $O(t, UO()) || null;
 }
-//#endregion
-//#region node_modules/recharts/es6/component/LabelList.js
+// node_modules/recharts/es6/component/LabelList.js
 var nk = ["valueAccessor"], rk = [
 	"dataKey",
 	"clockWise",
@@ -12545,8 +12309,7 @@ function hk(e) {
 		content: t
 	}) : typeof t == "object" ? /*#__PURE__*/ P.createElement(mk, ik({ key: "labelList-implicit" }, t, { type: String(t.type) })) : null : null;
 }
-//#endregion
-//#region node_modules/recharts/es6/shape/Polygon.js
+// node_modules/recharts/es6/shape/Polygon.js
 var gk = [
 	"points",
 	"className",
@@ -12632,8 +12395,7 @@ var Sk = (e) => e != null && e.x === +e.x && e.y === +e.y, Ck = function() {
 		d: u
 	}));
 };
-//#endregion
-//#region node_modules/recharts/es6/shape/Dot.js
+// node_modules/recharts/es6/shape/Dot.js
 function Dk() {
 	return Dk = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -12776,13 +12538,11 @@ var Nk = () => void 0, Pk = H([
 		}
 	}
 }), Gk = Wk.actions, Kk = Gk.addRadiusAxis, qk = Gk.removeRadiusAxis, Jk = Gk.addAngleAxis, Yk = Gk.removeAngleAxis, Xk = Wk.reducer;
-//#endregion
-//#region node_modules/recharts/es6/util/getClassNameFromUnknown.js
+// node_modules/recharts/es6/util/getClassNameFromUnknown.js
 function Zk(e) {
 	return e && typeof e == "object" && "className" in e && typeof e.className == "string" ? e.className : "";
 }
-//#endregion
-//#region node_modules/recharts/es6/polar/PolarAngleAxis.js
+// node_modules/recharts/es6/polar/PolarAngleAxis.js
 var Qk = ["children", "type"], $k = ["ref"];
 function eA() {
 	return eA = Object.assign ? Object.assign.bind() : function(e) {
@@ -12949,8 +12709,7 @@ function yA(e) {
 	}, /*#__PURE__*/ P.createElement(vA, t));
 }
 yA.displayName = "PolarAngleAxis";
-//#endregion
-//#region node_modules/react-is/cjs/react-is.production.js
+// node_modules/react-is/cjs/react-is.production.js
 var bA = /* @__PURE__ */ n(((e) => {
 	var t = Symbol.for("react.transitional.element"), n = Symbol.for("react.portal"), r = Symbol.for("react.fragment"), i = Symbol.for("react.strict_mode"), a = Symbol.for("react.profiler"), o = Symbol.for("react.consumer"), s = Symbol.for("react.context"), c = Symbol.for("react.forward_ref"), l = Symbol.for("react.suspense"), u = Symbol.for("react.suspense_list"), d = Symbol.for("react.memo"), f = Symbol.for("react.lazy"), p = Symbol.for("react.view_transition");
 	function m(e) {
@@ -12997,8 +12756,7 @@ function EA(e, t) {
 	}), n;
 }
 var DA = (e) => e && typeof e == "object" && "clipDot" in e ? !!e.clipDot : !0;
-//#endregion
-//#region node_modules/recharts/es6/util/ActiveShapeUtils.js
+// node_modules/recharts/es6/util/ActiveShapeUtils.js
 function OA(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -13064,8 +12822,7 @@ function RA(e) {
 	var t = e.option, n = e.DefaultShape, r = e.shapeProps, i = e.activeClassName, a = i === void 0 ? "recharts-active-shape" : i, o = e.inActiveClassName, s = o === void 0 ? "recharts-shape" : o, c = IA(r), l = /*#__PURE__*/ (0, P.isValidElement)(t) ? FA(t, r) : t === n ? /*#__PURE__*/ P.createElement(n, r) : typeof t == "function" ? t(r, c) : typeof t == "object" ? /*#__PURE__*/ P.createElement(n, NA(t, r)) : /*#__PURE__*/ P.createElement(n, r);
 	return LA(r) ? /*#__PURE__*/ P.createElement(F, { className: a }, l) : /*#__PURE__*/ P.createElement(F, { className: s }, l);
 }
-//#endregion
-//#region node_modules/recharts/es6/context/tooltipContext.js
+// node_modules/recharts/es6/context/tooltipContext.js
 var zA = (e, t, n) => {
 	var r = B();
 	return (i, a) => (o) => {
@@ -13092,8 +12849,7 @@ var zA = (e, t, n) => {
 		}));
 	};
 };
-//#endregion
-//#region node_modules/recharts/es6/state/SetTooltipEntrySettings.js
+// node_modules/recharts/es6/state/SetTooltipEntrySettings.js
 function HA(e) {
 	var t = e.tooltipEntrySettings, n = B(), r = Fl(), i = (0, P.useRef)(null);
 	return (0, P.useLayoutEffect)(() => {
@@ -13109,8 +12865,7 @@ function HA(e) {
 		i.current &&= (n(tw(i.current)), null);
 	}, [n]), null;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/SetLegendPayload.js
+// node_modules/recharts/es6/state/SetLegendPayload.js
 function UA(e) {
 	var t = e.legendPayload, n = B(), r = Fl(), i = (0, P.useRef)(null);
 	return (0, P.useLayoutEffect)(() => {
@@ -13141,8 +12896,7 @@ function WA(e) {
 		i.current &&= (n(Fu(i.current)), null);
 	}, [n]), null;
 }
-//#endregion
-//#region node_modules/recharts/es6/animation/matchBy.js
+// node_modules/recharts/es6/animation/matchBy.js
 function GA(e, t) {
 	return XA(e) || YA(e, t) || qA(e, t) || KA();
 }
@@ -13242,8 +12996,7 @@ function ij(e, t, n) {
 		next: e
 	})) : n === "index" ? ej(e, t) : n === "append" ? tj(e, t) : rj(e, t, n);
 }
-//#endregion
-//#region node_modules/recharts/es6/animation/useAnimationStartSnapshot.js
+// node_modules/recharts/es6/animation/useAnimationStartSnapshot.js
 function aj(e, t) {
 	var n = (0, P.useRef)(e), r = (0, P.useRef)(t.current), i = (0, P.useRef)(!0);
 	n.current !== e && (n.current = e, r.current = t.current, i.current = !1);
@@ -13256,8 +13009,7 @@ function aj(e, t) {
 		syncStepValue: a
 	};
 }
-//#endregion
-//#region node_modules/recharts/es6/animation/AnimatedItems.js
+// node_modules/recharts/es6/animation/AnimatedItems.js
 function oj(e, t) {
 	return dj(e) || uj(e, t) || cj(e, t) || sj();
 }
@@ -13371,14 +13123,12 @@ function yj(e) {
 	if (Array.isArray(e)) return e;
 }
 var bj = P.useId ?? (() => mj(P.useState(() => yt("uid-")), 1)[0]);
-//#endregion
-//#region node_modules/recharts/es6/util/useUniqueId.js
+// node_modules/recharts/es6/util/useUniqueId.js
 function xj(e, t) {
 	var n = bj();
 	return t || (e ? `${e}-${n}` : n);
 }
-//#endregion
-//#region node_modules/recharts/es6/context/RegisterGraphicalItemId.js
+// node_modules/recharts/es6/context/RegisterGraphicalItemId.js
 var Sj = /*#__PURE__*/ (0, P.createContext)(void 0), Cj = (e) => {
 	var t = e.id, n = e.type, r = e.children, i = xj(`recharts-${n}`, t);
 	return /*#__PURE__*/ P.createElement(Sj.Provider, { value: i }, r(i));
@@ -13555,8 +13305,7 @@ function Kj(e) {
 	}), m = {};
 	return s && c != null && (m.clipPath = `url(#clipPath-${d ? "" : "dots-"}${c})`), /*#__PURE__*/ P.createElement(mE, { zIndex: u }, /*#__PURE__*/ P.createElement(F, Vj({ className: r }, m), p));
 }
-//#endregion
-//#region node_modules/recharts/es6/state/cartesianAxisSlice.js
+// node_modules/recharts/es6/state/cartesianAxisSlice.js
 function qj(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -13709,8 +13458,7 @@ var oM = $j.updateYAxisWidth, sM = $j.updateXAxisHeight, cM = Qj.reducer, lM = H
 		height: Math.max(0, n - e.top - e.bottom)
 	};
 }), uM = () => V(lM), dM = () => V(_T);
-//#endregion
-//#region node_modules/recharts/es6/component/ActivePoints.js
+// node_modules/recharts/es6/component/ActivePoints.js
 function fM(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -13787,8 +13535,7 @@ function vM(e) {
 		clipPath: a
 	}));
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineBarSizeList.js
+// node_modules/recharts/es6/state/selectors/combiners/combineBarSizeList.js
 function yM(e, t) {
 	return wM(e) || CM(e, t) || xM(e, t) || bM();
 }
@@ -13852,8 +13599,7 @@ var TM = (e, t, n) => {
 	}));
 	return [...s, ...c];
 };
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/combiners/combineAllBarPositions.js
+// node_modules/recharts/es6/state/selectors/combiners/combineAllBarPositions.js
 function DM(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -13958,13 +13704,11 @@ var NM = (e, t, n, r, i, a, o) => {
 		if (n != null) return n.position;
 	}
 };
-//#endregion
-//#region node_modules/recharts/es6/zIndex/getZIndexFromUnknown.js
+// node_modules/recharts/es6/zIndex/getZIndexFromUnknown.js
 function IM(e, t) {
 	return e && typeof e == "object" && "zIndex" in e && typeof e.zIndex == "number" && G(e.zIndex) ? e.zIndex : t;
 }
-//#endregion
-//#region node_modules/recharts/es6/context/chartDataContext.js
+// node_modules/recharts/es6/context/chartDataContext.js
 var LM = (e) => {
 	var t = e.chartData, n = B(), r = Fl();
 	return (0, P.useEffect)(() => r ? () => {} : (n(LE(t)), () => {
@@ -14050,8 +13794,7 @@ var WM = function(e) {
 }), KM = GM.actions;
 KM.addDot, KM.removeDot, KM.addArea, KM.removeArea;
 var qM = KM.addLine, JM = KM.removeLine, YM = GM.reducer;
-//#endregion
-//#region node_modules/recharts/es6/container/ClipPathProvider.js
+// node_modules/recharts/es6/container/ClipPathProvider.js
 function XM(e, t) {
 	return tN(e) || eN(e, t) || QM(e, t) || ZM();
 }
@@ -14128,8 +13871,7 @@ var nN = /*#__PURE__*/ (0, P.createContext)(void 0), rN = (e) => {
 		return r && i;
 	}
 };
-//#endregion
-//#region node_modules/recharts/es6/cartesian/ReferenceLine.js
+// node_modules/recharts/es6/cartesian/ReferenceLine.js
 function oN(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -14282,18 +14024,15 @@ function bN(e) {
 	}), /*#__PURE__*/ P.createElement(vN, t));
 }
 bN.displayName = "ReferenceLine";
-//#endregion
-//#region node_modules/es-toolkit/dist/function/noop.mjs
+// node_modules/es-toolkit/dist/function/noop.mjs
 function xN() {}
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isPlainObject.mjs
+// node_modules/es-toolkit/dist/predicate/isPlainObject.mjs
 function SN(e) {
 	if (!e || typeof e != "object") return !1;
 	let t = Object.getPrototypeOf(e);
 	return t !== null && t !== Object.prototype && Object.getPrototypeOf(t) !== null ? !1 : Object.prototype.toString.call(e) === "[object Object]";
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isEqualWith.mjs
+// node_modules/es-toolkit/dist/predicate/isEqualWith.mjs
 function CN(e, t, n) {
 	return wN(e, t, void 0, void 0, void 0, void 0, n);
 }
@@ -14381,13 +14120,11 @@ function TN(e, t, n, r) {
 		n.delete(e), n.delete(t);
 	}
 }
-//#endregion
-//#region node_modules/es-toolkit/dist/predicate/isEqual.mjs
+// node_modules/es-toolkit/dist/predicate/isEqual.mjs
 function EN(e, t) {
 	return CN(e, t, xN);
 }
-//#endregion
-//#region node_modules/recharts/es6/util/getEveryNth.js
+// node_modules/recharts/es6/util/getEveryNth.js
 function DN(e, t) {
 	if (t < 1) return [];
 	if (t === 1) return e;
@@ -14397,8 +14134,7 @@ function DN(e, t) {
 	}
 	return n;
 }
-//#endregion
-//#region node_modules/recharts/es6/util/TickUtils.js
+// node_modules/recharts/es6/util/TickUtils.js
 function ON(e, t, n) {
 	return WM({
 		width: e.width + t.width,
@@ -14423,8 +14159,7 @@ function AN(e, t, n, r, i) {
 function jN(e, t) {
 	return DN(e, t + 1);
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/getEquidistantTicks.js
+// node_modules/recharts/es6/cartesian/getEquidistantTicks.js
 function MN(e, t, n, r, i) {
 	for (var a = (r || []).slice(), o = t.start, s = t.end, c = 0, l = 1, u = o, d = function() {
 		var t = r?.[c];
@@ -14455,8 +14190,7 @@ function NN(e, t, n, r, i) {
 	}
 	return [];
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/getTicks.js
+// node_modules/recharts/es6/cartesian/getTicks.js
 function PN(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -14556,8 +14290,7 @@ function VN(e, t, n) {
 	}, g = i[0], _ = i[1], v = i.length >= 2 && g != null && _ != null ? mt(_.coordinate - g.coordinate) : 1, y = kN(a, v, p);
 	return c === "equidistantPreserveStart" ? MN(v, y, h, i, o) : c === "equidistantPreserveEnd" ? NN(v, y, h, i, o) : (f = c === "preserveStart" || c === "preserveStartEnd" ? BN(v, y, h, i, o, c === "preserveStartEnd") : zN(v, y, h, i, o), f.filter((e) => e.isShow));
 }
-//#endregion
-//#region node_modules/recharts/es6/util/YAxisUtils.js
+// node_modules/recharts/es6/util/YAxisUtils.js
 var HN = (e) => {
 	var t = e.ticks, n = e.label, r = e.labelGapWithTick, i = r === void 0 ? 5 : r, a = e.tickSize, o = a === void 0 ? 0 : a, s = e.tickMargin, c = s === void 0 ? 0 : s, l = 0;
 	if (t) {
@@ -14973,8 +14706,7 @@ var _P = /*#__PURE__*/ (0, P.forwardRef)((e, t) => {
 	return /*#__PURE__*/ P.createElement(vP, iP({}, n, { ref: t }));
 });
 yP.displayName = "CartesianAxis";
-//#endregion
-//#region node_modules/recharts/es6/theme/RechartsThemeContext.js
+// node_modules/recharts/es6/theme/RechartsThemeContext.js
 var bP = /*#__PURE__*/ (0, P.createContext)({ grid: {
 	stroke: "#ccc",
 	fill: "none"
@@ -15268,8 +15000,7 @@ function UP(e) {
 	}))));
 }
 UP.displayName = "CartesianGrid";
-//#endregion
-//#region node_modules/recharts/es6/cartesian/LineDrawShape.js
+// node_modules/recharts/es6/cartesian/LineDrawShape.js
 var WP = [
 	"animationElapsedTime",
 	"isAnimating",
@@ -15354,8 +15085,7 @@ function eF(e) {
 		strokeDasharray: o
 	}));
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/useAnimatedLineLength.js
+// node_modules/recharts/es6/cartesian/useAnimatedLineLength.js
 function tF(e) {
 	var t = (0, P.useRef)(0), n = (0, P.useRef)(0), r = (0, P.useRef)(!1), i = (0, P.useRef)(e);
 	return i.current !== e && (t.current = n.current, i.current = e), (0, P.useCallback)((e, i) => {
@@ -15364,8 +15094,7 @@ function tF(e) {
 		return e > 0 && i > 0 && (n.current = Math.max(n.current, a), a >= i) ? (r.current = !0, null) : a;
 	}, []);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/errorBarSlice.js
+// node_modules/recharts/es6/state/errorBarSlice.js
 var nF = Gs({
 	name: "errorBars",
 	initialState: {},
@@ -15419,8 +15148,7 @@ function lF(e) {
 	var t = e.children, n = oF(e, aF);
 	return /*#__PURE__*/ P.createElement(cF.Provider, { value: n }, t);
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/GraphicalItemClipPath.js
+// node_modules/recharts/es6/cartesian/GraphicalItemClipPath.js
 function uF(e, t) {
 	var n = V((t) => Rx(t, e)), r = V((e) => Vx(e, t)), i = n?.allowDataOverflow ?? Ix.allowDataOverflow, a = r?.allowDataOverflow ?? zx.allowDataOverflow;
 	return {
@@ -15440,8 +15168,7 @@ function dF(e) {
 		height: v
 	}));
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/lineSelectors.js
+// node_modules/recharts/es6/state/selectors/lineSelectors.js
 var fF = (e, t, n, r) => VC(e, "xAxis", t, r), pF = (e, t, n, r) => BC(e, "xAxis", t, r), mF = (e, t, n, r) => VC(e, "yAxis", n, r), hF = (e, t, n, r) => BC(e, "yAxis", n, r), gF = H([
 	q,
 	fF,
@@ -15477,8 +15204,7 @@ var yF = H([
 		});
 	}
 });
-//#endregion
-//#region node_modules/recharts/es6/util/getRadiusAndStrokeWidthFromDot.js
+// node_modules/recharts/es6/util/getRadiusAndStrokeWidthFromDot.js
 function bF(e) {
 	var t = He(e), n = 3, r = 2;
 	if (t != null) {
@@ -15493,8 +15219,7 @@ function bF(e) {
 		strokeWidth: r
 	};
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/Line.js
+// node_modules/recharts/es6/cartesian/Line.js
 var xF = ["id"], SF = [
 	"type",
 	"layout",
@@ -15908,16 +15633,14 @@ function KF(e) {
 }
 var qF = /*#__PURE__*/ P.memo(KF, td);
 qF.displayName = "Line";
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/graphicalItemSelectors.js
+// node_modules/recharts/es6/state/selectors/graphicalItemSelectors.js
 function JF(e, t) {
 	return e.graphicalItems.cartesianItems.find((e) => e.id === t)?.xAxisId ?? 0;
 }
 function YF(e, t) {
 	return e.graphicalItems.cartesianItems.find((e) => e.id === t)?.yAxisId ?? 0;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/areaSelectors.js
+// node_modules/recharts/es6/state/selectors/areaSelectors.js
 var XF = (e, t, n) => VC(e, "xAxis", JF(e, t), n), ZF = (e, t, n) => BC(e, "xAxis", JF(e, t), n), QF = (e, t, n) => VC(e, "yAxis", YF(e, t), n), $F = (e, t, n) => BC(e, "yAxis", YF(e, t), n), eI = H([
 	q,
 	XF,
@@ -16073,8 +15796,7 @@ function mI(e) {
 		strokeWidth: d.strokeWidth
 	}))), /*#__PURE__*/ P.createElement(F, { clipPath: `url(#${m})` }, v, y, b)) : /*#__PURE__*/ P.createElement(P.Fragment, null, v, y, b);
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/Area.js
+// node_modules/recharts/es6/cartesian/Area.js
 var hI = ["id"], gI = [
 	"activeDot",
 	"animationBegin",
@@ -16487,14 +16209,12 @@ function zI(e) {
 }
 var BI = /*#__PURE__*/ P.memo(zI, td);
 BI.displayName = "Area";
-//#endregion
-//#region node_modules/tiny-invariant/dist/esm/tiny-invariant.js
+// node_modules/tiny-invariant/dist/esm/tiny-invariant.js
 var VI = "Invariant failed";
 function HI(e, t) {
 	if (!e) throw Error(VI);
 }
-//#endregion
-//#region node_modules/recharts/es6/util/BarUtils.js
+// node_modules/recharts/es6/util/BarUtils.js
 var UI = ["option"];
 function WI(e, t) {
 	if (e == null) return {};
@@ -17159,8 +16879,7 @@ function JL(e) {
 }
 var YL = /*#__PURE__*/ P.memo(JL, td);
 YL.displayName = "Bar";
-//#endregion
-//#region node_modules/recharts/es6/util/axisPropsAreEqual.js
+// node_modules/recharts/es6/util/axisPropsAreEqual.js
 var XL = ["domain", "range"], ZL = ["domain", "range"];
 function QL(e, t) {
 	if (e == null) return {};
@@ -17188,8 +16907,7 @@ function tR(e, t) {
 	var n = e.domain, r = e.range, i = QL(e, XL), a = t.domain, o = t.range, s = QL(t, ZL);
 	return !eR(n, a) || !eR(r, o) ? !1 : td(i, s);
 }
-//#endregion
-//#region node_modules/recharts/es6/cartesian/XAxis.js
+// node_modules/recharts/es6/cartesian/XAxis.js
 var nR = ["type"], rR = [
 	"dangerouslySetInnerHTML",
 	"ticks",
@@ -17372,8 +17090,7 @@ var mR = (e) => {
 	}), /*#__PURE__*/ P.createElement(mR, t));
 }, tR);
 gR.displayName = "XAxis";
-//#endregion
-//#region node_modules/recharts/es6/cartesian/YAxis.js
+// node_modules/recharts/es6/cartesian/YAxis.js
 var _R = ["type"], vR = [
 	"dangerouslySetInnerHTML",
 	"ticks",
@@ -17568,8 +17285,7 @@ var MR = H([
 	RT,
 	jl
 ], XT);
-//#endregion
-//#region node_modules/recharts/es6/util/getRelativeCoordinate.js
+// node_modules/recharts/es6/util/getRelativeCoordinate.js
 function NR(e) {
 	return "getBBox" in e.currentTarget && typeof e.currentTarget.getBBox == "function";
 }
@@ -17588,8 +17304,7 @@ function PR(e) {
 	});
 	return "touches" in e ? Array.from(e.touches).map((e) => o(e.clientX, e.clientY)) : o(e.clientX, e.clientY);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/mouseEventsMiddleware.js
+// node_modules/recharts/es6/state/mouseEventsMiddleware.js
 var FR = ws("mouseClick"), IR = jc();
 IR.startListening({
 	actionCreator: FR,
@@ -17607,7 +17322,7 @@ RR.startListening({
 	actionCreator: LR,
 	effect: (e, t) => {
 		var n = e.payload, r = t.getState().eventSettings, i = r.throttleDelay, a = r.throttledEvents, o = a === "all" || a?.includes("mousemove");
-		zR !== null && (cancelAnimationFrame(zR), zR = null), BR !== null && (typeof i != "number" || !o) && (clearTimeout(BR), BR = null), VR = PR(n);
+		zR !== null && (cancelAnimationFrame(zR), zR = null), BR === null || typeof i == "number" && o || (clearTimeout(BR), BR = null), VR = PR(n);
 		var s = () => {
 			var e = t.getState(), n = KC(e, e.tooltip.settings.shared);
 			if (!VR) zR = null, BR = null;
@@ -17626,13 +17341,11 @@ RR.startListening({
 		o ? i === "raf" ? zR = requestAnimationFrame(s) : typeof i == "number" && BR === null && (BR = setTimeout(s, i)) : s();
 	}
 });
-//#endregion
-//#region node_modules/recharts/es6/state/reduxDevtoolsJsonStringifyReplacer.js
+// node_modules/recharts/es6/state/reduxDevtoolsJsonStringifyReplacer.js
 function HR(e, t) {
 	return t instanceof HTMLElement ? `HTMLElement <${t.tagName} class="${t.className}">` : t === window ? "global.window" : e === "children" && typeof t == "object" && t ? "<<CHILDREN>>" : t;
 }
-//#endregion
-//#region node_modules/recharts/es6/state/rootPropsSlice.js
+// node_modules/recharts/es6/state/rootPropsSlice.js
 var UR = {
 	accessibilityLayer: !0,
 	barCategoryGap: "10%",
@@ -17661,7 +17374,7 @@ $R.startListening({
 	effect: (e, t) => {
 		nz = e.payload, ez !== null && (cancelAnimationFrame(ez), ez = null);
 		var n = t.getState().eventSettings, r = n.throttleDelay, i = n.throttledEvents, a = i === "all" || i.includes("keydown");
-		tz !== null && (typeof r != "number" || !a) && (clearTimeout(tz), tz = null);
+		tz === null || typeof r == "number" && a || (clearTimeout(tz), tz = null);
 		var o = () => {
 			try {
 				var e = t.getState();
@@ -17747,8 +17460,7 @@ $R.startListening({
 		}
 	}
 });
-//#endregion
-//#region node_modules/recharts/es6/util/createEventProxy.js
+// node_modules/recharts/es6/util/createEventProxy.js
 function rz(e) {
 	e.persist();
 	var t = e.currentTarget;
@@ -17758,8 +17470,7 @@ function rz(e) {
 		return typeof r == "function" ? r.bind(e) : r;
 	} });
 }
-//#endregion
-//#region node_modules/recharts/es6/state/externalEventsMiddleware.js
+// node_modules/recharts/es6/state/externalEventsMiddleware.js
 var iz = ws("externalEvent"), az = jc(), oz = /* @__PURE__ */ new Map(), sz = /* @__PURE__ */ new Map(), cz = /* @__PURE__ */ new Map();
 az.startListening({
 	actionCreator: iz,
@@ -17774,7 +17485,7 @@ az.startListening({
 			var s = oz.get(a);
 			s !== void 0 && (cancelAnimationFrame(s), oz.delete(a));
 			var c = t.getState().eventSettings, l = c.throttleDelay, u = c.throttledEvents, d = u === "all" || u?.includes(a), f = sz.get(a);
-			f !== void 0 && (typeof l != "number" || !d) && (clearTimeout(f), sz.delete(a));
+			f === void 0 || typeof l == "number" && d || (clearTimeout(f), sz.delete(a));
 			var p = () => {
 				var e = cz.get(a);
 				try {
@@ -17826,7 +17537,7 @@ dz.startListening({
 		if (n.touches != null && n.touches.length !== 0) {
 			hz = rz(n);
 			var r = t.getState().eventSettings, i = r.throttleDelay, a = r.throttledEvents, o = a === "all" || a.includes("touchmove");
-			fz !== null && (cancelAnimationFrame(fz), fz = null), pz !== null && (typeof i != "number" || !o) && (clearTimeout(pz), pz = null), mz = Array.from(n.touches).map((e) => PR({
+			fz !== null && (cancelAnimationFrame(fz), fz = null), pz === null || typeof i == "number" && o || (clearTimeout(pz), pz = null), mz = Array.from(n.touches).map((e) => PR({
 				clientX: e.clientX,
 				clientY: e.clientY,
 				currentTarget: n.currentTarget
@@ -17870,8 +17581,7 @@ dz.startListening({
 		}
 	}
 });
-//#endregion
-//#region node_modules/recharts/es6/state/eventSettingsSlice.js
+// node_modules/recharts/es6/state/eventSettingsSlice.js
 var gz = {
 	throttleDelay: "raf",
 	throttledEvents: [
@@ -17933,8 +17643,7 @@ var gz = {
 		}
 	});
 };
-//#endregion
-//#region node_modules/recharts/es6/state/RechartsStoreProvider.js
+// node_modules/recharts/es6/state/RechartsStoreProvider.js
 function Sz(e) {
 	var t = e.preloadedState, n = e.children, r = e.reduxStoreName, i = Fl(), a = (0, P.useRef)(null);
 	if (i) return n;
@@ -17945,8 +17654,7 @@ function Sz(e) {
 		store: a.current
 	}, n);
 }
-//#endregion
-//#region node_modules/recharts/es6/state/ReportMainChartProps.js
+// node_modules/recharts/es6/state/ReportMainChartProps.js
 function Cz(e) {
 	var t = e.layout, n = e.margin, r = B(), i = Fl();
 	return (0, P.useEffect)(() => {
@@ -17959,8 +17667,7 @@ function Cz(e) {
 	]), null;
 }
 var wz = /*#__PURE__*/ (0, P.memo)(Cz, td);
-//#endregion
-//#region node_modules/recharts/es6/state/ReportChartProps.js
+// node_modules/recharts/es6/state/ReportChartProps.js
 function Tz(e) {
 	var t = B();
 	return (0, P.useEffect)(() => {
@@ -17973,8 +17680,7 @@ var Ez = /*#__PURE__*/ (0, P.memo)((e) => {
 		t(vz(e));
 	}, [t, e]), null;
 }, td);
-//#endregion
-//#region node_modules/recharts/es6/zIndex/ZIndexPortal.js
+// node_modules/recharts/es6/zIndex/ZIndexPortal.js
 function Dz(e) {
 	var t = e.zIndex, n = e.isPanorama, r = (0, P.useRef)(null), i = B();
 	return (0, P.useLayoutEffect)(() => (r.current && i(dE({
@@ -18010,8 +17716,7 @@ function Oz(e) {
 		isPanorama: n
 	})));
 }
-//#endregion
-//#region node_modules/recharts/es6/container/RootSurface.js
+// node_modules/recharts/es6/container/RootSurface.js
 var kz = ["children"];
 function Az(e, t) {
 	if (e == null) return {};
@@ -18072,8 +17777,7 @@ var Nz = {
 	var n = e.children, r = Az(e, kz);
 	return Fl() ? /*#__PURE__*/ P.createElement(Fz, null, /*#__PURE__*/ P.createElement(Oz, { isPanorama: !0 }, n)) : /*#__PURE__*/ P.createElement(Pz, Mz({ ref: t }, r), /*#__PURE__*/ P.createElement(Oz, { isPanorama: !1 }, n));
 });
-//#endregion
-//#region node_modules/recharts/es6/util/useReportScale.js
+// node_modules/recharts/es6/util/useReportScale.js
 function Lz(e, t) {
 	return Hz(e) || Vz(e, t) || zz(e, t) || Rz();
 }
@@ -18129,8 +17833,7 @@ function Uz() {
 		i
 	]), r;
 }
-//#endregion
-//#region node_modules/recharts/es6/chart/RechartsWrapper.js
+// node_modules/recharts/es6/chart/RechartsWrapper.js
 function Wz(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -18470,8 +18173,7 @@ var pB = /*#__PURE__*/ (0, P.forwardRef)((e, t) => {
 		ref: t
 	}, /*#__PURE__*/ P.createElement(rN, null, a)));
 });
-//#endregion
-//#region node_modules/recharts/es6/chart/CartesianChart.js
+// node_modules/recharts/es6/chart/CartesianChart.js
 function mB() {
 	return mB = Object.assign ? Object.assign.bind() : function(e) {
 		for (var t = 1; t < arguments.length; t++) {
@@ -18584,16 +18286,14 @@ var bB = gB({
 	categoricalChartProps: e,
 	ref: t
 }));
-//#endregion
-//#region node_modules/recharts/es6/state/ReportPolarOptions.js
+// node_modules/recharts/es6/state/ReportPolarOptions.js
 function EB(e) {
 	var t = B();
 	return (0, P.useEffect)(() => {
 		t(JR(e));
 	}, [t, e]), null;
 }
-//#endregion
-//#region node_modules/recharts/es6/chart/PolarChart.js
+// node_modules/recharts/es6/chart/PolarChart.js
 var DB = ["layout"];
 function OB() {
 	return OB = Object.assign ? Object.assign.bind() : function(e) {
@@ -18729,13 +18429,11 @@ var IB = MB({
 	categoricalChartProps: e,
 	ref: t
 }));
-//#endregion
-//#region src/react/charts/cn.ts
+// src/react/charts/cn.ts
 function BB(...e) {
 	return d(l(e));
 }
-//#endregion
-//#region src/react/evilcharts/registry/ui/recharts-chart.tsx
+// src/react/evilcharts/registry/ui/recharts-chart.tsx
 var $ = b(), VB = {
 	light: "",
 	dark: ".dark"
@@ -18889,8 +18587,7 @@ var rV = ({ animationDuration: e = 200, ...t }) => /* @__PURE__ */ (0, $.jsx)(pD
 	animationDuration: e,
 	...t
 });
-//#endregion
-//#region src/react/evilcharts/registry/ui/recharts-legend.tsx
+// src/react/evilcharts/registry/ui/recharts-legend.tsx
 function iV({ className: e, hideIcon: t = !1, nameKey: n, payload: r, verticalAlign: i, align: a = "right", selected: o, onSelectChange: s, isClickable: c, variant: l = "rounded-square" }) {
 	let { config: u } = GB();
 	return r?.length ? /* @__PURE__ */ (0, $.jsx)("div", {
@@ -19540,8 +19237,7 @@ function _V({ variant: e }) {
 		})]
 	});
 }
-//#endregion
-//#region src/react/evilcharts/registry/charts/recharts-bar-chart.tsx
+// src/react/evilcharts/registry/charts/recharts-bar-chart.tsx
 var vV = 2, yV = "loading", bV = 2e3, xV = "evil-stacked", SV = .5, CV = .05, wV = [
 	0,
 	.7,
@@ -20278,8 +19974,7 @@ var JV = ({ chartId: e, onShimmerExit: t }) => /* @__PURE__ */ (0, $.jsxs)($.Fra
 	] });
 };
 DV.Bar = OV, DV.XAxis = kV, DV.YAxis = AV, DV.Grid = jV, DV.Tooltip = MV, DV.Legend = NV, DV.Brush = lV;
-//#endregion
-//#region src/react/charts/chart-card.tsx
+// src/react/charts/chart-card.tsx
 var XV = `${c({ radius: "chart" })} flex flex-col gap-4 max-sm:p-4`;
 function ZV({ title: e, children: t }) {
 	return /* @__PURE__ */ (0, $.jsxs)("section", {
@@ -20350,8 +20045,7 @@ function uH(e) {
 		colors: cH(sH[t % sH.length])
 	}]));
 }
-//#endregion
-//#region src/react/charts/chart-tip.tsx
+// src/react/charts/chart-tip.tsx
 var dH = "flex min-w-32 flex-col gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl";
 function fH({ swatch: e, name: t, value: n }) {
 	return /* @__PURE__ */ (0, $.jsxs)("div", {
@@ -20401,8 +20095,7 @@ function hH({ nameKey: e, valueKey: t, hideLabel: n }) {
 		})
 	});
 }
-//#endregion
-//#region src/react/charts/bar-card.tsx
+// src/react/charts/bar-card.tsx
 var gH = [0, (e) => e * 1.2];
 function _H(e) {
 	let t = Math.abs(e), n = (t, n) => {
@@ -20480,8 +20173,7 @@ function yH({ title: e, unit: t, series: n, rows: r, color: i, empty: a, layout:
 		})]
 	});
 }
-//#endregion
-//#region src/react/charts/heat.ts
+// src/react/charts/heat.ts
 var bH = [
 	"周一",
 	"周二",
@@ -20536,8 +20228,7 @@ function CH(e) {
 		end: t.at(-1).date
 	};
 }
-//#endregion
-//#region src/react/charts/heat-card.tsx
+// src/react/charts/heat-card.tsx
 var wH = 14, TH = 17, EH = {
 	4: {
 		fill: "fill-chart-4",
@@ -20675,8 +20366,7 @@ function jH({ activity: e, title: t, dailyTitle: n, words: r, tone: i, empty: a 
 		children: a
 	});
 }
-//#endregion
-//#region src/react/components/expandable-ranking.tsx
+// src/react/components/expandable-ranking.tsx
 function MH({ children: e, className: t = "", previewCount: n = 10 }) {
 	let r = (0, P.useId)(), i = (0, P.useRef)(null), [a, o] = (0, P.useState)(!1), [s, c] = (0, P.useState)(!1), l = P.Children.toArray(e), u = l.length > n;
 	(0, P.useLayoutEffect)(() => {
@@ -20722,7 +20412,6 @@ function MH({ children: e, className: t = "", previewCount: n = 10 }) {
 		}) : null]
 	});
 }
-//#endregion
 export { vM as ActivePoints, jH as ActivityHeat, pj as AnimatedItems, gH as BAR_DOMAIN, yH as BarCard, XV as CHART_CARD, sH as CHART_COLORS, lk as CartesianLabelListContextProvider, aH as CategoryTick, mD as Cell, _V as ChartBackground, KB as ChartContainer, ZV as ChartEmpty, oH as ChartHead, cV as ChartLegend, iV as ChartLegendContent, hH as ChartTip, rV as ChartTooltip, tV as ChartTooltipContent, Y as DefaultZIndexes, Kj as Dots, DV as EvilBarChart, MH as ExpandableRanking, hk as LabelListFromLabelProp, F as Layer, qB as LoadingIndicator, yA as PolarAngleAxis, LB as PolarChart, HO as PolarLabelContextProvider, tk as PolarLabelFromLabelProp, dk as PolarLabelListContextProvider, Ek as Polygon, Cj as RegisterGraphicalItemId, Rm as Sector, Pj as SetPolarGraphicalItem, WA as SetPolarLegendPayload, HA as SetTooltipEntrySettings, RA as Shape, DO as Text, mE as ZIndexLayer, wr as adaptEventsOfChild, Kk as addRadiusAxis, AE as arrayTooltipSearcher, vH as barLabel, iH as categoryAxisWidth, BB as cn, NM as combineAllBarPositions, FM as combineBarPosition, EM as combineBarSizeList, ng as combineDisplayedStackedData, yS as combineStackGroups, PM as combineStackedData, H as createSelector, IB as defaultPolarChartProps, Nh as defaultPolarRadiusAxisProps, EA as findAllByType, rH as fitLabel, Fh as getAxisTypeBasedOnLayout, ll as getBandSizeOfAxis, rl as getBaseValueOfBar, nl as getCateCoordinateOfBar, Zk as getClassNameFromUnknown, ZB as getColorsCount, el as getNormalizedStackId, dl as getTooltipNameProp, K as getValueByDataKey, IM as getZIndexFromUnknown, Gr as identity, L as interpolate, qr as isArrayLike, Jc as isCategoricalAxis, R as isNullish, rg as isStacked, Yi as iteratee, ij as matchAnimationItems, QA as matchAppend, ZA as matchByIndex, mt as mathSign, Tt as noop, gm as polarToCartesian, qk as removeRadiusAxis, Ar as resolveDefaultProps, uT as selectActiveTooltipIndex, Uh as selectAngleAxis, Ch as selectBarCategoryGap, Sh as selectBarGap, Wm as selectChartDataAndAlwaysIgnoreIndexes, Um as selectChartDataWithIndexes, q as selectChartLayout, zk as selectPolarAxisScale, Vk as selectPolarAxisTicks, Uk as selectPolarGraphicalItemAxisTicks, Ak as selectPolarItemsSettings, $h as selectPolarViewBox, Wh as selectRadiusAxis, Eh as selectReverseStackOrder, wh as selectRootBarSize, xh as selectRootMaxBarSize, Th as selectStackOffsetType, gS as selectTooltipAxis, kk as selectUnfilteredPolarItems, uH as sliceConfig, lH as sliceKey, Ue as svgPropertiesAndEvents, Ve as svgPropertiesNoEvents, He as svgPropertiesNoEventsFromUnknown, cH as tone, Zc as truncateByDomain, fj as useAnimationCallbacks, aj as useAnimationStartSnapshot, B as useAppDispatch, V as useAppSelector, Fl as useIsPanorama, VA as useMouseClickItemDispatch, zA as useMouseEnterItemDispatch, BA as useMouseLeaveItemDispatch, Eu as usePolarChartLayout };
 
-//# debugId=1d145860-18b0-4d5f-a44a-69dd60a675da
+//# debugId=94510268-cd38-48ae-a83d-aca22df32d2f

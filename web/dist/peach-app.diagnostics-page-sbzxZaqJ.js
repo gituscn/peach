@@ -1,14 +1,14 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "34f47ab5-17ee-48af-8cb6-7cf9e651fd7e", e._sentryDebugIdIdentifier = "sentry-dbid-34f47ab5-17ee-48af-8cb6-7cf9e651fd7e");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "efc03dfa-b8c2-4ba8-92cb-09c9725e00cb", e._sentryDebugIdIdentifier = "sentry-dbid-efc03dfa-b8c2-4ba8-92cb-09c9725e00cb");
 	} catch {}
 })();
 import { ApiError as e, Button as t, ButtonLink as n, Chip as r, DIAGNOSTICS_KEY as i, Disclosure as a, EmptyState as o, Fact as s, FactList as c, Fieldset as l, FieldsetTitle as u, Input as d, LOC as f, LinkButton as p, LoadingDots as m, Note as h, Progress as g, Section as _, SettingsCard as v, SettingsSectionLabel as y, Stack as b, __toESM as x, apiGet as S, apiSend as C, busyProps as w, configurationSection as ee, cx as T, diagnosticHeaders as E, diagnosticsSkeleton as D, errorMessage as O, fetchDiagnostics as k, fmtDur as A, fmtSize as j, queryClient as te, require_jsx_runtime as ne, require_react as re, settingsPath as ie, tl as M, useAction as N, useQuery as P } from "./peach-app.js";
-import { ErrorExcerpt as F } from "./peach-app.error-excerpt-GIDhsLJp.js";
-import { DataTable as I } from "./peach-app.data-table-CI9MJhw_.js";
-import { SiteMark as L } from "./peach-app.site-mark-Cjd7g2Ii.js";
-//#region src/react/diagnostics/health-list.tsx
+import { ErrorExcerpt as F } from "./peach-app.error-excerpt-DeVcv4q5.js";
+import { DataTable as I } from "./peach-app.data-table-vvlsREiR.js";
+import { SiteMark as L } from "./peach-app.site-mark-B-6CccRY.js";
+// src/react/diagnostics/health-list.tsx
 var R = /* @__PURE__ */ x(re(), 1), z = ne(), B = (e) => e.title || e.name || e.code || `作品 #${e.id}`, V = (e) => [[
 	"作品",
 	"番号",
@@ -148,8 +148,7 @@ function H({ group: e, openItem: n, receipt: r }) {
 		})
 	});
 }
-//#endregion
-//#region src/react/diagnostics/scraping-export.tsx
+// src/react/diagnostics/scraping-export.tsx
 var U = "/api/diagnostics/exports", W = ["diagnostic-export"];
 function G({ kind: r, codes: i = "" }) {
 	let a = N(), o = P({
@@ -293,8 +292,7 @@ function K() {
 		})
 	});
 }
-//#endregion
-//#region src/react/diagnostics/diagnostics-page.tsx
+// src/react/diagnostics/diagnostics-page.tsx
 var q = {
 	ok: "正常",
 	warning: "需检查",
@@ -510,7 +508,6 @@ function ae(e) {
 		]
 	});
 }
-//#endregion
 export { ae as DiagnosticsPage };
 
-//# debugId=34f47ab5-17ee-48af-8cb6-7cf9e651fd7e
+//# debugId=efc03dfa-b8c2-4ba8-92cb-09c9725e00cb

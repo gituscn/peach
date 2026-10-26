@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "aec72817-ff19-477c-a97a-e89d8b02fa4f", e._sentryDebugIdIdentifier = "sentry-dbid-aec72817-ff19-477c-a97a-e89d8b02fa4f");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "3ea817c3-3923-4e7f-b881-4fe550ffc52c", e._sentryDebugIdIdentifier = "sentry-dbid-3ea817c3-3923-4e7f-b881-4fe550ffc52c");
 	} catch {}
 })();
 import { cardClass as e, require_jsx_runtime as t } from "./peach-app.js";
-//#region src/react/components/stat-card.tsx
+// src/react/components/stat-card.tsx
 var n = t(), r = [
 	"text-chart-6",
 	"text-chart-5",
@@ -92,7 +92,6 @@ function d({ label: e, icon: t, accent: a = 0, figure: o, footer: s }) {
 		})
 	] });
 }
-//#endregion
 export { l as PLAIN_STAT_STRIP, u as PlainStat, o as STAT_STRIP, s as STAT_STRIP_SIX, d as StatCard, c as plainStatClass, a as statCardClass };
 
-//# debugId=aec72817-ff19-477c-a97a-e89d8b02fa4f
+//# debugId=3ea817c3-3923-4e7f-b881-4fe550ffc52c

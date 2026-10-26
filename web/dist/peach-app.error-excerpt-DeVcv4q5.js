@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "144295ae-2a64-43c4-9bec-6cf5c77a21d1", e._sentryDebugIdIdentifier = "sentry-dbid-144295ae-2a64-43c4-9bec-6cf5c77a21d1");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "750e9fc8-f4bf-48f9-9aa4-7f9cedd93f26", e._sentryDebugIdIdentifier = "sentry-dbid-750e9fc8-f4bf-48f9-9aa4-7f9cedd93f26");
 	} catch {}
 })();
 import { Button as e, __toESM as t, cardClass as n, readableErrorHeadline as r, require_jsx_runtime as i, require_react as a, useOverlayScrollbar as o } from "./peach-app.js";
-//#region src/react/activity/error-excerpt.tsx
+// src/react/activity/error-excerpt.tsx
 var s = /* @__PURE__ */ t(a(), 1), c = i();
 function l({ children: e, label: t, id: r }) {
 	let i = o();
@@ -54,7 +54,6 @@ function u({ text: t, className: n = "" }) {
 		}) : null]
 	});
 }
-//#endregion
 export { l as ErrorDetails, u as ErrorExcerpt };
 
-//# debugId=144295ae-2a64-43c4-9bec-6cf5c77a21d1
+//# debugId=750e9fc8-f4bf-48f9-9aa4-7f9cedd93f26

@@ -1,13 +1,13 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "021f7b59-d6d4-46a2-932a-369d52f583a9", e._sentryDebugIdIdentifier = "sentry-dbid-021f7b59-d6d4-46a2-932a-369d52f583a9");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "767a3b83-aa86-4598-9779-e2d400ac7cdc", e._sentryDebugIdIdentifier = "sentry-dbid-767a3b83-aa86-4598-9779-e2d400ac7cdc");
 	} catch {}
 })();
-import { createPaginatedRowModel as e } from "./peach-app.createPaginatedRowModel-DKa1ysea.js";
-import { createSortedRowModel as t, useTableSelection as n } from "./peach-app.use-table-selection-Bi_E2zbh.js";
+import { createPaginatedRowModel as e } from "./peach-app.createPaginatedRowModel-BaoO3AFa.js";
+import { createSortedRowModel as t, useTableSelection as n } from "./peach-app.use-table-selection-CLiE6jgl.js";
 import { $76d00c5a4edb230a$export$76ccd210b9029917 as r, $76d00c5a4edb230a$export$816b5d811295e6bc as i, $76d00c5a4edb230a$export$b59bdbef9ce70de2 as a, $76d00c5a4edb230a$export$f6f0c3fe4ec306ea as o, $76d00c5a4edb230a$export$f850895b287ef28e as s, Button as c, Checkbox as l, ChevronSortDown as u, DataTableFooter as d, DataTableFrame as f, DataTableSort as p, SelectionDock as m, Table as h, TableColumnControls as g, TableColumnResizer as _, TableSelectionHeader as v, __toESM as y, cardClass as b, columnVisibilityFeature as x, createColumnHelper as S, flexRender as C, require_jsx_runtime as w, require_react as T, rowPaginationFeature as E, rowSelectionFeature as D, rowSortingFeature as O, tableFeatures as k, useTable as A, useTablePreferences as j } from "./peach-app.js";
-//#region src/react/components/data-table.tsx
+// src/react/components/data-table.tsx
 var M = /* @__PURE__ */ y(T(), 1), N = w(), P = k({
 	rowSortingFeature: O,
 	rowSelectionFeature: D,
@@ -208,7 +208,6 @@ function F({ label: e, items: t, columns: y, rowId: x, rowLabel: w, selected: T,
 		]
 	});
 }
-//#endregion
 export { F as DataTable };
 
-//# debugId=021f7b59-d6d4-46a2-932a-369d52f583a9
+//# debugId=767a3b83-aa86-4598-9779-e2d400ac7cdc

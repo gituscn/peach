@@ -1,14 +1,14 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "4ef4db2f-ac8c-4921-9877-33825cf6f62f", e._sentryDebugIdIdentifier = "sentry-dbid-4ef4db2f-ac8c-4921-9877-33825cf6f62f");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "424e82d5-a02d-47a8-8595-27f1179d1c8f", e._sentryDebugIdIdentifier = "sentry-dbid-424e82d5-a02d-47a8-8595-27f1179d1c8f");
 	} catch {}
 })();
 import { Button as e, Chip as t, Disclosure as n, DownloadsPanel as r, EmptyState as i, LinkButton as a, LoadingDots as o, Note as s, Progress as c, TASKS_KEY as l, TRIGGER_LABELS as u, __toESM as d, apiGet as f, apiSend as p, busyProps as m, cardClass as h, elapsedText as g, errorMessage as _, f1 as v, fetchEarlier as y, fetchTasks as b, foldRoutine as x, followupDetail as S, groupFollowups as C, hasResultProblems as w, i2 as T, isActive as E, isRoutine as D, latestOfKind as ee, mergeFinished as O, momentText as k, pollInterval as A, problemDestination as j, progressText as M, require_jsx_runtime as N, require_react as P, statusLabel as F, summaryItems as I, taskIssues as L, uo as R, useMutation as z, useQuery as B, useQueryClient as V } from "./peach-app.js";
-import { CodeBlock as H } from "./peach-app.code-block-CuHUqiH3.js";
-import { Page as U } from "./peach-app.page-Irl_Wogd.js";
-import { ErrorDetails as W, ErrorExcerpt as G } from "./peach-app.error-excerpt-GIDhsLJp.js";
-//#region src/react/activity/background-issues.tsx
+import { CodeBlock as H } from "./peach-app.code-block-CtzIYGbl.js";
+import { Page as U } from "./peach-app.page-8O0Xao0B.js";
+import { ErrorDetails as W, ErrorExcerpt as G } from "./peach-app.error-excerpt-DeVcv4q5.js";
+// src/react/activity/background-issues.tsx
 var K = /* @__PURE__ */ d(P(), 1), q = N(), J = ["background-issues"];
 function te() {
 	let e = (0, K.useId)(), t = B({
@@ -58,8 +58,7 @@ function ne({ issue: t }) {
 		children: r.error ? `${i}\n没有重试：${_(r.error)}` : i
 	});
 }
-//#endregion
-//#region src/react/activity/activity-page.tsx
+// src/react/activity/activity-page.tsx
 var re = {
 	succeeded: "lime",
 	failed: "rose",
@@ -367,7 +366,6 @@ function oe() {
 		/* @__PURE__ */ (0, q.jsx)(r, {})
 	] });
 }
-//#endregion
 export { oe as ActivityPage };
 
-//# debugId=4ef4db2f-ac8c-4921-9877-33825cf6f62f
+//# debugId=424e82d5-a02d-47a8-8595-27f1179d1c8f

@@ -1,15 +1,15 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "82936c02-5b67-4889-8313-b4254447f6e3", e._sentryDebugIdIdentifier = "sentry-dbid-82936c02-5b67-4889-8313-b4254447f6e3");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "b81902df-1b12-4b24-b8c5-e195b07069c0", e._sentryDebugIdIdentifier = "sentry-dbid-b81902df-1b12-4b24-b8c5-e195b07069c0");
 	} catch {}
 })();
-import { ActivityHeat as e, AnimatedItems as t, BarCard as n, CHART_CARD as r, CHART_COLORS as i, Cell as a, ChartBackground as o, ChartContainer as s, ChartEmpty as c, ChartLegend as l, ChartLegendContent as u, ChartTip as d, ChartTooltip as f, ChartTooltipContent as p, DefaultZIndexes as m, ExpandableRanking as h, LabelListFromLabelProp as g, Layer as _, LoadingIndicator as v, PolarAngleAxis as y, PolarChart as b, PolarLabelListContextProvider as x, RegisterGraphicalItemId as S, Sector as C, SetPolarGraphicalItem as w, SetPolarLegendPayload as T, SetTooltipEntrySettings as E, Shape as ee, ZIndexLayer as D, adaptEventsOfChild as O, arrayTooltipSearcher as te, combineAllBarPositions as ne, combineBarPosition as re, combineBarSizeList as ie, combineDisplayedStackedData as ae, combineStackGroups as oe, combineStackedData as se, createSelector as k, defaultPolarChartProps as ce, findAllByType as le, getBandSizeOfAxis as A, getBaseValueOfBar as ue, getCateCoordinateOfBar as de, getColorsCount as fe, getNormalizedStackId as pe, getTooltipNameProp as me, getValueByDataKey as he, getZIndexFromUnknown as ge, interpolate as _e, isCategoricalAxis as ve, isNullish as ye, isStacked as be, matchAppend as xe, mathSign as Se, noop as Ce, resolveDefaultProps as we, selectActiveTooltipIndex as Te, selectAngleAxis as Ee, selectBarCategoryGap as De, selectBarGap as Oe, selectChartDataAndAlwaysIgnoreIndexes as ke, selectChartDataWithIndexes as Ae, selectChartLayout as j, selectPolarAxisScale as je, selectPolarAxisTicks as Me, selectPolarGraphicalItemAxisTicks as Ne, selectPolarItemsSettings as Pe, selectPolarViewBox as Fe, selectRadiusAxis as Ie, selectReverseStackOrder as Le, selectRootBarSize as Re, selectRootMaxBarSize as ze, selectStackOffsetType as Be, selectTooltipAxis as Ve, selectUnfilteredPolarItems as He, sliceConfig as Ue, sliceKey as We, svgPropertiesNoEvents as Ge, svgPropertiesNoEventsFromUnknown as Ke, truncateByDomain as qe, useAnimationCallbacks as Je, useAppSelector as M, useMouseClickItemDispatch as Ye, useMouseEnterItemDispatch as Xe, useMouseLeaveItemDispatch as Ze, usePolarChartLayout as Qe } from "./peach-app.expandable-ranking-CyDn34Ar.js";
+import { ActivityHeat as e, AnimatedItems as t, BarCard as n, CHART_CARD as r, CHART_COLORS as i, Cell as a, ChartBackground as o, ChartContainer as s, ChartEmpty as c, ChartLegend as l, ChartLegendContent as u, ChartTip as d, ChartTooltip as f, ChartTooltipContent as p, DefaultZIndexes as m, ExpandableRanking as h, LabelListFromLabelProp as g, Layer as _, LoadingIndicator as v, PolarAngleAxis as y, PolarChart as b, PolarLabelListContextProvider as x, RegisterGraphicalItemId as S, Sector as C, SetPolarGraphicalItem as w, SetPolarLegendPayload as T, SetTooltipEntrySettings as E, Shape as ee, ZIndexLayer as D, adaptEventsOfChild as O, arrayTooltipSearcher as te, combineAllBarPositions as ne, combineBarPosition as re, combineBarSizeList as ie, combineDisplayedStackedData as ae, combineStackGroups as oe, combineStackedData as se, createSelector as k, defaultPolarChartProps as ce, findAllByType as le, getBandSizeOfAxis as A, getBaseValueOfBar as ue, getCateCoordinateOfBar as de, getColorsCount as fe, getNormalizedStackId as pe, getTooltipNameProp as me, getValueByDataKey as he, getZIndexFromUnknown as ge, interpolate as _e, isCategoricalAxis as ve, isNullish as ye, isStacked as be, matchAppend as xe, mathSign as Se, noop as Ce, resolveDefaultProps as we, selectActiveTooltipIndex as Te, selectAngleAxis as Ee, selectBarCategoryGap as De, selectBarGap as Oe, selectChartDataAndAlwaysIgnoreIndexes as ke, selectChartDataWithIndexes as Ae, selectChartLayout as j, selectPolarAxisScale as je, selectPolarAxisTicks as Me, selectPolarGraphicalItemAxisTicks as Ne, selectPolarItemsSettings as Pe, selectPolarViewBox as Fe, selectRadiusAxis as Ie, selectReverseStackOrder as Le, selectRootBarSize as Re, selectRootMaxBarSize as ze, selectStackOffsetType as Be, selectTooltipAxis as Ve, selectUnfilteredPolarItems as He, sliceConfig as Ue, sliceKey as We, svgPropertiesNoEvents as Ge, svgPropertiesNoEventsFromUnknown as Ke, truncateByDomain as qe, useAnimationCallbacks as Je, useAppSelector as M, useMouseClickItemDispatch as Ye, useMouseEnterItemDispatch as Xe, useMouseLeaveItemDispatch as Ze, usePolarChartLayout as Qe } from "./peach-app.expandable-ranking-Beq4MhKl.js";
 import { $b4f18e3395fe64d7$export$3d96ec278d3efce4 as N, $b4f18e3395fe64d7$export$3e41faf802a29e71 as P, $b4f18e3395fe64d7$export$b2539bed5023c21c as $e, $b4f18e3395fe64d7$export$e51a686c67fdaa2d as et, ButtonLink as F, EmptyState as I, LOC as tt, MEDIA_SOURCE_ICONS as nt, NR as rt, Note as it, Progress as L, SEGMENT as at, SEGMENTED_TRACK as ot, STATS_KEY as st, SegmentedTabList as ct, SourceMark as lt, StatusLabel as ut, Xc as dt, Xt as ft, _8 as pt, __toESM as mt, bandRows as ht, cardClass as gt, clsx as _t, errorMessage as vt, fetchStats as yt, fmtCount as R, fmtSize as z, known as bt, lengthRows as xt, mM as St, mediumRows as Ct, percentText as wt, playedFor as Tt, playedItemUrl as Et, radialArc as Dt, radialBarSize as Ot, radialCeiling as kt, radialSlices as At, reachedShare as jt, replayRows as Mt, require_jsx_runtime as Nt, require_react as Pt, settingsPath as Ft, uo as It, useQuery as Lt, watchNote as Rt, watchedShare as zt } from "./peach-app.js";
-import { Page as Bt } from "./peach-app.page-Irl_Wogd.js";
-import { STAT_STRIP as Vt, StatCard as Ht, statCardClass as Ut } from "./peach-app.stat-card-Q_AB9v0S.js";
-import { ConnectionStatus as Wt } from "./peach-app.connection-status-BP0ylxDH.js";
-//#region node_modules/recharts/es6/util/RadialBarUtils.js
+import { Page as Bt } from "./peach-app.page-8O0Xao0B.js";
+import { STAT_STRIP as Vt, StatCard as Ht, statCardClass as Ut } from "./peach-app.stat-card-CzHMHp_P.js";
+import { ConnectionStatus as Wt } from "./peach-app.connection-status-D5osXsr7.js";
+// node_modules/recharts/es6/util/RadialBarUtils.js
 var B = /* @__PURE__ */ mt(Pt()), Gt = ["option"];
 function Kt(e, t) {
 	if (e == null) return {};
@@ -41,8 +41,7 @@ function Xt(e) {
 		shapeProps: n
 	});
 }
-//#endregion
-//#region node_modules/recharts/es6/state/selectors/radialBarSelectors.js
+// node_modules/recharts/es6/state/selectors/radialBarSelectors.js
 function Zt(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -532,8 +531,7 @@ function Vn(e) {
 	}), /*#__PURE__*/ B.createElement(In, t), /*#__PURE__*/ B.createElement(zn, K({}, t, { id: e }))));
 }
 Vn.displayName = "RadialBar";
-//#endregion
-//#region node_modules/recharts/es6/chart/RadialBarChart.js
+// node_modules/recharts/es6/chart/RadialBarChart.js
 function Hn(e, t) {
 	var n = Object.keys(e);
 	if (Object.getOwnPropertySymbols) {
@@ -781,8 +779,7 @@ var dr = () => /* @__PURE__ */ (0, Y.jsx)(Vn, {
 	})
 });
 X.RadialBar = ir, X.Tooltip = ar, X.Legend = or;
-//#endregion
-//#region src/react/stats/radial-card.tsx
+// src/react/stats/radial-card.tsx
 var fr = [
 	"bg-chart-1",
 	"bg-chart-2",
@@ -894,8 +891,7 @@ function mr({ title: e, rows: t, empty: n, unit: i = "个视频" }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/stats/stats-page.tsx
+// src/react/stats/stats-page.tsx
 var hr = Ft("媒体库与入库"), gr = 10, _r = i[5], vr = i[4], yr = `${gt()} flex flex-col gap-4`, br = "添加媒体目录或关注来源后，这里会显示馆藏统计。", xr = "补全资料或添加标签后，这里会显示馆藏中的内容标签。", Sr = "开始播放后，这里会显示最近的真实观看证据。", Cr = "补充作品资料或手动添加标签后，这里会显示各个标签来源对应的视频数量。", wr = "添加媒体目录后，这里会显示存储空间。", Tr = "把媒体目录归进媒体库后，这里会按库显示视频数。", Er = "探测时长后，这里会显示时长分布。", Dr = "探测画质后，这里会显示画质分布。", Or = "开始播放后，这里会显示播放落在一周的哪些时段。", kr = "开始播放后，这里会显示每个作品播了几次。", Ar = (e, t) => Math.min(Math.max(e, 0), t);
 function Z({ term: e, value: t }) {
 	return /* @__PURE__ */ (0, Y.jsxs)("div", {
@@ -1475,7 +1471,6 @@ function Vr(e) {
 		})
 	] });
 }
-//#endregion
 export { Vr as StatsPage };
 
-//# debugId=82936c02-5b67-4889-8313-b4254447f6e3
+//# debugId=b81902df-1b12-4b24-b8c5-e195b07069c0

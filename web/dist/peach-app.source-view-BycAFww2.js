@@ -1,12 +1,12 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "26255194-9b7b-4fe8-91cb-f5b6ebe493fa", e._sentryDebugIdIdentifier = "sentry-dbid-26255194-9b7b-4fe8-91cb-f5b6ebe493fa");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d0f9d15f-ec2b-495d-abb2-7893602f5ebd", e._sentryDebugIdIdentifier = "sentry-dbid-d0f9d15f-ec2b-495d-abb2-7893602f5ebd");
 	} catch {}
 })();
 import { Button as e, Chip as t, Wt as n, __toESM as r, authorAvatar as i, authorInitial as a, errorHeadline as o, isBroken as s, require_jsx_runtime as c, require_react as l, sourceIconUrl as u, statusText as d } from "./peach-app.js";
-import { MarkImage as f } from "./peach-app.site-mark-Cjd7g2Ii.js";
-//#region src/react/follow-manage/source-view.tsx
+import { MarkImage as f } from "./peach-app.site-mark-B-6CccRY.js";
+// src/react/follow-manage/source-view.tsx
 var p = /* @__PURE__ */ r(l(), 1), m = c();
 function h({ provider: e }) {
 	return /* @__PURE__ */ (0, m.jsx)(f, { src: u(e) });
@@ -79,7 +79,6 @@ function y({ text: t, prefix: n = "", tone: r = "error" }) {
 		}) : null]
 	});
 }
-//#endregion
 export { g as AuthorAvatar, y as ErrorLine, h as SourceIcon, v as SourceLink, _ as StatusBadge };
 
-//# debugId=26255194-9b7b-4fe8-91cb-f5b6ebe493fa
+//# debugId=d0f9d15f-ec2b-495d-abb2-7893602f5ebd

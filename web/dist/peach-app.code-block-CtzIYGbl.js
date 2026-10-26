@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "4ea303b0-591f-40ff-9a9a-dd95b540d85a", e._sentryDebugIdIdentifier = "sentry-dbid-4ea303b0-591f-40ff-9a9a-dd95b540d85a");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "3d05dd80-6784-4e02-9de6-6e0401c7a1ba", e._sentryDebugIdIdentifier = "sentry-dbid-3d05dd80-6784-4e02-9de6-6e0401c7a1ba");
 	} catch {}
 })();
 import { Button as e, __toESM as t, cardClass as n, cx as r, require_jsx_runtime as i, require_react as a, useOverlayScrollbar as o } from "./peach-app.js";
-//#region src/react/components/code-block.tsx
+// src/react/components/code-block.tsx
 var s = /* @__PURE__ */ t(a(), 1), c = i();
 function l({ code: t, language: i, label: a, maxCharacters: l, bounded: u = !0, copyLabel: d, onCopy: f }) {
 	let p = o(), [m, h] = (0, s.useState)(""), [g, _] = (0, s.useState)(!1);
@@ -57,7 +57,6 @@ function l({ code: t, language: i, label: a, maxCharacters: l, bounded: u = !0, 
 		]
 	});
 }
-//#endregion
 export { l as CodeBlock };
 
-//# debugId=4ea303b0-591f-40ff-9a9a-dd95b540d85a
+//# debugId=3d05dd80-6784-4e02-9de6-6e0401c7a1ba

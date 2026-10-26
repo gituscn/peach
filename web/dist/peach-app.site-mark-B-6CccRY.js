@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "5edae07f-4b9b-4d7d-960e-7db84a5595ee", e._sentryDebugIdIdentifier = "sentry-dbid-5edae07f-4b9b-4d7d-960e-7db84a5595ee");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "c4264bd9-1ffd-4d5f-a245-698b6698f8f3", e._sentryDebugIdIdentifier = "sentry-dbid-c4264bd9-1ffd-4d5f-a245-698b6698f8f3");
 	} catch {}
 })();
 import { __toESM as e, cc as t, require_jsx_runtime as n, require_react as r, s5 as i, siteMarkUrl as a } from "./peach-app.js";
-//#region src/react/components/site-mark.tsx
+// src/react/components/site-mark.tsx
 var o = /* @__PURE__ */ e(r(), 1), s = n(), c = "size-(--icon-inline) shrink-0";
 function l({ src: e }) {
 	let [n, r] = (0, o.useState)("");
@@ -37,7 +37,6 @@ function u({ source: e, linkId: t }) {
 	].includes(e);
 	return /* @__PURE__ */ (0, s.jsx)(l, { src: t === void 0 ? n ? `/site-icon/${e}.png` : a({ source: e }) : `/link-mark?id=${t}` });
 }
-//#endregion
 export { l as MarkImage, u as SiteMark };
 
-//# debugId=5edae07f-4b9b-4d7d-960e-7db84a5595ee
+//# debugId=c4264bd9-1ffd-4d5f-a245-698b6698f8f3

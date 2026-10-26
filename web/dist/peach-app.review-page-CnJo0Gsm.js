@@ -1,14 +1,14 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "ac91d102-4347-4ca0-b801-a4a22933061b", e._sentryDebugIdIdentifier = "sentry-dbid-ac91d102-4347-4ca0-b801-a4a22933061b");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "687e110e-cb9d-4eb8-9a59-584848673871", e._sentryDebugIdIdentifier = "sentry-dbid-687e110e-cb9d-4eb8-9a59-584848673871");
 	} catch {}
 })();
 import { $b4f18e3395fe64d7$export$3d96ec278d3efce4 as e, $b4f18e3395fe64d7$export$3e41faf802a29e71 as t, $b4f18e3395fe64d7$export$b2539bed5023c21c as n, $ea3928288112382f$export$439d29a4e110a164 as r, $fe21c36db05242bb$export$a98f0dcb43a68a25 as i, $fe21c36db05242bb$export$d7b12c4107be0d61 as a, Button as o, ButtonLink as s, Checkbox as c, CheckboxGlyph as l, Chip as u, DEFAULT_CATEGORY as d, ENTITY_REVIEW_KINDS as f, Ea as ee, EmptyState as p, ExternalLink as m, Gg as te, InputBase as h, Note as g, REVIEW_CATEGORIES as _, REVIEW_KEY as v, REVIEW_LABELS as ne, Select as y, SelectItem as b, SelectionActions as x, SelectionDock as S, TextField as C, Wt as w, __toESM as T, avatarInner as E, busyProps as D, canApprove as re, cardClass as O, commonReviewSources as k, currentReviewRow as A, decisionPayload as j, decisionReceipt as ie, defaultChoice as ae, dropReviewRows as M, errorMessage as N, fetchReview as oe, filterReviewRows as se, groupReviewRows as ce, isReviewCategory as le, l7 as P, m7 as ue, mirrorText as de, paginationRange as fe, pendingGenres as F, recordGenre as pe, reloadReview as I, require_jsx_runtime as L, require_react as me, reviewGroupingOptions as he, reviewWindow as ge, rowEvidence as _e, rowFieldName as ve, rowSubject as ye, rowTags as R, rowTitle as z, selectReviewRange as be, spinnerHtml as B, submitDecision as xe, useMutation as Se, useOverlayScrollbar as V, useQuery as Ce } from "./peach-app.js";
-import { Page as we } from "./peach-app.page-Irl_Wogd.js";
-import { LEGACY_AVATAR_IMG as H } from "./peach-app.legacy-avatar-CtPLcaNX.js";
-import { PillAriaTabList as Te } from "./peach-app.pill-aria-tab-list-CJ47JigD.js";
-//#region src/react/review/bulk-toolbar.tsx
+import { Page as we } from "./peach-app.page-8O0Xao0B.js";
+import { LEGACY_AVATAR_IMG as H } from "./peach-app.legacy-avatar-BREPiIcW.js";
+import { PillAriaTabList as Te } from "./peach-app.pill-aria-tab-list-Clralw3f.js";
+// src/react/review/bulk-toolbar.tsx
 var U = /* @__PURE__ */ T(me(), 1), W = L();
 function Ee(e) {
 	let { groupOptions: t, groupBy: n, onGroupBy: r, groups: i, filter: a, onFilter: s, pageKeys: c, selected: l, onSelected: u, selectedRows: d, metadata: f, approvable: ee, busy: p, feedback: m, onUnifySource: te, onRun: h } = e, g = c.filter((e) => l.has(e)), _ = g.length > 0 && g.length === c.length, v = k(d), ne = f && d.some((e) => (e.candidates?.length || 0) > 1), x = v.length ? "统一选择来源" : "所选项目无共同来源";
@@ -111,8 +111,7 @@ function Ee(e) {
 		]
 	})] });
 }
-//#endregion
-//#region src/react/review/candidate-form.tsx
+// src/react/review/candidate-form.tsx
 var G = {
 	title: "标题",
 	original_title: "原标题",
@@ -288,8 +287,7 @@ function J({ row: e, tags: t, locked: n, toast: r }) {
 		})]
 	}) : null;
 }
-//#endregion
-//#region src/react/review/review-evidence.tsx
+// src/react/review/review-evidence.tsx
 var Y = (e = "") => /^https?:\/\//i.test(e) ? e : "", Ae = (e = "") => Y(e) || (e.startsWith("/") && !e.startsWith("//") ? e : "");
 function je({ url: e }) {
 	let t = Ae(e || "");
@@ -524,8 +522,7 @@ function Pe({ assets: e, picked: t, onPicked: n, locked: i }) {
 		})]
 	});
 }
-//#endregion
-//#region src/react/review/review-card.tsx
+// src/react/review/review-card.tsx
 var Q = O({
 	variant: "outlined",
 	padding: "none",
@@ -732,8 +729,7 @@ function Le(e) {
 		]
 	});
 }
-//#endregion
-//#region src/react/review/review-page.tsx
+// src/react/review/review-page.tsx
 var Re = "flex cursor-pointer items-center justify-between gap-2";
 function ze({ page: e, pages: t, onPage: n }) {
 	return t <= 1 ? null : /* @__PURE__ */ (0, W.jsxs)("nav", {
@@ -1008,7 +1004,6 @@ function Be(r) {
 		]
 	}) });
 }
-//#endregion
 export { Be as ReviewPage };
 
-//# debugId=ac91d102-4347-4ca0-b801-a4a22933061b
+//# debugId=687e110e-cb9d-4eb8-9a59-584848673871

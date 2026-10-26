@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "923ff459-a6a5-4c91-8bdc-7904555ea4f5", e._sentryDebugIdIdentifier = "sentry-dbid-923ff459-a6a5-4c91-8bdc-7904555ea4f5");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "6cd2b25a-0b24-40eb-b4d1-65906e26632d", e._sentryDebugIdIdentifier = "sentry-dbid-6cd2b25a-0b24-40eb-b4d1-65906e26632d");
 	} catch {}
 })();
 import { cx as e, require_jsx_runtime as t, sortCx as n } from "./peach-app.js";
-//#region src/react/boardui/components/base/badges/status-dot.tsx
+// src/react/boardui/components/base/badges/status-dot.tsx
 var r = t(), i = n({
 	base: "inline-flex size-3 shrink-0 items-center justify-center rounded-full",
 	halo: {
@@ -28,8 +28,7 @@ function a({ color: t = "green", className: n, ref: a, ...o }) {
 		children: /* @__PURE__ */ (0, r.jsx)("span", { className: e("size-1.5 rounded-full", i.dot[t]) })
 	});
 }
-//#endregion
-//#region src/react/components/connection-status.tsx
+// src/react/components/connection-status.tsx
 var o = {
 	success: "text-green-700 dark:text-green-400",
 	warning: "text-status-yellow-text",
@@ -46,7 +45,6 @@ function s({ online: t, tone: n, children: i }) {
 		children: [/* @__PURE__ */ (0, r.jsx)(a, { color: s === "success" ? "green" : s === "warning" ? "yellow" : "indigo" }), i ?? (t === !0 ? "在线" : t === !1 ? "离线" : "未检测")]
 	});
 }
-//#endregion
 export { s as ConnectionStatus };
 
-//# debugId=923ff459-a6a5-4c91-8bdc-7904555ea4f5
+//# debugId=6cd2b25a-0b24-40eb-b4d1-65906e26632d

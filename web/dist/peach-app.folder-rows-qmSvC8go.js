@@ -1,11 +1,11 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "e9ac4b70-e2f6-4988-a25d-44d3287e31ad", e._sentryDebugIdIdentifier = "sentry-dbid-e9ac4b70-e2f6-4988-a25d-44d3287e31ad");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "49714d13-8bb1-4053-8625-ff5e0591ab0b", e._sentryDebugIdIdentifier = "sentry-dbid-49714d13-8bb1-4053-8625-ff5e0591ab0b");
 	} catch {}
 })();
 import { Button as e, CLOUD_LOCATIONS as t, ErrorText as n, Help as r, IconButton as i, Input as a, Label as o, M6 as s, MEDIA_SOURCE_ICONS as c, MEDIA_SOURCE_OPTIONS as l, Select$1 as u, SelectItem as d, SourceMark as f, __toESM as p, busyProps as m, cx as h, require_jsx_runtime as g, require_react as _ } from "./peach-app.js";
-//#region src/react/settings/folder-rows.tsx
+// src/react/settings/folder-rows.tsx
 var v = /* @__PURE__ */ p(_(), 1), y = g();
 function b({ className: e }) {
 	return /* @__PURE__ */ (0, y.jsx)("svg", {
@@ -185,7 +185,6 @@ function A({ index: e, value: t, onChange: n, options: r = x }) {
 		})
 	});
 }
-//#endregion
 export { w as FolderField, T as FolderFieldLine, k as FolderRow, b as FolderSearchIcon, x as MEDIA_SOURCES, E as MediaReadPolicy, D as MediaReadPolicyHelp, A as SourceSelect, C as isCloudSource, S as sourceMark, O as useFolderRows };
 
-//# debugId=e9ac4b70-e2f6-4988-a25d-44d3287e31ad
+//# debugId=49714d13-8bb1-4053-8625-ff5e0591ab0b

@@ -1,13 +1,13 @@
 (function() {
 	try {
 		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "2932dda7-a6f0-4c28-944c-2cf2d9405c90", e._sentryDebugIdIdentifier = "sentry-dbid-2932dda7-a6f0-4c28-944c-2cf2d9405c90");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "94e77db7-e24f-4220-8578-032c24fd3093", e._sentryDebugIdIdentifier = "sentry-dbid-94e77db7-e24f-4220-8578-032c24fd3093");
 	} catch {}
 })();
 import { $fe21c36db05242bb$export$d7b12c4107be0d61 as e, ArtSlot as t, Button as n, ButtonLink as r, Chip as i, CloudDownloadDialog as a, DISCOVERY_SORTS as o, DOWNLOADS_KEY as s, DOWNLOADS_URL as c, E3 as l, EmptyFocusButton as u, EmptyState as d, FilterGlassRows as f, FilterIconButton as p, FilterPill as m, GlassPill as h, Help as g, Input as _, JAV_LAYOUTS as v, JAV_RECOMMENDATION_GRID as ee, JavHeader as y, LibraryShortcuts as te, M6 as b, Note as x, PHASES as S, Pagination as C, SEGMENT as w, SEGMENTED_TRACK as T, SegmentedRadioGroup as E, Segments as ne, SortKeys as re, SourceAvatar as ie, TaskProgress as ae, WANTS_KEY as oe, WantMagnets as D, Wt as se, __toESM as ce, addWant as le, apiGet as O, appSettingsStore as ue, avatarInner as k, busyProps as A, cachedMagnetStates as j, cardClass as M, cardRatio as de, coverUrl as fe, discoveryArtwork as pe, discoveryKey as me, discoveryScore as he, entityPath as ge, errorMessage as N, fetchDiscoveries as _e, fetchWants as ve, gridLayout as ye, invalidateWants as P, javContentSkeleton as F, javLayout as be, javTagSkeleton as xe, pageWindow as I, peachHistory$1 as L, qE as R, recommendationScore as Se, relayoutCovers as Ce, removeWants as z, require_jsx_runtime as B, require_react as V, resetWants as H, searchNote as U, shellNavigate as W, spriteGlyph as G, storeJavLayout as we, textLang as Te, useAction as K, useQuery as q, wantName as J, wireHorizontalScroller as Ee } from "./peach-app.js";
-import { ErrorLine as Y } from "./peach-app.source-view-Bk_L5GHG.js";
-import "./peach-app.source-list-B2yIEqVl.js";
-//#region src/react/jav/discovery-faces.tsx
+import { ErrorLine as Y } from "./peach-app.source-view-BycAFww2.js";
+import "./peach-app.source-list-CCoPlUwi.js";
+// src/react/jav/discovery-faces.tsx
 var X = /* @__PURE__ */ ce(V(), 1), Z = B();
 function De({ item: e }) {
 	let t = e.performer_refs?.length ? e.performer_refs : [...new Set(e.performers.split(/[,，、;/]/).filter(Boolean))].map((e) => ({ name: e })), n = t.slice(0, 5).map((t, n) => {
@@ -34,8 +34,7 @@ function De({ item: e }) {
 		children: n
 	}) : n[0] || null;
 }
-//#endregion
-//#region src/react/wants/want-list.tsx
+// src/react/wants/want-list.tsx
 var Q = {
 	code: "手动添加",
 	feed: "订阅新作",
@@ -372,8 +371,7 @@ function Ne({ readOnly: e, toast: t, query: r = "", clearQuery: i }) {
 		]
 	});
 }
-//#endregion
-//#region src/react/jav/jav-page.tsx
+// src/react/jav/jav-page.tsx
 var Pe = G("search"), Fe = G("x"), Ie = G("refresh-cw");
 function $(e) {
 	let t = new URLSearchParams(location.search);
@@ -675,7 +673,7 @@ function Re({ readOnly: e, receipt: a, resource: s, query: c, navigate: u, clear
 								href: o.asset_id ? `/assets/${o.asset_id}` : `/works/${encodeURIComponent(o.code)}`,
 								"aria-label": `查看 ${o.code} 详情`,
 								onClick: (e) => {
-									!e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0 && (e.preventDefault(), u(e.currentTarget.getAttribute("href")));
+									e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0 || (e.preventDefault(), u(e.currentTarget.getAttribute("href")));
 								},
 								"data-media-pic": "",
 								"data-jav-cover-box": "",
@@ -816,7 +814,6 @@ function Re({ readOnly: e, receipt: a, resource: s, query: c, navigate: u, clear
 		]
 	});
 }
-//#endregion
 export { Le as JavPage };
 
-//# debugId=2932dda7-a6f0-4c28-944c-2cf2d9405c90
+//# debugId=94e77db7-e24f-4220-8578-032c24fd3093
