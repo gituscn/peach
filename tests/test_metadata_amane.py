@@ -1,7 +1,6 @@
 """amane 桥的 Peach 一侧：起子进程、翻 payload、失败分档、冷却动作，以及采集链上那一档。"""
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -23,24 +22,13 @@ from peach.metadata_policy import SOURCE_SPECS
 from peach.metadata_routes import AMANE_OFFICIAL_STAGE, AMANE_STAGE
 from peach.scraping_access import SourcePaused, cooldown_state, paused_until, pause_source
 from peach.sources import REASON_KINDS, FailureReason, SiteRecord
+from support.amane import write_amane_metadata
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def completed(stdout, returncode=0, stderr=""):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
-
-
-def write_amane_metadata(tools, version, *, ready=False):
-    package = metadata_amane.bridge_home(tools) / ".venv" / "Lib" / "site-packages" / f"amane-{version}.dist-info"
-    package.mkdir(parents=True, exist_ok=True)
-    (package / "METADATA").write_text(f"Metadata-Version: 2.1\nName: amane\nVersion: {version}\n", encoding="utf-8")
-    (package / "direct_url.json").write_text(json.dumps({
-        "vcs_info": {"commit_id": metadata_amane.pinned_revision()}}), encoding="utf-8")
-    if ready:
-        (metadata_amane.bridge_home(tools) / 'installed.json').write_text(json.dumps({
-            'revision': metadata_amane.pinned_revision(), 'version': version,
-            'lock_sha256': hashlib.sha256((metadata_amane.BRIDGE_ROOT / 'uv.lock').read_bytes()).hexdigest()}), encoding='utf-8')
 
 
 def report(**sites):
