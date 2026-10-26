@@ -1,5 +1,9 @@
 # 复用清单
 
+## 测试规划与阶段计时
+
+`scripts/test_resume.py` 的 `ImpactPlan` 在一次恢复规划内缓存域集合、测试导入图与路径影响；调用方用当前快照创建计划，检查点输入改变时重新计算。`scripts/test_runner.py` 的 `local_batches` 统一快速检查、普通分片和内部并行容器的执行顺序，`scripts/test_run_progress.py` 的 `phase` 将阶段墙钟写入正式测试记录。沿用标准库与现有单项证明协议，不改变证明有效期、环境身份或完整批次要求。使用范围与计时口径见 [测试与 CI](TESTING.md)。
+
 ## 首次设置分步框架
 
 首次设置、已有数据恢复与完成态共用 `frontend/src/react/pages/setup/setup-scene.tsx` 的分栏框架。媒体库卡片复用配置页的图标、来源色、处理方式及目录控件，访问范围使用 `ConfigurationChoice`。场景布局参考和来源见 [取证记录](reference-snapshots/arion-onboarding.md)，设备素材见 [素材说明](../resources/setup/README.md)。没有新增运行时依赖；提交、校验和源码文案编辑沿用现有入口。步骤标题、场景说明和操作区随步骤独立挂载，防止文案草稿映射串到其他步骤。
