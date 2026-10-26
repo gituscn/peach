@@ -1,14 +1,14 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "5a938300-db81-4425-b94e-12426ab1c080", e._sentryDebugIdIdentifier = "sentry-dbid-5a938300-db81-4425-b94e-12426ab1c080");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "29f9e346-1df7-4000-acce-466d6653fd1d", e._sentryDebugIdIdentifier = "sentry-dbid-29f9e346-1df7-4000-acce-466d6653fd1d");
 	} catch {}
 })();
 import { $fe21c36db05242bb$export$d7b12c4107be0d61 as e, AMANE_BRIDGE_CHECK_URL as t, AMANE_BRIDGE_KEY as n, AMANE_BRIDGE_REBUILD_URL as r, Button as i, COVER_JOB_KEY as a, CUSTOM_SOURCES_KEY as o, CUSTOM_SOURCES_URL as s, Checkbox as c, Disclosure as l, ErrorText as u, ExternalLink as d, Fact as f, FactList as p, FieldLabel as m, Footer as h, Help as g, Input as _, LinkButton as v, LoadingDots as y, Note as b, Rows as ee, SCRAPING_CHECK_URL as te, SCRAPING_COVER_URL as x, SCRAPING_KEY as S, SCRAPING_SETTINGS_URL as ne, SEGMENT as re, SEGMENTED_TRACK as ie, Section as C, SegmentedRadioGroup as ae, Select$1 as oe, SelectField as w, SelectItem as se, SettingsRow as ce, Stack as T, StatusLabel as E, __toESM as D, apiSend as O, busyProps as k, checkText as le, confirmModal as A, errorMessage as j, esc as M, fetchAmaneBridge as N, fetchCoverJob as P, fetchCustomSources as F, fetchSources as I, i2 as ue, queryClient as L, require_jsx_runtime as R, require_react as z, spinnerHtml as B, useAction as V, useBackgroundJob as H, useMutation as U, useQuery as W } from "./peach-app.js";
-import { CodeBlock as de } from "./peach-app.code-block-CtzIYGbl.js";
-import { Page as G } from "./peach-app.page-8O0Xao0B.js";
-import { SiteMark as K } from "./peach-app.site-mark-B-6CccRY.js";
-import { ConnectionStatus as fe } from "./peach-app.connection-status-D5osXsr7.js";
+import { CodeBlock as de } from "./peach-app.code-block-CyDva4Ms.js";
+import { Page as G } from "./peach-app.page-QAncjzM1.js";
+import { SiteMark as K } from "./peach-app.site-mark-D_VlIyJz.js";
+import { ConnectionStatus as fe } from "./peach-app.connection-status-DI6kgn3i.js";
 // src/react/scraping/custom-sources.tsx
 var q = /* @__PURE__ */ D(z(), 1), J = R(), pe = [
 	["code", "番号"],
@@ -615,4 +615,4 @@ function xe({ toast: e }) {
 }
 export { xe as ScrapingPage, Q as linkHost, Z as networkOptions };
 
-//# debugId=5a938300-db81-4425-b94e-12426ab1c080
+//# debugId=29f9e346-1df7-4000-acce-466d6653fd1d

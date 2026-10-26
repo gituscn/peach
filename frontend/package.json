@@ -35,8 +35,8 @@
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
-    "@sentry/cli": "3.8.0",
-    "@sentry/vite-plugin": "11.8.0",
+    "@sentry/cli": "3.8.2",
+    "@sentry/vite-plugin": "11.9.0",
     "@shadcn/lint": "0.2.3",
     "@tailwindcss/vite": "4.3.3",
     "@types/d3-sankey": "0.12.5",

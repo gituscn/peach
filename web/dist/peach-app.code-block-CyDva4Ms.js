@@ -1,7 +1,7 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "3d05dd80-6784-4e02-9de6-6e0401c7a1ba", e._sentryDebugIdIdentifier = "sentry-dbid-3d05dd80-6784-4e02-9de6-6e0401c7a1ba");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "41e202a0-1aa4-46b4-a38d-149b68ebacdd", e._sentryDebugIdIdentifier = "sentry-dbid-41e202a0-1aa4-46b4-a38d-149b68ebacdd");
 	} catch {}
 })();
 import { Button as e, __toESM as t, cardClass as n, cx as r, require_jsx_runtime as i, require_react as a, useOverlayScrollbar as o } from "./peach-app.js";
@@ -59,4 +59,4 @@ function l({ code: t, language: i, label: a, maxCharacters: l, bounded: u = !0, 
 }
 export { l as CodeBlock };
 
-//# debugId=3d05dd80-6784-4e02-9de6-6e0401c7a1ba
+//# debugId=41e202a0-1aa4-46b4-a38d-149b68ebacdd

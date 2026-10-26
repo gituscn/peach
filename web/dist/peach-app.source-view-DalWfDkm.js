@@ -1,11 +1,11 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d0f9d15f-ec2b-495d-abb2-7893602f5ebd", e._sentryDebugIdIdentifier = "sentry-dbid-d0f9d15f-ec2b-495d-abb2-7893602f5ebd");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "88012f02-3fa8-41e5-a124-c10c692bbb15", e._sentryDebugIdIdentifier = "sentry-dbid-88012f02-3fa8-41e5-a124-c10c692bbb15");
 	} catch {}
 })();
 import { Button as e, Chip as t, Wt as n, __toESM as r, authorAvatar as i, authorInitial as a, errorHeadline as o, isBroken as s, require_jsx_runtime as c, require_react as l, sourceIconUrl as u, statusText as d } from "./peach-app.js";
-import { MarkImage as f } from "./peach-app.site-mark-B-6CccRY.js";
+import { MarkImage as f } from "./peach-app.site-mark-D_VlIyJz.js";
 // src/react/follow-manage/source-view.tsx
 var p = /* @__PURE__ */ r(l(), 1), m = c();
 function h({ provider: e }) {
@@ -81,4 +81,4 @@ function y({ text: t, prefix: n = "", tone: r = "error" }) {
 }
 export { g as AuthorAvatar, y as ErrorLine, h as SourceIcon, v as SourceLink, _ as StatusBadge };
 
-//# debugId=d0f9d15f-ec2b-495d-abb2-7893602f5ebd
+//# debugId=88012f02-3fa8-41e5-a124-c10c692bbb15

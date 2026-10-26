@@ -1,13 +1,13 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "424e82d5-a02d-47a8-8595-27f1179d1c8f", e._sentryDebugIdIdentifier = "sentry-dbid-424e82d5-a02d-47a8-8595-27f1179d1c8f");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "287d949a-afd5-4449-afed-898680b65442", e._sentryDebugIdIdentifier = "sentry-dbid-287d949a-afd5-4449-afed-898680b65442");
 	} catch {}
 })();
 import { Button as e, Chip as t, Disclosure as n, DownloadsPanel as r, EmptyState as i, LinkButton as a, LoadingDots as o, Note as s, Progress as c, TASKS_KEY as l, TRIGGER_LABELS as u, __toESM as d, apiGet as f, apiSend as p, busyProps as m, cardClass as h, elapsedText as g, errorMessage as _, f1 as v, fetchEarlier as y, fetchTasks as b, foldRoutine as x, followupDetail as S, groupFollowups as C, hasResultProblems as w, i2 as T, isActive as E, isRoutine as D, latestOfKind as ee, mergeFinished as O, momentText as k, pollInterval as A, problemDestination as j, progressText as M, require_jsx_runtime as N, require_react as P, statusLabel as F, summaryItems as I, taskIssues as L, uo as R, useMutation as z, useQuery as B, useQueryClient as V } from "./peach-app.js";
-import { CodeBlock as H } from "./peach-app.code-block-CtzIYGbl.js";
-import { Page as U } from "./peach-app.page-8O0Xao0B.js";
-import { ErrorDetails as W, ErrorExcerpt as G } from "./peach-app.error-excerpt-DeVcv4q5.js";
+import { CodeBlock as H } from "./peach-app.code-block-CyDva4Ms.js";
+import { Page as U } from "./peach-app.page-QAncjzM1.js";
+import { ErrorDetails as W, ErrorExcerpt as G } from "./peach-app.error-excerpt-B8v2xEIP.js";
 // src/react/activity/background-issues.tsx
 var K = /* @__PURE__ */ d(P(), 1), q = N(), J = ["background-issues"];
 function te() {
@@ -368,4 +368,4 @@ function oe() {
 }
 export { oe as ActivityPage };
 
-//# debugId=424e82d5-a02d-47a8-8595-27f1179d1c8f
+//# debugId=287d949a-afd5-4449-afed-898680b65442

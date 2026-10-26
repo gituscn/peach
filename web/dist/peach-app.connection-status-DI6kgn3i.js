@@ -1,7 +1,7 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "6cd2b25a-0b24-40eb-b4d1-65906e26632d", e._sentryDebugIdIdentifier = "sentry-dbid-6cd2b25a-0b24-40eb-b4d1-65906e26632d");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "33956b0f-afd5-4db7-9e64-5fb8c492f1ed", e._sentryDebugIdIdentifier = "sentry-dbid-33956b0f-afd5-4db7-9e64-5fb8c492f1ed");
 	} catch {}
 })();
 import { cx as e, require_jsx_runtime as t, sortCx as n } from "./peach-app.js";
@@ -47,4 +47,4 @@ function s({ online: t, tone: n, children: i }) {
 }
 export { s as ConnectionStatus };
 
-//# debugId=6cd2b25a-0b24-40eb-b4d1-65906e26632d
+//# debugId=33956b0f-afd5-4db7-9e64-5fb8c492f1ed

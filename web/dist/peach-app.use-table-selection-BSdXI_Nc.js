@@ -1,7 +1,7 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "d235f947-137c-4b1c-98e5-46c4526b62d3", e._sentryDebugIdIdentifier = "sentry-dbid-d235f947-137c-4b1c-98e5-46c4526b62d3");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "076d9335-7e0e-414a-987a-28e135eff52b", e._sentryDebugIdIdentifier = "sentry-dbid-076d9335-7e0e-414a-987a-28e135eff52b");
 	} catch {}
 })();
 import { __toESM as e, autoResetPageIndex as t, column_getCanSort as n, column_getSortFn as r, copyInstancePropertiesWithoutMemos as i, require_react as a, skipFirstRun as o, tableMemo as s } from "./peach-app.js";
@@ -92,4 +92,4 @@ function f(e) {
 }
 export { c as createSortedRowModel, f as useTableSelection };
 
-//# debugId=d235f947-137c-4b1c-98e5-46c4526b62d3
+//# debugId=076d9335-7e0e-414a-987a-28e135eff52b

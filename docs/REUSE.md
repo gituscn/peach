@@ -1,5 +1,27 @@
 # 复用清单
 
+## 发布依赖接管来源
+
+依赖清单复用 Dependabot 的独立 PR 差集，版本与完整依赖图由当前清单和锁文件确定。相邻修改保留主线消费者并重算锁；npm vendor 与前端包使用项目入口重建，许可证和来源记录随资源分发。接管器分别识别应用与 amane 桥的清单，并以实际接管提交确认完成；普通 PR 引用不构成采用。
+
+| 来源 PR | 固定来源提交 |
+| --- | --- |
+| [#129](https://github.com/peach-mitao/peach/pull/129) | `f8899d626f8ef2b4f3c959eb7668ea3c25c56a16` |
+| [#133](https://github.com/peach-mitao/peach/pull/133) | `28fb1b8d748183aeb1a912f7c9ef01d9c34cfe09` |
+| [#147](https://github.com/peach-mitao/peach/pull/147) | `1c436adf6db7105b63306f06bea7f2f2653c50bb` |
+| [#148](https://github.com/peach-mitao/peach/pull/148) | `6de7bd0767d68434297664597caa18e41601a878` |
+| [#149](https://github.com/peach-mitao/peach/pull/149) | `eeed8f01cf935574398af2080114f29263fb6274` |
+| [#179](https://github.com/peach-mitao/peach/pull/179) | `366740dae787c056762afd59c21400d060d1edb0` |
+| [#180](https://github.com/peach-mitao/peach/pull/180) | `c352663209ced88201679727c87539ff12f41980` |
+| [#181](https://github.com/peach-mitao/peach/pull/181) | `6611fc77d7ecac7c9e805b508e183a9468f99c28` |
+| [#182](https://github.com/peach-mitao/peach/pull/182) | `7394cfeab955cbcb0640f57f10e93ae768045fc8` |
+| [#183](https://github.com/peach-mitao/peach/pull/183) | `437f96d76c14c5fe0a00450a6b3a83b3731811d1` |
+| [#184](https://github.com/peach-mitao/peach/pull/184) | `3e8960f79220fc29ffe68b5d7aff5ac9f9d88611` |
+
+注册表稳定版本检查补充 FastAPI、Starlette、tzlocal、Sentry 构建依赖和 Python 镜像的更新。Pillow 的兼容与安全说明按[官方发行说明](https://pillow.readthedocs.io/en/stable/releasenotes/13.0.0.html)核对；运行依赖 amane 固定官方稳定版，并按[上游复核](reference-snapshots/upstream-review.md)适配登录失败分类。更新只替换代码、运行环境与构建资源；既有资料继续遵守原字段保护与升级修复契约。
+
+源码与 wheel 的桥安装回执绑定完整依赖锁的 SHA-256；缺少标识或标识不符时，复用现有安装锁和 `uv sync --locked` 重建工具环境，并在离线类加载自检通过后写回执。同一 amane revision 的传递依赖升级也能生效；随包运行环境继续由构建入口按锁生成，不重置媒体、配置或资料。
+
 ## 全屏视频比例
 
 采用 simon1561 的 [PR #155](https://github.com/peach-mitao/peach/pull/155)，固定来源提交 `7ee5f2d6e0da03983fe943cb8179bee69c4f5639`，许可沿用本项目 AGPL-3.0-or-later。全屏适配复用现有 CSS `object-fit: contain`，原生全屏、播放器全屏类、属性与 full-window 回退使用同一规则；页面外框、控件和媒体管线保持既有契约，无新增依赖。
@@ -831,7 +853,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 | 厂牌字标名录 | 发行商与平台自己的厂牌名录，入口在 `harvest_maker_directories.DIRECTORIES`：MGStage `/ppv/makers.php`、Prestige `/api/maker`、KMP `/label`（大半是 SVG）与 jae.tokyo 展会名录 | slug↔账本对账（四路判据，空罗马字形不可比）、按形状分三张指定表（方标装大位、字标烤方两位共用、方标只管小位）、改地址后靠 provenance 边车重新收人、复核 CSV 与安装闸门。存入口不存图片地址（KMP 文件名带时间戳），不推导 URL、不猜名字 |
 | JAV 元数据查询 | 每个站只有一个归属（ADR-0048）：自写解析器持有 r18.dev、DMM／FANZA、一本道、FC2、fc2cmadb、FC2PPV-DB、JAVten、JavArchive、AVBase、JavBus、javdb，片商官网与转载站经 amane 桥（ADR-0043、ADR-0044）；MetaTube SDK `6a5e6128c725187aeaf921d48ed7d9cd9f30671b`（Apache-2.0）只作来源身份与丰富字段模型参考；DMM 的 GraphQL 接口地址、`ppvContent` 与 `legacySearchPPV` 两条查询的取法参照 OpenAver（MIT）`core/scrapers/dmm.py`，cid 匹配与身份核对是 Peach 自己的（ADR-0059） | 只发规范番号；Peach 管来源链（`metadata_routes`）、`provider_id`／`content_id`、逐字段优先级、原始与目录证据、健康统计、候选复核与 ledger 投影。amane 的 POC 判据与字段缺口见 [取证](reference-snapshots/amane-crawlers-poc.md) |
 | Javinizer-Go 历史快照 | `sources/metadata/javinizer-go/<番号>/<来源>.json`，由 Javinizer-Go v1.5.x（MIT，`dd56998328d078c9baf68ff4fde2e6fcaa2a691a`）在 2026-09 之前取回；二进制与快照留在磁盘，没有调用路径（ADR-0044） | 只作离线证据：封面层读它的 `cover_url` 与 `content_id`，别名解析读企划名义，账本里 `javinizer:<站>:<字段>` 的 provenance 按 `metadata_policy.HISTORICAL_SOURCES` 认级别。`scrape_codes` 写进同一目录的新快照 `provider` 记解析器名、`provider_version` 记 Peach 版本 |
-| amane 刮削站点（官方档 makers、prestige、faleno、dahlia、mgstage；转载站 fc2club、freejavbt、airav、avsox） | amane `cc42cee6ecf290cf05af1caa347d2dc2d5aeffcd`（v0.20.0，GPL-3.0），经 `tools/amane-bridge/` 薄桥子进程接入（ADR-0043、ADR-0048；`makers` 是 amane 的 `official` 模块）：独立 `pyproject.toml`／`uv.lock` 钉 sha，桌面包通过主锁固定的 PyInstaller 分发独立可执行文件，Docker 携带独立 venv；源码与 wheel 在 `<Peach 数据目录>/tools/amane-bridge/.venv` 自动准备。桥只用 `amane.crawlers.sites.<站>` 与 `amane.net.*`，不碰 `aggregate` | GPL-3.0 与 Peach 的 AGPL-3.0-or-later 以进程边界相接；随包附许可证与完整对应源码。运行时核对版本、revision 和程序路径，构建与制品验收清空 PATH 后离线加载全部站点类；安装包缺失或不匹配时要求重新安装。字段、失败分档与无写入 POC 见 [上游复核](reference-snapshots/upstream-review.md)。Prestige 封套与正封分别投影封面和海报，配信日不作发行日；AIRAV 不解析试看时长。上游 `WebClient` 以 `verify=False` 发公开请求、不带凭据；403/406 可另轮换三次指纹，Peach 保持 60 秒子进程总时限。Peach 管来源链位置、身份核对、冷却、候选与结算 |
+| amane 刮削站点（官方档 makers、prestige、faleno、dahlia、mgstage；转载站 fc2club、freejavbt、airav、avsox） | amane `fd9294fbe5b4aa88ce1df84d534f6816ad9460d5`（v0.22.1，GPL-3.0），经 `tools/amane-bridge/` 薄桥子进程接入（ADR-0043、ADR-0048；`makers` 是 amane 的 `official` 模块）：独立 `pyproject.toml`／`uv.lock` 钉 sha，桌面包通过主锁固定的 PyInstaller 分发独立可执行文件，Docker 携带独立 venv；源码与 wheel 在 `<Peach 数据目录>/tools/amane-bridge/.venv` 自动准备。桥只用 `amane.crawlers.sites.<站>` 与 `amane.net.*`，不碰 `aggregate` | GPL-3.0 与 Peach 的 AGPL-3.0-or-later 以进程边界相接；随包附许可证与完整对应源码。运行时核对版本、revision 和程序路径，构建与制品验收清空 PATH 后离线加载全部站点类；安装包缺失或不匹配时要求重新安装。字段、失败分档与无写入 POC 见 [上游复核](reference-snapshots/upstream-review.md)。Prestige 封套与正封分别投影封面和海报，配信日不作发行日；AIRAV 不解析试看时长。上游 `WebClient` 以 `verify=False` 发公开请求、不带凭据；403/406 可另轮换三次指纹，Peach 保持 60 秒子进程总时限。Peach 管来源链位置、身份核对、冷却、候选与结算 |
 | 已确认厂牌的目录归位 | Javinizer-Go v1.5.2 organizer（MIT）只作冲突预检、模板化目录和回滚边界的协议参考，不调用它，不让它持有 Peach ledger | `rehome_unknown_jav.py` 只消费人工确认映射；先出逐文件 CSV，拒绝扁平化重名与厂牌冲突，SQLite 备份后移动文件并同步 Peach 路径／实体 provenance |
 | FC2 目录元数据与跨号证据 | 已缓存的 fc2cmadb Inertia `article`／评论；Javinizer-Go v1.5.2 的 FC2 解析器（MIT）只作商品页字段边界参考 | 旧文章仍有标题、原始标签、日期、时长、卖家、FC2 CDN 封面与 `comments`（2026-08-31 登录态实测）；无歧义标签译成现有词表，标题／标签进 `/review`，`w1200` 封面过尺寸与解码门槛落生成产物；pair、合集/分片保护、hash/时长/尺寸佐证、库外 evidence、健康统计与复核归 Peach，不依赖 FC2-Leak-Detector/JavSP，镜像候选不直写 ledger |
 | 缺索引 MP4 重建 | untrunc（anthwlock `9d86ec9`，GPL-2.0-or-later）与兼容的 FFmpeg 8.1.3 静态构建，固定来源及哈希见 `scripts/untrunc-sources.json`。Windows 安装包与免安装包携带 `tools/untrunc`，同一 Release 提供完整对应源码；原生样片实测覆盖尾部 `moov` 缺失后的 H.264/AAC 恢复、时长与全片解码。显式 `PEACH_UNTRUNC` 优先，其后依次查随包目录、数据工具与 PATH | `src/peach/mp4recover.py` 挑参照（同目录文件名最近的先试，最多 4 部）、验收（解码错误 ≤3 行、音视频时长差 ≤5%）、换回原路径并把坏原件改名成同目录的 `.文件名.peach-original`；缺整个 `moov` 的片子哪里都打不开，所以结果替换原文件，不像缺 `ctts` 那样另存头。实测见 [取证](SOURCING.md#媒体与关注实测) |

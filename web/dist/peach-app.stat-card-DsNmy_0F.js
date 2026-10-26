@@ -1,7 +1,7 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "3ea817c3-3923-4e7f-b881-4fe550ffc52c", e._sentryDebugIdIdentifier = "sentry-dbid-3ea817c3-3923-4e7f-b881-4fe550ffc52c");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "66908864-9b4c-4ae1-ad83-cdc8d0df8cf6", e._sentryDebugIdIdentifier = "sentry-dbid-66908864-9b4c-4ae1-ad83-cdc8d0df8cf6");
 	} catch {}
 })();
 import { cardClass as e, require_jsx_runtime as t } from "./peach-app.js";
@@ -94,4 +94,4 @@ function d({ label: e, icon: t, accent: a = 0, figure: o, footer: s }) {
 }
 export { l as PLAIN_STAT_STRIP, u as PlainStat, o as STAT_STRIP, s as STAT_STRIP_SIX, d as StatCard, c as plainStatClass, a as statCardClass };
 
-//# debugId=3ea817c3-3923-4e7f-b881-4fe550ffc52c
+//# debugId=66908864-9b4c-4ae1-ad83-cdc8d0df8cf6

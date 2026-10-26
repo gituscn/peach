@@ -1,7 +1,7 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "0058056d-f1a0-4e15-91b6-6526f2678e1f", e._sentryDebugIdIdentifier = "sentry-dbid-0058056d-f1a0-4e15-91b6-6526f2678e1f");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "03c796bd-9eae-4c65-b1da-08950f5a1993", e._sentryDebugIdIdentifier = "sentry-dbid-03c796bd-9eae-4c65-b1da-08950f5a1993");
 	} catch {}
 })();
 import { $b4f18e3395fe64d7$export$e51a686c67fdaa2d as e, PillTabList as t, __toESM as n, require_jsx_runtime as r, require_react as i, useHorizontalScroller as a } from "./peach-app.js";
@@ -17,4 +17,4 @@ function c({ scrollable: n = !0, ...r }) {
 }
 export { c as PillAriaTabList };
 
-//# debugId=0058056d-f1a0-4e15-91b6-6526f2678e1f
+//# debugId=03c796bd-9eae-4c65-b1da-08950f5a1993

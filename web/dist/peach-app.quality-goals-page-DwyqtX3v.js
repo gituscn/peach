@@ -1,11 +1,11 @@
 (function() {
 	try {
-		var e = typeof window < "u" ? window : typeof global < "u" ? global : typeof globalThis < "u" ? globalThis : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "e3a11bfd-7f1c-4522-99fc-2f8d562521b1", e._sentryDebugIdIdentifier = "sentry-dbid-e3a11bfd-7f1c-4522-99fc-2f8d562521b1");
+		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "f5c89ca7-5af8-4135-9b68-d1f145ae11ee", e._sentryDebugIdIdentifier = "sentry-dbid-f5c89ca7-5af8-4135-9b68-d1f145ae11ee");
 	} catch {}
 })();
 import { Button as e, CloudDownloadDialog as t, CollectionSummary as n, EmptyState as r, LOC as i, Note as a, OA as o, QUALITY_GOALS_KEY as s, __toESM as c, cardClass as l, errorMessage as u, fetchQualityGoals as d, fmtDur as f, fmtSize as p, previewUrl as m, require_jsx_runtime as h, require_react as g, useQuery as _ } from "./peach-app.js";
-import { Page as v } from "./peach-app.page-8O0Xao0B.js";
+import { Page as v } from "./peach-app.page-QAncjzM1.js";
 // src/react/quality-goals/quality-goals-page.tsx
 var y = /* @__PURE__ */ c(g(), 1), b = h();
 function x({ item: t, openItem: n, searchResources: r, javTitleHtml: a, javDisplayName: o, srcBadge: s }) {
@@ -130,4 +130,4 @@ function S({ toast: e, ...i }) {
 }
 export { S as QualityGoalsPage };
 
-//# debugId=e3a11bfd-7f1c-4522-99fc-2f8d562521b1
+//# debugId=f5c89ca7-5af8-4135-9b68-d1f145ae11ee
