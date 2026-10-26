@@ -67,7 +67,7 @@ sudo /usr/bin/xattr -rd com.apple.quarantine "/Applications/Peach.app"
 
 安装镜像使用 APFS 文件系统，保留已签名资源的 Unicode 文件名及应用扩展属性。浅桃色背景固定左侧 Peach、右侧 Applications 的拖放布局，隐藏工具栏与边栏，背景同时提供标准与 Retina 分辨率。许可证保留在应用的 `Contents/Resources/LICENSE`，安装窗口只显示两个入口。
 
-版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版检查见[测试与依赖](TESTING.md#每次发版检查)，打标签统一使用 `scripts/release_tag.py`。
+版本标签触发 Release 工作流，在 Apple Silicon 与 Intel 原生 runner 分别构建，再由干净 runner 下载并挂载 DMG，验证签名、架构和独立运行。两种 DMG 与 Windows 安装包全部通过后，才一同上传到 GitHub 预发布，统一生成 SHA-256 清单。手动运行工作流只验收候选制品，不创建 Release；推送普通提交不会触发安装包构建。发版从只读审阅和依赖检查开始，重型验证前完成复核并冻结输入；集成、运行核验与定版按[发版检查](TESTING.md#每次发版检查)执行，打标签统一使用 `scripts/release_tag.py`。
 
 ### GitLab 发布与下载后端
 

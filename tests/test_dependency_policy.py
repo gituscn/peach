@@ -17,6 +17,19 @@ from tests.support.gitrepo import seed_repository
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class NativeTransportSecurityTests(unittest.TestCase):
+    def test_bundled_brotli_has_the_security_fix(self):
+        from curl_cffi import Curl
+        curl = Curl()
+        try:
+            native = curl.version().decode("ascii")
+        finally:
+            curl.close()
+        version = re.search(r"\bbrotli/(\d+)\.(\d+)\.(\d+)", native)
+        self.assertIsNotNone(version, native)
+        self.assertGreaterEqual(tuple(map(int, version.groups())), (1, 2, 1), native)
+
+
 class NpmInstallTests(unittest.TestCase):
     def test_transport_errors_retry_the_same_locked_install(self):
         from scripts import npm_ci
