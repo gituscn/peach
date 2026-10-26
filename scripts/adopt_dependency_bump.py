@@ -285,7 +285,8 @@ def adopted(number: int, branch: str, *, root: Path = ROOT) -> bool:
     """
     base = run(("git", "merge-base", "HEAD", f"origin/{branch}"), root=root).strip()
     log = run(("git", "log", "--format=%B", f"{base}..HEAD"), root=root)
-    return re.search(rf"Dependabot PR #{number}(?!\d)", log) is not None
+    return re.search(rf"^Dependabot PR #{number}(?!\d) (?:只改了 manifest 与 lock|没有派生产物)",
+                     log, re.M) is not None
 
 
 def adopt(pr: dict, *, apply: bool, signature: str, root: Path = ROOT) -> dict:

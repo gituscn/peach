@@ -435,6 +435,23 @@ class DependencyPolicyTests(unittest.TestCase):
             closing = [step for step in resumed["next"] if step.startswith("gh pr close")]
             self.assertEqual([step.split()[3] for step in closing], ["1", "2", "3"])
 
+    def test_a_reference_to_a_pr_keeps_its_dependency_update_pending(self):
+        with tempfile.TemporaryDirectory() as holder:
+            repo = seed_repository(Path(holder).resolve() / "repo",
+                                   {".github/workflows/test.yml": b"a: 1\n"}, "base")
+            takeover_repository(repo)
+            branch = "dependabot/example"
+            dependabot_branch(repo, branch, {".github/workflows/test.yml": b"a: 2\n"})
+            adopt.fetch(branch, root=repo)
+            git(repo, "commit", "--allow-empty", "-qm", "fix(deps): 核对独立依赖清单",
+                "-m", "来源为 Dependabot PR #133 的实际文件范围")
+            self.assertFalse(adopt.adopted(133, branch, root=repo))
+            result = adopt.adopt({"number": 133, "headRefName": branch}, apply=True,
+                                 signature="Codex (GPT-6) <noreply@openai.com>", root=repo)
+            self.assertTrue(result["applied"])
+            self.assertTrue(adopt.adopted(133, branch, root=repo))
+            self.assertEqual((repo / ".github/workflows/test.yml").read_bytes(), b"a: 2\n")
+
     def test_the_takeover_commit_message_passes_the_readme_impact_gate(self):
         """`README-Impact` 与 `Co-Authored-By` 必须同一个 trailer 块、中间不空行。
 
