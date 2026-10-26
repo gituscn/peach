@@ -212,6 +212,7 @@ windows-media:
   stage: media
   needs: [release-preflight]
   cache:
+    when: always
     key:
       prefix: windows-media-v2
       files: [scripts/ffmpeg-sources.json, scripts/untrunc-sources.json]
@@ -222,9 +223,17 @@ windows-media:
     name: release
     action: prepare
   script:
-    - apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build cmake curl xz-utils
-    - python3 scripts/media_build_cache.py windows
-    - python3 scripts/ci_r2_artifacts.py push windows-media
+    - python3 scripts/ci_r2_artifacts.py restore windows-media
+    - |
+      restored="$(python3 -c 'import json; print(int(json.load(open("build/ci-artifacts/windows-media-resume.json"))["restored"]))')"
+      if [ "$restored" = 0 ]; then
+        apt-get install -y build-essential gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix mingw-w64-x86-64-dev nasm pkg-config clang meson ninja-build cmake curl xz-utils
+        python3 scripts/media_build_cache.py windows
+      fi
+      uploaded="$(python3 -c 'import json; print(int(json.load(open("build/ci-artifacts/windows-media-resume.json"))["uploaded"]))')"
+      if [ "$uploaded" = 0 ]; then
+        python3 scripts/ci_r2_artifacts.py push windows-media
+      fi
   artifacts:
     expire_in: 14 days
     paths:
@@ -268,6 +277,7 @@ build-macos:
     name: release
     action: prepare
   cache:
+    when: always
     key:
       prefix: macos-media-v2
       files: [scripts/ffmpeg-sources.json, scripts/untrunc-sources.json]
