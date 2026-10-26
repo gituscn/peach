@@ -26,6 +26,41 @@ from support.mp4 import minimal_mp4
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class MediaResponseSecurityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_media_policy_clears_only_old_cache_once_and_isolates_images(self):
+        from starlette.applications import Starlette
+        from starlette.responses import HTMLResponse, Response
+        from starlette.routing import Route
+        from peach.api import ResponseHeadersMiddleware
+        from peach.routes_media import _image_response
+        import httpx
+
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'image.svg'
+            path.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>',encoding='utf-8')
+            async def endpoint(request):
+                if request.url.path=='/page':
+                    return HTMLResponse('<html>test</html>')
+                if request.url.path=='/image':
+                    return _image_response(request,path,'image/svg+xml')
+                return Response(status_code=204)
+            app=ResponseHeadersMiddleware(Starlette(routes=[Route('/{path}',endpoint)]))
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='https://test') as client:
+                client.cookies.set('peach_session','keep')
+                first=await client.get('/page')
+                self.assertEqual(first.headers['clear-site-data'],'"cache"')
+                self.assertIn('httponly',first.headers['set-cookie'].lower())
+                second=await client.get('/page')
+                self.assertNotIn('clear-site-data',second.headers)
+                self.assertEqual(client.cookies.get('peach_session'),'keep')
+                image=await client.get('/image')
+                cached=await client.get('/image',headers={'If-None-Match':image.headers['etag']})
+                self.assertEqual(cached.status_code,304)
+                for response in (image,cached):
+                    self.assertIn('sandbox',response.headers['content-security-policy'])
+                    self.assertEqual(response.headers['x-content-type-options'],'nosniff')
+
+
 HAS_DEPS = all(importlib.util.find_spec(name) for name in ("fastapi", "httpx"))
 if HAS_DEPS:
     import httpx

@@ -98,8 +98,28 @@ async def _wait_for_disconnect(receive: Receive) -> None:
     """等到客户端断开。请求体读完后 uvicorn 的 receive() 只会在断开时再返回一次。"""
     while True:
         message = await receive()
-        if message["type"] == "http.disconnect":
+        task = asyncio.current_task()
+        if message["type"] == "http.disconnect" or (task is not None and task.cancelling()):
             return
+
+
+async def _wait_for_tasks(*tasks) -> None:
+    """清理期间保留外层取消，等子任务结束后再向上交还。"""
+    finished = asyncio.gather(*tasks, return_exceptions=True)
+    cancelled = False
+    while not finished.done():
+        try:
+            await asyncio.shield(finished)
+        except asyncio.CancelledError:
+            cancelled = True
+    if cancelled:
+        raise asyncio.CancelledError
+
+
+async def _cancel_and_wait(*tasks) -> None:
+    for task in tasks:
+        task.cancel()
+    await _wait_for_tasks(*tasks)
 
 
 async def run_until_disconnect[T](operation: Awaitable[T], receive: Receive) -> T:
@@ -113,17 +133,39 @@ async def run_until_disconnect[T](operation: Awaitable[T], receive: Receive) -> 
         watch.result()
         raise ClientDisconnect()
     finally:
-        work.cancel()
-        watch.cancel()
-        await asyncio.gather(work, watch, return_exceptions=True)
+        await _cancel_and_wait(work, watch)
 
 
-async def _send_until_disconnect(inner, scope: Scope, receive: Receive, send: Send) -> None:
+async def _send_until_disconnect(inner, scope: Scope, receive: Receive, send: Send, *, is_cancelled=None) -> None:
     """跑 `inner` 发响应，客户端一断开就把它掐掉。"""
+    started = False
+
+    async def tracked_send(message):
+        nonlocal started
+        await send(message)
+        if message['type'] == 'http.response.start':
+            started = True
+
+    respond = asyncio.ensure_future(inner(scope, receive, tracked_send))
+    watch = asyncio.ensure_future(_wait_for_disconnect(receive))
+    cancellation = None
     try:
-        await run_until_disconnect(inner(scope, receive, send), receive)
-    except ClientDisconnect:
-        return
+        await asyncio.wait({respond, watch}, return_when=asyncio.FIRST_COMPLETED)
+    except asyncio.CancelledError as error:
+        cancellation = error
+    finally:
+        try:
+            await _cancel_and_wait(respond, watch)
+        except asyncio.CancelledError as error:
+            cancellation = cancellation or error
+    if not respond.cancelled():
+        respond.result()
+    if not watch.cancelled():
+        watch.result()
+    if cancellation is not None and (is_cancelled is None or not is_cancelled()):
+        raise cancellation
+    if respond.cancelled() and not started:
+        await Response(status_code=204)(scope, receive, send)
 
 
 class BufferedFileResponse(FileResponse):
@@ -141,11 +183,14 @@ class BufferedFileResponse(FileResponse):
 
     chunk_size = 1 << 20
 
+    def _is_cancelled(self) -> bool:
+        return False
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await super().__call__(scope, receive, send)
             return
-        await _send_until_disconnect(super().__call__, scope, receive, send)
+        await _send_until_disconnect(super().__call__, scope, receive, send, is_cancelled=self._is_cancelled)
 
 
 class CancellableFileResponse(BufferedFileResponse):
@@ -163,6 +208,9 @@ class CancellableFileResponse(BufferedFileResponse):
         self.session = session
         self.registry = registry
 
+    def _is_cancelled(self) -> bool:
+        return self.registry.is_cancelled(self.session)
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         task = asyncio.current_task()
         if task is None or not self.registry.register(self.session, task):
@@ -171,7 +219,8 @@ class CancellableFileResponse(BufferedFileResponse):
         try:
             await super().__call__(scope, receive, send)
         except asyncio.CancelledError:
-            logging.getLogger(__name__).info("stream session cancelled: %s", self.session)
+            if self._is_cancelled():
+                logging.getLogger(__name__).info("stream session cancelled: %s", self.session)
             raise
         finally:
             self.registry.unregister(self.session, task)
@@ -250,9 +299,11 @@ class SplicedMp4Response(Response):
             await Response(status_code=410, headers={"Cache-Control": "no-store"})(scope, receive, send)
             return
         try:
-            await _send_until_disconnect(self._respond, scope, receive, send)
+            await _send_until_disconnect(self._respond, scope, receive, send,
+                                         is_cancelled=lambda: tracked and self.registry.is_cancelled(self.session))
         except asyncio.CancelledError:
-            logging.getLogger(__name__).info("stream session cancelled: %s", self.session)
+            if tracked and self.registry.is_cancelled(self.session):
+                logging.getLogger(__name__).info("stream session cancelled: %s", self.session)
             raise
         finally:
             if tracked and task is not None:

@@ -14,6 +14,25 @@ from peach.metadata import (
 
 
 class MetadataProviderTests(unittest.TestCase):
+    def test_damaged_source_fields_leave_healthy_fields_available(self):
+        fields = extract_peach_fields({'title':'壊\ufffdれた題名', 'maker':'正しいメーカー',
+            'release_date':'2026-01-02', 'actresses':[{'japanese_name':'名前\ufffd'}],
+            'genres':['未\ufffd分類']})
+        self.assertNotIn('title', fields)
+        self.assertNotIn('performers', fields)
+        self.assertNotIn('tags', fields)
+        self.assertEqual(fields['studio']['value'], '正しいメーカー')
+        self.assertEqual(fields['release_date']['value'], '2026-01-02')
+        self.assertNotIn('title', extract_catalog_evidence({'title':'壊\ufffdれた題名'}))
+
+    def test_valid_non_latin_source_text_and_performer_aliases_remain_available(self):
+        fields = extract_peach_fields({'title':'日本語 中文 café',
+            'actresses':[{'japanese_name':'正常な名前','aliases':['別名\ufffd']}],
+            'maker':'正常な会社'})
+        self.assertEqual(fields['title']['value'], '日本語 中文 café')
+        self.assertNotIn('performers', fields)
+        self.assertEqual(fields['studio']['value'], '正常な会社')
+
     def test_all_unmapped_genres_are_reviewable_without_fabricated_tags(self):
         fields = extract_peach_fields({"genres": ["未知类别甲", "未知类别乙"]})
         self.assertEqual(fields["tags"]["value"], [])

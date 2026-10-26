@@ -432,6 +432,23 @@ def _url_list_evidence(raw: object, label: str) -> dict | None:
     }
 
 
+def contains_replacement_character(value: object) -> bool:
+    """来源解码已丢失的字符不能作为文字证据，保留原始快照供重新取证。"""
+    if isinstance(value, str):
+        return '\ufffd' in value
+    if isinstance(value, dict):
+        return any(contains_replacement_character(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(contains_replacement_character(item) for item in value)
+    return False
+
+
+def candidate_text_is_valid(candidate: dict) -> bool:
+    """候选正文与未映射标签均须可解码；来源路径和诊断文字不参与判定。"""
+    return not any(contains_replacement_character(candidate.get(key))
+                   for key in ('value', 'display_value', 'unmapped_genres'))
+
+
 def extract_catalog_evidence(payload: dict) -> dict[str, dict]:
     """Preserve source-only catalog fields without mapping them to ledger truth.
 
@@ -467,7 +484,7 @@ def extract_catalog_evidence(payload: dict) -> dict[str, dict]:
     screenshots = _url_list_evidence(payload.get("screenshot_urls"), "张截图")
     if screenshots is not None:
         out["screenshot_urls"] = screenshots
-    return out
+    return {field: value for field, value in out.items() if candidate_text_is_valid(value)}
 
 
 def extract_peach_fields(payload: dict, genre_decisions=None) -> dict[str, dict]:
@@ -520,4 +537,4 @@ def extract_peach_fields(payload: dict, genre_decisions=None) -> dict[str, dict]
             "unmapped_genres": unmapped,
             "warnings": [unmapped_genre_warning(unmapped)] if unmapped else [],
         }
-    return out
+    return {field: value for field, value in out.items() if candidate_text_is_valid(value)}

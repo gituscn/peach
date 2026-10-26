@@ -45,7 +45,7 @@ from .field_owners import (
 )
 from .genre_decisions import load_genre_decisions
 from .genre_taxonomy import UNMAPPED, genres_in_warning, resolve_genre
-from .metadata import identifies_code
+from .metadata import candidate_text_is_valid, identifies_code
 from .metadata_alias_resolve import (
     is_planning_alias as _is_planning_alias,
     register_planning_alias,
@@ -684,7 +684,7 @@ def _row_candidates(row: dict, decided) -> list[dict]:
     code = str(row.get("code") or "").strip()
     return [_fc2_seller_as_label(field, code, _fold_genre_decisions(field, candidate, decided))
             for candidate in _parsed_candidates(row)
-            if _candidate_identifies_code(code, candidate)]
+            if _candidate_identifies_code(code, candidate) and candidate_text_is_valid(candidate)]
 
 
 def _auto_apply_rule(candidate: dict, agreed: int) -> str:
@@ -762,6 +762,7 @@ def _evidence_candidates(row: dict, field: str = "") -> list[dict]:
             if (str(c.get("source") or "").strip() in SOURCE_SPECS
                 or str(c.get("source") or "").strip() == LOCAL_NFO_SOURCE)
             and not blacklisted(field, str(c.get("source") or "").strip())
+            and candidate_text_is_valid(c)
             and _original_title_candidate(field, c, str(row.get('code') or ''))]
 
 
@@ -1216,6 +1217,8 @@ def _landing_scope(connection, group: dict, candidate: dict,
     整套落库（`_apply_metadata_candidate`）与只补新增标签（`_extend_approved_tags`）
     共用这一份：范围、并发凭据和番号身份不能只在其中一条路上核。
     """
+    if not candidate_text_is_valid(candidate):
+        raise ValueError('来源文字含无法解码的字符，请重新采集资料')
     code = str(group.get("code") or "").strip()
     query = str(group.get("query") or code).strip()
     if group.get('asset_path'):

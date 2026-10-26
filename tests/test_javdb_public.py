@@ -22,6 +22,19 @@ from support.ledger import fresh_ledger
 
 
 class PublicProtocolTests(unittest.TestCase):
+    def test_signature_rejects_multiple_recipes_unknown_time_and_control_literals(self):
+        script = ('const AA="sample-middle",BB="sample-suffix";'
+                  'function makeHeader(){const now=Math.floor(Date.now()/1e3).toString();'
+                  'return`${now}.${AA}.${digest(now+BB)}`}const headers={jdsignature:makeHeader()};')
+        function=script[script.index('function'):script.index('const headers')]
+        for invalid in (script+'const other={jdsignature:otherHeader()};', script+function,
+                        script.replace('Date.now()','clock()'),
+                        script.replace('sample-suffix', r'bad\nvalue')):
+            with self.subTest(script=invalid):
+                self.assertIsNone(public_signature_parts(invalid))
+        self.assertEqual(public_signature_parts(script.replace('1e3','1000')),
+                         ('sample-middle','sample-suffix'))
+
     def test_signature_follows_header_recipe_with_minified_identifiers(self):
         script = ('const AA="sample-middle",BB="sample-suffix";'
                   'function makeHeader(){const now=Math.floor(Date.now()/1e3).toString();'
@@ -147,7 +160,7 @@ class PublicProtocolTests(unittest.TestCase):
             if request.url.endswith('/'):
                 body = b'<script src="/assets/index-test.js"></script>'
             elif '/assets/' in request.url:
-                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=String(Date.now());'
+                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=Math.floor(Date.now()/1e3).toString();'
                         b'return`${n}.${S1}.${digest(n+E1)}`}const headers={jdsignature:signature()};')
             else:
                 if blocked:
@@ -351,7 +364,7 @@ class DetailProjectionTests(unittest.TestCase):
             elif request.url.endswith('/'):
                 body = b'<script src="/assets/index-test.js"></script>'
             elif '/assets/' in request.url:
-                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=String(Date.now());'
+                body = (b'const S1="test-middle",E1="test-suffix";function signature(){const n=Math.floor(Date.now()/1e3).toString();'
                         b'return`${n}.${S1}.${digest(n+E1)}`}const headers={jdsignature:signature()};')
             else:
                 body = json.dumps({'success': 1, 'data': {'movie': {'id': 'Exact', 'number': 'EXM-001',
