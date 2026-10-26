@@ -22,8 +22,8 @@ function ProcessingMenuGroup({ label, maintenance = false, children }: {
   label: string; maintenance?: boolean; children: ReactNode;
 }) {
   const ref = useMovingSurface('hover');
-  return <div ref={ref} role="group" aria-label={label}
-    className={cx('flex flex-col gap-1', maintenance && 'mt-2 rounded-lg bg-background-secondary-default p-1 pt-3 [--color-dropdown-item-hover-background:var(--color-background-secondary-hover)]')}>
+  return <div ref={ref} role="group" aria-label={label} data-processing-maintenance={maintenance || undefined}
+    className={cx('flex flex-col gap-1', maintenance && 'mt-2 rounded-lg bg-background-secondary-default p-1 pt-3')}>
     {children}
   </div>;
 }
