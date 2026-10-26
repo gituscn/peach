@@ -33,17 +33,20 @@ _CACHE_READS = ContextVar('jav_public_cache_reads', default=None)
 
 def public_signature_parts(script: str) -> tuple[str, str] | None:
     """从公开请求头的签名计算式读取常量，不执行来源脚本。"""
-    call = re.search(r'\bjdsignature\s*:\s*(' + _JS_IDENTIFIER + r')\s*\(\s*\)', script)
-    if not call:
+    calls = set(re.findall(r'\bjdsignature\s*:\s*(' + _JS_IDENTIFIER + r')\s*\(\s*\)', script))
+    if len(calls) != 1:
         return None
-    recipe = re.search(
-        r'\bfunction\s+' + re.escape(call[1]) + r'\s*\(\s*\)\s*\{[^{}]{0,512}?\breturn\s*'
-        r'`\$\{(?P<stamp>' + _JS_IDENTIFIER + r')\}\.\$\{(?P<middle>' + _JS_IDENTIFIER + r')\}\.'
+    recipes = list(re.finditer(
+        r'\bfunction\s+' + re.escape(calls.pop()) + r'\s*\(\s*\)\s*\{\s*(?:const|let|var)\s+'
+        r'(?P<stamp>' + _JS_IDENTIFIER + r')\s*=\s*Math\.floor\(Date\.now\(\)\s*/\s*'
+        r'(?:1e3|1000)\)\.toString\(\)\s*;\s*return\s*'
+        r'`\$\{(?P=stamp)\}\.\$\{(?P<middle>' + _JS_IDENTIFIER + r')\}\.'
         r'\$\{' + _JS_IDENTIFIER + r'\(\s*(?P=stamp)\s*\+\s*(?P<suffix>' + _JS_IDENTIFIER + r')\s*\)\}`\s*;?\s*\}',
         script,
-    )
-    if not recipe:
+    ))
+    if len(recipes) != 1:
         return None
+    recipe = recipes[0]
     values = []
     for name in (recipe['middle'], recipe['suffix']):
         assignments = re.findall(r'(?<![\w$])' + re.escape(name) + r'\s*=\s*("(?:\\.|[^"\\]){1,512}")\s*[,;]', script)
@@ -53,7 +56,8 @@ def public_signature_parts(script: str) -> tuple[str, str] | None:
             value = json.loads(assignments[0])
         except ValueError:
             return None
-        if not isinstance(value, str) or not 1 <= len(value) <= 256:
+        if (not isinstance(value, str) or not 1 <= len(value) <= 256
+                or any(ord(char) < 32 for char in value)):
             return None
         values.append(value)
     return values[0], values[1]
