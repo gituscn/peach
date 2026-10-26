@@ -1,5 +1,11 @@
 # 复用清单
 
+## 叶子证书密钥标识与存量补签
+
+采用 peach-patcher 的 [PR #177](https://github.com/peach-mitao/peach/pull/177)，固定来源提交 `62927d4b975bdad3420ef214bc9330382a4233d6`，许可证沿用本项目 AGPL-3.0-or-later。运行期与两个 TLS 设置脚本复用 OpenSSL 的 [`subjectKeyIdentifier` 和 `authorityKeyIdentifier`](https://docs.openssl.org/3.0/man5/x509v3_config/#authority-key-identifier) 扩展，显式签入叶子证书；标准库 [`ssl.create_default_context`](https://docs.python.org/3.14/library/ssl.html#ssl.create_default_context) 的严格验证策略保持启用。现有签发工具随运行环境提供，无新增依赖。
+
+`certs.reissue_reason` 将缺少 AKI 的叶子证书交给已有补签流程，CA 和已安装信任保持原样；合格叶子沿用 SAN 与到期判据。存量回归采用临时 CA、缺 AKI 的有效叶子、真实严格 TLS 握手和补签后重复检查，核对 CA 保留及叶子备份。社区用例按 OpenSSL 与 LibreSSL 的缺标识签发行为适配，不用跳过测试代替存量验证。未采用 mkcert 或新增 X.509 编码库，现有工具已覆盖签发能力，Peach 仅保留 CA 生命周期和补签策略。
+
 ## 测试规划与阶段计时
 
 `scripts/test_resume.py` 的 `ImpactPlan` 在一次恢复规划内缓存域集合、测试导入图与路径影响；调用方用当前快照创建计划，检查点输入改变时重新计算。`scripts/test_runner.py` 的 `local_batches` 统一快速检查、普通分片和内部并行容器的执行顺序，`scripts/test_run_progress.py` 的 `phase` 将阶段墙钟写入正式测试记录。沿用标准库与现有单项证明协议，不改变证明有效期、环境身份或完整批次要求。使用范围与计时口径见 [测试与 CI](TESTING.md)。
