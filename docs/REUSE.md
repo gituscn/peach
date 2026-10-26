@@ -22,6 +22,8 @@
 
 源码与 wheel 的桥安装回执绑定完整依赖锁的 SHA-256；缺少标识或标识不符时，复用现有安装锁和 `uv sync --locked` 重建工具环境，并在离线类加载自检通过后写回执。同一 amane revision 的传递依赖升级也能生效；随包运行环境继续由构建入口按锁生成，不重置媒体、配置或资料。
 
+主应用与独立桥环境共同固定 `curl_cffi 0.17.0`（MIT），采用[官方安全发行说明](https://github.com/lexiforest/curl_cffi/releases/tag/v0.17.0)中的内置 Brotli 1.2.1、证书库及 Windows 撤销列表修正。原生传输在测试中读取实际 libcurl 版本，核对内置 Brotli 的安全版本；Python 的独立 Brotli 包与 libcurl 自带的解码器分别验收。Peach 沿用现有代理、指纹、TLS 和来源边界，不引入 WebSocket 或账户能力。
+
 ## 全屏视频比例
 
 采用 simon1561 的 [PR #155](https://github.com/peach-mitao/peach/pull/155)，固定来源提交 `7ee5f2d6e0da03983fe943cb8179bee69c4f5639`，许可沿用本项目 AGPL-3.0-or-later。全屏适配复用现有 CSS `object-fit: contain`，原生全屏、播放器全屏类、属性与 full-window 回退使用同一规则；页面外框、控件和媒体管线保持既有契约，无新增依赖。

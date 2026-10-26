@@ -34,7 +34,7 @@ dependencies = [
   "bencode2==0.3.38",
   "browserexport==0.4.4",
   "pyahocorasick==2.3.1",
-  "curl_cffi==0.16.3",
+  "curl_cffi==0.17.0",
   "fastapi==0.162.0",
   # grpcio 与 protobuf 给云下载调 CloudDrive2 的 gRPC 接口（`downloads_clouddrive.py`）。
   # 消息代码由 grpcio-tools 1.84.0 生成后提交，它自带的 protoc 对应 protobuf 7.35.1，
