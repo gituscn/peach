@@ -4813,6 +4813,9 @@ class R2ArtifactTransferTests(unittest.TestCase):
         objects = {}
 
         def run(command, **_kwargs):
+            if command[1] == "copyto":
+                objects[command[3]] = Path(command[2]).read_bytes()
+                return
             self.assertEqual(command[1], "copy")
             names = Path(command[command.index("--files-from-raw") + 1]).read_text().splitlines()
             source, destination = command[2:4]
@@ -4828,6 +4831,8 @@ class R2ArtifactTransferTests(unittest.TestCase):
         def read(command, **_kwargs):
             if command[0] == "git":
                 return "a" * 40 if "rev-parse" in command else ""
+            if command[1] == "cat":
+                return objects[command[2]].decode()
             return json.dumps([{"Path": key.split("peach:peach-releases/", 1)[1], "Size": len(value)}
                                for key, value in objects.items()])
 
@@ -4847,7 +4852,12 @@ class R2ArtifactTransferTests(unittest.TestCase):
             artifact.unlink()
             module.transfer(root, "windows-release", "pull")
             self.assertEqual(artifact.read_bytes(), b"verified executable archive")
-            key, = objects
+            artifact.unlink()
+            manifest_path.unlink()
+            with mock.patch.dict(os.environ, {"CI_JOB_ID": "790"}):
+                self.assertTrue(module.restore(root, "windows-release")["restored"])
+            self.assertEqual(artifact.read_bytes(), b"verified executable archive")
+            key, = [name for name in objects if name.endswith("/release/Peach-1.2.3-windows-x64.zip")]
             self.assertTrue(key.startswith("peach:peach-releases/_ci/123/456/" + "a" * 40 + "/"))
             objects[key] = b"corrupted"
             with self.assertRaisesRegex(ValueError, "SHA-256"):
@@ -4874,6 +4884,80 @@ class R2ArtifactTransferTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             module.validate_manifest({**manifest, "files": [item, {**item, "path": "release/VERSION.txt"}]},
                                      "windows-release", build)
+
+    def test_partial_upload_retry_recovers_built_bytes_and_original_remote_prefix(self):
+        module = load_script("ci_r2_artifacts")
+        objects, fail = {}, [True]
+        def run(command, **_kwargs):
+            if command[1] == "copyto":
+                objects[command[3]] = Path(command[2]).read_bytes()
+                return
+            names = Path(command[command.index("--files-from-raw") + 1]).read_text().splitlines()
+            source, destination = command[2:4]
+            for name in names:
+                if destination.startswith("peach:"):
+                    objects[destination + "/" + name] = (Path(source) / name).read_bytes()
+                else:
+                    path = Path(destination) / name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(objects[source + "/" + name])
+            if destination.startswith("peach:") and fail[0]:
+                fail[0] = False
+                raise subprocess.CalledProcessError(1, command)
+        def read(command, **_kwargs):
+            if command[0] == "git":
+                return "a" * 40 if "rev-parse" in command else ""
+            if command[1] == "cat":
+                return objects[command[2]].decode()
+            return json.dumps([{"Path": key.split("peach:peach-releases/", 1)[1], "Size": len(value)}
+                               for key, value in objects.items()])
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(module, "rclone_environment", side_effect=self.rclone_environment), \
+                mock.patch.object(module.subprocess, "check_output", side_effect=read), \
+                mock.patch.object(module.subprocess, "run", side_effect=run):
+            root = Path(directory).resolve() / "checkout"
+            root.mkdir()
+            environment = {**self.environment(), "CI_BUILDS_DIR": str(Path(directory).resolve() / "builds")}
+            with mock.patch.dict(os.environ, environment, clear=True):
+                self.tools(root)
+                artifact = root / "release/Peach-1.2.3-windows-x64.zip"
+                artifact.parent.mkdir()
+                artifact.write_bytes(b"same built archive")
+                with self.assertRaises(subprocess.CalledProcessError):
+                    module.transfer(root, "windows-release", "push")
+                backup = module.upload_backup(root, module.identity(), "windows-release")
+                self.assertTrue((backup / "upload.json").is_file())
+                artifact.unlink()
+                with mock.patch.dict(os.environ, {"CI_JOB_ID": "790"}):
+                    result = module.restore(root, "windows-release")
+                    self.assertTrue(result["restored"])
+                    self.assertFalse(result["uploaded"])
+                    module.transfer(root, "windows-release", "push")
+                self.assertEqual(artifact.read_bytes(), b"same built archive")
+                self.assertFalse(backup.exists())
+                self.assertFalse(any("/windows-release/790/" in key for key in objects))
+
+    def test_capacity_failure_preserves_completed_build_for_retry(self):
+        module = load_script("ci_r2_artifacts")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve() / "checkout"
+            root.mkdir()
+            environment = {**self.environment(), "CI_BUILDS_DIR": str(Path(directory).resolve() / "builds")}
+            with mock.patch.dict(os.environ, environment, clear=True), \
+                    mock.patch.object(module, "rclone_environment", side_effect=self.rclone_environment), \
+                    mock.patch.object(module.subprocess, "check_output", side_effect=["a" * 40, "", "[]"]), \
+                    mock.patch.object(module, "require_capacity", side_effect=ValueError("capacity")), \
+                    mock.patch.object(module.subprocess, "run") as upload:
+                self.tools(root)
+                artifact = root / "release/Peach-1.2.3-windows-x64.zip"
+                artifact.parent.mkdir()
+                artifact.write_bytes(b"completed build")
+                with self.assertRaisesRegex(ValueError, "capacity"):
+                    module.transfer(root, "windows-release", "push")
+                backup = module.upload_backup(root, module.identity(), "windows-release")
+                self.assertEqual((backup / artifact.relative_to(root)).read_bytes(), b"completed build")
+                self.assertTrue((backup / "upload.json").is_file())
+                upload.assert_not_called()
 
     def test_macos_inventory_keeps_signed_images_and_checks_build_identity(self):
         module = load_script("ci_r2_artifacts")

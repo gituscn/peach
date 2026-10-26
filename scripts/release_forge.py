@@ -19,7 +19,7 @@ from peach.peach_proxy import read_url
 REQUIRED_TEST_JOBS = frozenset({"verify-linux", "verify-windows", "verify-macos", "wheel-smoke"})
 #: 版本提交的主线流水线里演练的标签作业（ADR-0121）：全部成功才打标签。规则没匹配上、演练没跑，
 #: 也不能当作通过。三平台验收是必需任务，演练规则在版本提交上把它们改成全量。
-REHEARSAL_JOBS = frozenset({"windows-media", "build-windows", "build-macos", "smoke-windows", "docker-build"})
+REHEARSAL_JOBS = frozenset({"windows-media", "build-windows", "build-macos", "smoke-windows", "docker-build", "seal-release"})
 TERMINAL_STATUSES = frozenset({"success", "failed", "canceled", "skipped"})
 #: 必需任务落在这些状态时，整条流水线等多久都不会转绿；重试会生成同名的新任务。
 RED_JOB_STATUSES = frozenset({"failed", "canceled"})

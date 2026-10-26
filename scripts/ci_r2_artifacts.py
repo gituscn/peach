@@ -1,4 +1,4 @@
-"""通过 R2 传递同一流水线的大产物，GitLab 只保存带 SHA-256 的清单。"""
+"""通过 R2 传递演练大产物并晋级至标签，GitLab 只保存带 SHA-256 的清单。"""
 from __future__ import annotations
 
 import argparse
@@ -22,6 +22,7 @@ GROUPS = {
                       "build/untrunc-windows/untrunc", "build/untrunc-windows/untrunc-corresponding-source.zip"),
     "windows-release": ("release",),
     "macos-release": ("dist/macos.noindex/arm64", "dist/macos.noindex/x86_64"),
+    "docker-release": ("build/ci-artifacts/docker-image.json",),
 }
 
 
@@ -69,6 +70,8 @@ def allowed_path(name: str, group: str) -> bool:
             or parts[-1] in {"ffmpeg-corresponding-source.zip", "untrunc-corresponding-source.zip",
                               "RELEASE_NOTES.md", "DOWNLOADS.md", "version.txt", "ci_windows.ps1",
                               "smoke_desktop.py", "smoke_update_tasks.py", "smoke_split_update.py"})
+    if group == "docker-release":
+        return name == "build/ci-artifacts/docker-image.json"
     return any(name == base or name.startswith(base + "/") for base in GROUPS[group])
 
 
@@ -156,14 +159,122 @@ def validate_manifest(manifest: dict, group: str, build: dict) -> list[dict]:
     return items
 
 
-def transfer(root: Path, group: str, mode: str) -> dict:
-    root = root.resolve(strict=True)
+def checkpoint(build: dict, group: str) -> str:
+    if group not in GROUPS:
+        raise ValueError("未知的产物组")
+    return prefix(build) + "/completed/" + group + ".json"
+
+
+def upload_backup(root: Path, build: dict, group: str) -> Path | None:
+    value = os.environ.get("CI_BUILDS_DIR")
+    if not value:
+        return None
+    if group not in GROUPS or any(not re.fullmatch(r"[1-9][0-9]*", build[key]) for key in ("project", "pipeline")):
+        raise ValueError("无效的构建续传身份")
+    base = Path(value).resolve() / ".peach-upload-resume"
+    path = base / build["project"] / build["pipeline"] / build["commit"] / group
+    if not path.resolve().is_relative_to(base.resolve()) or path.resolve().is_relative_to(root.resolve()):
+        raise ValueError("续传目录必须位于 CI 构建根的独立命名空间")
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents if parent.is_relative_to(base)):
+        raise ValueError("续传目录不能包含软链接")
+    return path
+
+
+def preserve_upload(root: Path, manifest: dict) -> None:
+    group, build = manifest["group"], manifest["identity"]
+    destination = upload_backup(root, build, group)
+    if destination is None:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in manifest["files"]:
+        source = local_path(root, item["path"], group)
+        target = local_path(destination, item["path"], group)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    temporary = destination / "upload.json.tmp"
+    temporary.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(destination / "upload.json")
+
+
+def discard_upload(root: Path, build: dict, group: str) -> None:
+    path = upload_backup(root, build, group)
+    if path is not None and path.exists():
+        shutil.rmtree(path)
+
+
+def remote_json(root: Path, key: str, payload: dict | None = None) -> dict | None:
+    """只在受保护 CI 的暂存命名空间读取或登记完整对象；网络失败不当作不存在。"""
+    if not re.fullmatch(r"_ci/[1-9][0-9]*/[1-9][0-9]*/[0-9a-f]{40}/(?:completed/[a-z-]+|release-candidate)\.json", key):
+        raise ValueError("无效的 CI 元数据路径")
+    environment = rclone_environment()
+    executable = rclone_executable(root.resolve(strict=True))
+    bucket = f"peach:{environment['PEACH_R2_BUCKET']}"
+    with tempfile.TemporaryDirectory(prefix="peach-ci-metadata-") as directory:
+        temporary = Path(directory)
+        configuration = temporary / "rclone.conf"
+        configuration.touch()
+        common = {"env": environment, "text": True, "encoding": "utf-8"}
+        if payload is None:
+            listing = json.loads(subprocess.check_output([executable, "lsjson", bucket, "--recursive", "--files-only",
+                "--config", str(configuration)], **common))
+            if not any(row["Path"] == key for row in listing):
+                return None
+            return json.loads(subprocess.check_output([executable, "cat", bucket + "/" + key,
+                "--config", str(configuration)], **common))
+        source = temporary / "metadata.json"
+        source.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        subprocess.run([executable, "copyto", str(source), bucket + "/" + key,
+            "--checksum", "--immutable", "--config", str(configuration)], env=environment, check=True)
+        return payload
+
+
+def restore(root: Path, group: str) -> dict:
+    """恢复同一受保护提交与流水线已完整上传的构建，供失败作业重试复用。"""
     build = identity()
+    manifest = remote_json(root, checkpoint(build, group))
+    result = {"restored": manifest is not None, "uploaded": manifest is not None, "group": group}
+    destination = root / "build/ci-artifacts"
+    destination.mkdir(parents=True, exist_ok=True)
+    if manifest is not None:
+        validate_manifest(manifest, group, build)
+        (destination / (group + ".json")).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        result.update(transfer(root, group, "pull"))
+        discard_upload(root, build, group)
+    else:
+        backup = upload_backup(root, build, group)
+        if backup is not None and (backup / "upload.json").is_file():
+            manifest = json.loads((backup / "upload.json").read_text(encoding="utf-8"))
+            items = validate_manifest(manifest, group, build)
+            for item in items:
+                path = local_path(backup, item["path"], group)
+                if not path.is_file() or path.stat().st_size != item["size"] or checksum(path) != item["sha256"]:
+                    raise ValueError("本机续传文件的大小或 SHA-256 不符")
+            for item in items:
+                target = local_path(root, item["path"], group)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(local_path(backup, item["path"], group), target)
+            (destination / (group + ".json")).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            result["restored"] = True
+    (destination / (group + "-resume.json")).write_text(json.dumps(result) + "\n", encoding="utf-8")
+    return result
+
+
+def transfer(root: Path, group: str, mode: str, *, source: dict | None = None) -> dict:
+    root = root.resolve(strict=True)
+    current = identity()
+    build = current if source is None else source
+    if source is not None and (mode != "pull" or any(build[key] != current[key] for key in ("project", "commit", "tag"))):
+        raise ValueError("晋级产物必须属于同一项目、版本与提交")
     environment = rclone_environment()
     executable = rclone_executable(root)
     manifest_path = root / "build/ci-artifacts" / (group + ".json")
     if mode == "push":
         producer_job = os.environ.get("CI_JOB_ID", "")
+        if manifest_path.exists():
+            previous = json.loads(manifest_path.read_text(encoding="utf-8"))
+            validate_manifest(previous, group, build)
+            if previous["files"] == inventory(root, group):
+                producer_job = previous["producer_job"]
     else:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         items = validate_manifest(manifest, group, build)
@@ -187,15 +298,18 @@ def transfer(root: Path, group: str, mode: str) -> dict:
             if actual != build["commit"] or dirty:
                 raise ValueError("暂存需要当前提交的干净构建目录")
             items = inventory(root, group)
+            manifest = {"format": 1, "identity": build, "group": group, "producer_job": producer_job, "files": items}
+            preserve_upload(root, manifest)
             existing = json.loads(command("lsjson", f"peach:{environment['PEACH_R2_BUCKET']}", "--recursive", "--files-only", read=True))
             require_capacity(existing, [{"name": item["path"], "size": item["size"]} for item in items],
                              storage_prefix, int(environment.get("PEACH_R2_MAX_BYTES", "8000000000")))
             listing = temporary / "files.txt"
             listing.write_text("".join(item["path"] + "\n" for item in items), encoding="utf-8")
             command("copy", str(root), remote, "--files-from-raw", str(listing), "--checksum", "--immutable")
-            manifest = {"format": 1, "identity": build, "group": group, "producer_job": producer_job, "files": items}
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            remote_json(root, checkpoint(build, group), manifest)
+            discard_upload(root, build, group)
         else:
             for item in items:
                 local_path(root, item["path"], group)
@@ -213,12 +327,12 @@ def transfer(root: Path, group: str, mode: str) -> dict:
     return {"group": group, "mode": mode, "files": len(items), "bytes": sum(item["size"] for item in items), "commit": build["commit"]}
 
 
-def cleanup(root: Path) -> dict:
-    """公开发布成功后只回收当前流水线的暂存前缀。
-
-    发布演练（ADR-0121）从不发布，暂存只是验收用的草稿，演练跑完直接回收。
-    """
-    build = identity()
+def cleanup(root: Path, *, source: dict | None = None) -> dict:
+    """回收指定流水线的暂存前缀；晋级入口在全部发布成功后选择来源演练。"""
+    current = identity()
+    build = current if source is None else source
+    if source is not None and any(build[key] != current[key] for key in ("project", "commit", "tag")):
+        raise ValueError("回收范围必须属于同一项目、版本与提交")
     rehearsal = os.environ.get("PEACH_RELEASE_REHEARSAL") == "1" and not os.environ.get("CI_COMMIT_TAG")
     environment = rclone_environment()
     executable = rclone_executable(root.resolve(strict=True))
@@ -239,12 +353,13 @@ def cleanup(root: Path) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("push", "pull", "cleanup"))
+    parser.add_argument("mode", choices=("push", "pull", "restore", "cleanup"))
     parser.add_argument("group", nargs="?", choices=tuple(GROUPS))
     args = parser.parse_args()
     if args.mode != "cleanup" and not args.group:
         parser.error("上传和下载须指定产物组")
-    result = cleanup(Path.cwd()) if args.mode == "cleanup" else transfer(Path.cwd(), args.group, args.mode)
+    result = (cleanup(Path.cwd()) if args.mode == "cleanup" else restore(Path.cwd(), args.group)
+              if args.mode == "restore" else transfer(Path.cwd(), args.group, args.mode))
     print(json.dumps(result, ensure_ascii=False))
 
 

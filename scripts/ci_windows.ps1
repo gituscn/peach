@@ -82,12 +82,25 @@ if ($Mode -eq 'docker-build' -or $Mode -eq 'docker-push') {
     Assert-ReleaseRef $Version
     $Endpoint = (docker context inspect --format '{{.Endpoints.docker.Host}}')
     Assert-Exit '需要运行 Docker Desktop'
-    $Candidate = "peach-ci:$Version-$env:CI_PIPELINE_ID"
+    $SourcePipeline = $env:CI_PIPELINE_ID
+    if ($Mode -eq 'docker-push') {
+        $CandidateReceipt = Get-Content -LiteralPath build/ci-artifacts/release-candidate.json -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($CandidateReceipt.target.pipeline -ne $env:CI_PIPELINE_ID -or $CandidateReceipt.target.commit -ne $env:CI_COMMIT_SHA) { throw '镜像晋级回执不属于当前发布' }
+        $SourcePipeline = $CandidateReceipt.candidate.identity.pipeline
+    }
+    $Candidate = "peach-ci:$Version-$SourcePipeline"
 }
 
 if ($Mode -eq 'docker-build') {
     $Revision = (git rev-parse HEAD).Trim()
     Assert-Exit '无法读取提交'
+    if ((Test-Path -LiteralPath build/ci-artifacts/docker-release-resume.json) -and (Get-Content -LiteralPath build/ci-artifacts/docker-release-resume.json -Raw | ConvertFrom-Json).restored) {
+        $Verified = Get-Content -LiteralPath build/ci-artifacts/docker-image.json -Raw -Encoding utf8 | ConvertFrom-Json
+        $Existing = docker image inspect --format '{{json .}}' $Candidate | ConvertFrom-Json
+        Assert-Exit '已登记的候选镜像不在本机，请重新执行演练'
+        if ($Existing.Id -ne $Verified.image_id -or $Existing.Config.Labels.'org.opencontainers.image.revision' -ne $Revision -or $Existing.Config.Labels.'org.opencontainers.image.version' -ne $Version) { throw '本机候选镜像与验收回执不一致' }
+        exit 0
+    }
     docker build --pull --label "org.opencontainers.image.version=$Version" --label "org.opencontainers.image.revision=$Revision" `
         --build-arg PEACH_SENTRY_DSN --build-arg PEACH_LIBRARY_SENTRY_DSN --build-arg PEACH_REQUIRE_REPORTING=1 -t $Candidate .
     Assert-Exit '镜像构建失败'
@@ -100,8 +113,10 @@ if ($Mode -eq 'docker-build') {
         docker image rm $Candidate | Out-Null
         throw
     }
-    # 演练不推送，验收完就删；标签流水线留给 publish-docker 推送后再删。
-    if ($env:PEACH_RELEASE_REHEARSAL -eq '1') { docker image rm $Candidate | Out-Null }
+    $ImageId = (docker image inspect --format '{{.Id}}' $Candidate).Trim()
+    Assert-Exit '无法读取已验收镜像摘要'
+    New-Item -ItemType Directory -Path build/ci-artifacts -Force | Out-Null
+    @{image=$Candidate; image_id=$ImageId; version=$Version; commit=$Revision; pipeline=$env:CI_PIPELINE_ID} | ConvertTo-Json | Set-Content -LiteralPath build/ci-artifacts/docker-image.json -Encoding utf8
     exit 0
 }
 
@@ -109,6 +124,9 @@ if ($Mode -eq 'docker-push') {
     if (-not $env:DOCKERHUB_USERNAME -or -not $env:DOCKERHUB_TOKEN) { throw '缺少 Docker Hub 发布变量' }
     docker image inspect $Candidate | Out-Null
     Assert-Exit "本机没有 docker-build 验收过的 $Candidate；重试 docker-build 后再推送"
+    $ActualImage = (docker image inspect --format '{{json .}}' $Candidate | ConvertFrom-Json)
+    Assert-Exit '无法读取候选镜像身份'
+    if ($ActualImage.Id -ne $CandidateReceipt.candidate.docker.image_id -or $ActualImage.Config.Labels.'org.opencontainers.image.revision' -ne $env:CI_COMMIT_SHA -or $ActualImage.Config.Labels.'org.opencontainers.image.version' -ne $Version) { throw '候选镜像与已验收的摘要、提交或版本不一致' }
     # 登录写进作业专用配置目录，不改动宿主用户的 Docker 登录。
     $SavedConfig, $SavedHost = $env:DOCKER_CONFIG, $env:DOCKER_HOST
     $env:DOCKER_HOST = $Endpoint
@@ -127,8 +145,8 @@ if ($Mode -eq 'docker-push') {
         docker logout | Out-Null
         Remove-Item -LiteralPath $env:DOCKER_CONFIG -Recurse -Force -ErrorAction SilentlyContinue
         $env:DOCKER_CONFIG, $env:DOCKER_HOST = $SavedConfig, $SavedHost
-        docker image rm $Candidate | Out-Null
     }
+    docker image rm $Candidate | Out-Null
     exit 0
 }
 
