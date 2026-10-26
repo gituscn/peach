@@ -47,7 +47,7 @@ class ReviewQueueTests(unittest.TestCase):
                 {'source':'makers','value':'壊\ufffdれた題名'},
                 {'source':'dmm','value':'元の題名'}]}])
         self._auto()
-        with sqlite3.connect(self.db_path) as connection:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
             self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=400').fetchone()[0],
                              '元の題名')
 
@@ -58,7 +58,7 @@ class ReviewQueueTests(unittest.TestCase):
                  'code':'EXM-001','field':'title'}
         candidate = {'candidate_key':'old','source':'makers','provider_id':'EXM-001',
                      'value':'壊\ufffdれた題名','confidence':.75}
-        with sqlite3.connect(self.db_path) as connection:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
             connection.row_factory = sqlite3.Row
             with self.assertRaisesRegex(ValueError, '无法解码'):
                 _apply_metadata_candidate(connection, group, candidate, 'now', 'review:makers')
