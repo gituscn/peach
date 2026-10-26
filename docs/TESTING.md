@@ -53,9 +53,16 @@ Dependabot 的 PR 一律在本地接管，不在网页上合：
 
 ### 每次发版检查
 
-`release_tag.py --bump auto --apply` 在写版本前调用 `release_review.py`，检查两份 Python 锁、两份 npm 清单的可用更新、Dependabot 待处理 PR、sha 固定的运行依赖及其最新稳定发布，以及登记表中全部非 manual 参考来源。独立检查入口为 `scripts/release_review.py`；报告存于 `build/release-review.json`，含提交、时间、差异与逐项错误。Docker 与 GitHub Actions 的更新以 Dependabot PR 为线索，不据空 PR 列表断言全部最新。
+依赖升级是定版前的固定批次。发版授权包含检查、适用升级、兼容修改、派生产物、验证和集成，不能只列出可用更新就进入定版。
 
-网络失败记为「未取得」，其余检查继续；检查不全时版本文件保持原样。发现更新只报告，由智能体对照真实消费者、字段语义与许可证判断采用范围；升级依赖沿用隔离工作树与完整验证。原文证据按 `peach-reference-evidence` 审阅后接受，人工笔记不被网页覆盖。
+1. 核对两份 Python 清单与锁、两份 npm 清单、Docker 镜像、GitHub Actions 和 SHA 固定的运行依赖。优先接管 Dependabot 已有 PR，保留编号和来源；同时核对稳定版本，过时的 PR 目标和未被 PR 覆盖的更新一并处理。运行时遵守项目的平台范围及官方支持周期。
+2. 在依赖升级隔离工作树中审阅大版本迁移、真实消费者、字段语义、许可证和平台兼容性，更新精确版本与锁文件，重算 vendor 和前端产物。SHA 固定的运行依赖按清单注释审阅上游差集；参考文档变化只作为证据，不自动覆盖实现。
+3. 行为变化跑对应定向回归；按界面技能完成适用预览确认后，代码冻结运行正式全量验证，取得 Windows、macOS 及适用制品证据，再走 ready / integrate。不能升级的逐项记录新旧版本、具体兼容问题、失败证据和恢复条件；其余独立升级继续完成，不用笼统的「留待以后」跳过整批。
+4. 在升级已合入的干净 master 上运行 `release_tag.py --bump auto --apply`，复核当前提交的审计与上游报告并起草发行说明。确认措辞后继续 `--ship --apply`；定版与标签阶段不另行改变依赖。
+
+`release_tag.py --bump auto --apply` 在写版本前调用 `release_review.py`，检查两份 Python 锁、两份 npm 清单的可用更新、Dependabot 待处理 PR、SHA 固定的运行依赖及其最新稳定发布，以及登记表中全部非 manual 参考来源。独立检查入口为 `scripts/release_review.py`；报告存于 `build/release-review.json`，含提交、时间、差异与逐项错误。Docker 与 GitHub Actions 的更新以 Dependabot PR 为线索，不据空 PR 列表断言全部最新。
+
+网络失败记为「未取得」，其余检查继续；检查不全时版本文件保持原样。审计门槛仍由发布入口执行，不能用暂缓升级的说明放过高危漏洞。原文证据按 `peach-reference-evidence` 审阅后接受，人工笔记不被网页覆盖。升级批次是发布工作流程；现有 `release_tag.py` 不自动改依赖或创建升级分支。
 
 用户手动提供的公开参考正文可通过 `--reference-evidence SOURCE=FILE` 明确用于本次检查。报告记录用户取证渠道、原始 URL 与正文 SHA-256，直接网络取证仍标为「未取得」；参数不修改来源登记、快照或后续发版的默认检查。
 

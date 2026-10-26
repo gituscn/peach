@@ -44,3 +44,24 @@ describe('媒体库查询范围', () => {
     ]);
   });
 });
+
+describe('响应体读取期间取消请求', () => {
+  afterEach(() => { vi.unstubAllGlobals() });
+
+  for (const method of ['GET', 'POST'] as const) {
+    it(`${method} 保留取消原因`, async () => {
+      const controller = new AbortController();
+      const cancelled = new DOMException('已中止', 'AbortError');
+      let rejectBody!: (reason: unknown) => void;
+      const body = new Promise<never>((_resolve, reject) => { rejectBody = reject });
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: () => body })));
+      const pending = method === 'GET'
+        ? apiGet('/api/duplicates', controller.signal)
+        : apiSend('/api/batch', { ids: [1] }, 'POST', controller.signal);
+      const rejected = expect(pending).rejects.toBe(cancelled);
+      controller.abort(cancelled);
+      rejectBody(cancelled);
+      await rejected;
+    });
+  }
+});
