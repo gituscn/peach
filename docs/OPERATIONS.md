@@ -81,7 +81,9 @@ Windows 原生 Runner 在深目录中检出项目时，需为 Git 启用 `core.l
 
 计划任务的「失败后重启」（`RestartCount`、`RestartInterval`）只在任务启动失败时生效，`gitlab-runner` 进程自己退出后不会被拉起，主线的 Windows 作业就一直排着没人接。所以任务的动作是 runner 目录里的入口脚本 `run-runner.ps1`：它按可执行文件路径查找本目录的 `gitlab-runner.exe`，已经在跑就直接退出，没在跑才拉起，这样不会让同一个 token 跑两个 runner。触发器保留「登录时」，另加一个每 5 分钟重复、不设结束时间的时间触发器，`MultipleInstances` 设为 `IgnoreNew`。runner 退出后最多 5 分钟就会被拉回来。
 
-版本标签须受保护。标签流水线重新核对提交与版本，构建固定来源的媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG，并进行独立制品验收。发布全有或全无：`publish-release` 要等全部构建、冒烟与 `docker-build` 通过才上传 R2 并创建 GitLab Release，`publish-docker` 排在它成功之后才推送镜像。任何一步没过，安装包、R2、Release、Docker Hub 一个都不动；发布作业自身失败时，重试同一个作业即可，标签不动。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，将同一份制品分别保存到 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选用 `r2` 或 `gitgud` 单后端。
+计划任务使用 `pythonw.exe` 调用 `scripts/run_gitlab_runner.py --root <runner目录>`，由启动器通过 `CREATE_NO_WINDOW` 运行原有 `run-runner.ps1`。PowerShell 的 `-WindowStyle Hidden` 不能保证不触发 Windows Terminal 托管，后台入口不直接以控制台程序作为计划任务动作。启动器日志保存在 runner 目录的 `runner-launcher.log`，runner 输出仍沿用 `runner.log`。
+
+版本标签须受保护。版本提交的演练完成三平台回归、固定来源媒体工具、Windows 完整包与拆分包、macOS 双架构 DMG、安装升级和镜像验收，再登记候选。标签核对相同提交、验证任务与文件摘要后发布已验收产物，不重新构建。`publish-release` 上传 R2 并创建 GitLab Release，`publish-docker` 排在它成功之后推送同一 image ID 的镜像；最终回收演练暂存。发布作业失败时重试同一作业，标签不动。项目流水线使用 `PEACH_DOWNLOAD_BACKEND=both`，同一份制品分别保存在 R2 与 GitGud Generic Package Registry；不把会过期的 job artifacts 当作永久下载地址。独立部署可明确选择 `r2` 或 `gitgud` 单后端。候选和发布顺序见 [ADR-0127](adr/0127-verified-release-artifact-promotion.md)。
 
 Linux 发布任务使用官方 uv Python 3.14 容器，并在获取制品工具前核对解释器版本；源码归档使用 `tarfile` 的 `data` 过滤器解压。CI 的 `.npm/` 与 `.uv-cache/` 属于生成缓存，不计入源码工作区变化。
 
@@ -93,9 +95,11 @@ GitGud 的 Linux 平台 Runner 不提供 Docker 守护进程，Docker 镜像由 
 
 可选的 `r2` 后端使用独立 Standard 桶与 HTTPS 自定义域名。`PEACH_R2_ACCESS_KEY_ID`、`PEACH_R2_SECRET_ACCESS_KEY`、`PEACH_R2_ENDPOINT` 放入受保护且隐藏的 CI 变量，环境作用域为 `release`；`PEACH_R2_BUCKET` 和 `PEACH_R2_PUBLIC_BASE` 指定发布目标。S3 传输复用 rclone，版本文件禁止覆盖；每份文件必须从公开入口完整下载并核对大小及 SHA-256 后，才更新公开版本索引和 Release 链接。
 
-GitLab 标签流水线通过 R2 暂存传递媒体工具、Windows 发行目录与 macOS 镜像，job artifacts 只保存 JSON 清单。中转需要上述 R2 变量；构建与验收任务使用 `release` 环境的 `prepare` 或 `verify` 动作，只有受保护的版本标签与受保护 master 上的版本提交演练能取得凭据，普通分支回归不使用这些变量。演练的暂存产物由 `release-rehearsal-cleanup` 在验收后回收。构建期 rclone 按当前操作系统和 CPU 架构从官方固定版本归档安装并核对 SHA-256。
+GitLab 演练通过 R2 暂存传递媒体工具、Windows 发行目录、macOS 镜像和 Docker 验收回执，job artifacts 保存 JSON 清单。中转需要上述 R2 变量；构建与验收任务使用 `release` 环境的 `prepare` 或 `verify` 动作，只有受保护版本标签与受保护 master 上的版本提交演练能取得凭据。候选保留到桌面与镜像都发布成功，由 `publication-cleanup` 回收；失败时保留供重试。构建期 rclone 按当前操作系统和 CPU 架构从官方固定版本归档安装并核对 SHA-256。
 
-暂存对象位于 `_ci/<项目 ID>/<流水线 ID>/<提交 SHA>/<产物组>/<作业 ID>/`，纳入同一桶的容量预算。每次重试使用自己的作业 ID，构建时间等元数据变化不会覆盖其他尝试的文件。下载任务先核对清单的版本、提交和流水线身份，再校验每份文件的大小与 SHA-256；产物路径限定在对应构建输出目录，不接收软链接或路径穿越。macOS 仅上传两种架构的 DMG、`build-info.json` 与 `SHA256SUMS.txt`，不传递展开应用。所有构建与独立制品验收成功后，发布任务才写入正式版本目录和公开版本索引；GitLab Release 创建成功后，只回收当前流水线的暂存前缀。失败流水线保留暂存以便排障和重试，不覆盖已有公开版本。
+暂存对象位于 `_ci/<项目 ID>/<流水线 ID>/<提交 SHA>/<产物组>/<作业 ID>/`，纳入同一桶预算。完整上传后在同一前缀的 `completed/` 登记不可变完成清单；重试优先恢复已经完成的同流水线产物，传输失败不当作未构建。`seal-release` 登记版本、提交、成功任务与文件摘要。标签通过 GitLab API 核对同一提交的成功主线演练，再下载其相同文件；路径限定在对应输出目录，不接收软链接或路径穿越。macOS 仅传两种架构的 DMG、对应源码、`build-info.json` 与 `SHA256SUMS.txt`，不传展开应用。所有构建和独立制品验收成功后才写正式版本目录和公开索引；桌面与镜像都发布成功后只回收该演练前缀。失败候选保留供重试，不覆盖已有公开版本。
+
+上传期间的完成构建保存在 `CI_BUILDS_DIR/.peach-upload-resume/` 的独立身份目录。R2 部分上传失败后，同机重试核对备份大小与 SHA-256，继续传到原作业前缀；完整上传清单登记后回收本组备份。机器更换且没有完整远端清单时需重新构建，不拼接未知来源文件。
 
 Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本的工具；连接失败或内容校验失败时，尝试 GitHub 的同版本文件。两个来源均须匹配安装器内置清单的大小与 SHA-256，不能混用其他版本。发布完成后，用 `scripts/smoke_split_update.py` 的 `--prepare-with-app --online` 在空缓存中运行实际制品，核对联网取得的工具能否重建完整程序。GitLab Release 的下载表使用 R2，资产区另列 GitGud 副本，文档链接指向对应版本标签。
 
@@ -105,7 +109,7 @@ Windows 轻量安装器缺少本地工具包时，先从 R2 下载当前版本�
 
 R2 公网下载流量免费，存储与请求按账户共享额度计费。预算告警只通知，不会停止服务；R2 后端不提供零费用硬封顶。要求绝不产生按量费用的部署应使用不绑定按量计费的下载服务，不启用 R2 自动发布。
 
-上传前列举本桶现有文件并计算新增制品的总容量；默认超过 8 GB 时停止上传，保留已有文件。`PEACH_R2_MAX_BYTES` 可明确调整该桶预算；此检查不能限制同账户其他桶，也不代替请求量计费保护。版本文件设置长期缓存，公开版本索引只缓存一分钟。
+演练入口读取本桶真实占用和暂存范围，构建清单齐备后、安装冒烟前计算暂存与公开副本的精确峰值，候选登记和上传时仍复查；默认超过 8 GB 时停止，保留已有文件。未知新版体积在构建前不视为已知容量。`PEACH_R2_MAX_BYTES` 可明确调整该桶预算；此检查不能限制同账户其他桶，也不代替请求量计费保护。版本文件设置长期缓存，公开版本索引只缓存一分钟。
 
 Mac 与 Windows 托盘的首层只显示简短状态与提醒数量，展开状态子菜单按行查看服务和媒体来源。长地址与路径会缩略，子菜单中的「查看完整配置」保留完整设置入口；提醒消失后会随下一轮健康检查更新。
 

@@ -1,6 +1,7 @@
 # ADR-0121：版本提交先演练，标签只负责发布且全有或全无
 
 - 状态：已采纳
+- 后续决策：产物晋级、传输续跑与回收方式见 [ADR-0127](0127-verified-release-artifact-promotion.md)。
 - 日期：2026-10-24
 - 关系：修订 [ADR-0119](0119-mainline-changed-scope-release-full-suite.md) 第四条「版本标签流水线：三平台全量是发布门槛」；补充 [ADR-0012](0012-version-and-update-boundary.md) 的发布边界
 

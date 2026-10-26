@@ -92,8 +92,7 @@ output="${PEACH_MACOS_OUTPUT_DIR:-$root/dist/macos.noindex/$architecture}"
 "$python" scripts/setup_macos_media_tools.py --root "$root/build/macos-media-toolchain"
 export PATH="$root/build/macos-media-toolchain/env/bin:$PATH"
 for tool in ffmpeg untrunc; do
-    "$python" scripts/build_macos_media.py --tool "$tool" --arch "$architecture" \
-        --output "$root/build/media-macos/$architecture/$tool"
+    "$python" scripts/media_build_cache.py macos --tool "$tool" --arch "$architecture"
 done
 "$python" scripts/fetch_cloudflared_macos.py --arch "$architecture" \
     --destination "$root/build/media-macos/$architecture/cloudflared"
