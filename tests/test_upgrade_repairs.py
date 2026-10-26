@@ -15,6 +15,97 @@ from support.ledger import fresh_ledger
 
 
 class UpgradeRepairTests(unittest.TestCase):
+    def damaged_asset(self, key=1, *, owner='auto:makers'):
+        self.asset(key, code='EXM-001', duration=1)
+        with self.database.write_transaction() as connection:
+            connection.execute('UPDATE asset SET name=?,catalog_title=?,field_owners=? WHERE id=?',
+                ('EXM-001.mp4', '壊\ufffdれた題名', json.dumps({'code':'scan:filename',
+                                                            'catalog_title':owner}), key))
+
+    def clean_snapshot(self):
+        snapshots = self.root/'sources/library-metadata'
+        snapshots.mkdir(parents=True,exist_ok=True)
+        (snapshots/'EXM-001-dmm.json').write_text(json.dumps({'id':'EXM-001','title':'元の題名'}),
+                                                encoding='utf-8')
+
+    def test_readable_source_repairs_machine_title_after_an_older_upgrade_receipt(self):
+        self.damaged_asset()
+        self.clean_snapshot()
+        with patch.object(upgrade_repairs, 'REVISION', 'legacy-text-rule'), patch(
+                'peach.metadata_text_repair.collect', return_value={'rows':[], 'asset_ids':[]}):
+            self.service.prepare()
+        self.service.prepare()
+        self.service.prepare()
+        with self.database.read_connection() as connection:
+            row=connection.execute('SELECT catalog_title,field_owners FROM asset WHERE id=1').fetchone()
+            self.assertEqual(row[0], '元の題名')
+            self.assertEqual(json.loads(row[1])['catalog_title'], 'auto:dmm')
+            self.assertEqual(connection.execute('SELECT count(*) FROM ledger_upgrade_repair').fetchone()[0], 2)
+            self.assertEqual(connection.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
+        self.assertEqual(len(list(self.root.glob('ledger.pre-upgrade-*.db'))), 2)
+        self.assertEqual(upgrade_repairs._read(self.service.receipt)['text_media_ids'], [1])
+
+    def test_damaged_manual_titles_and_entity_identities_are_not_renamed(self):
+        self.damaged_asset(owner='user:manual')
+        self.clean_snapshot()
+        with self.database.write_transaction() as connection:
+            entity=upsert_asset_entity(connection,kind='performer',name='名前\ufffd',asset_id=1,
+                role='performer',source='javinizer:makers:performer',confidence=.75,now='now')
+        self.service.prepare()
+        with self.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=1').fetchone()[0],
+                             '壊\ufffdれた題名')
+            self.assertEqual(connection.execute('SELECT canonical_name FROM entity WHERE id=?', (entity,)).fetchone()[0],
+                             '名前\ufffd')
+        receipt=upgrade_repairs._read(self.service.receipt)
+        self.assertGreater(receipt['local']['review_count'],0)
+        self.assertEqual(receipt['text_media_ids'],[1])
+
+    def test_missing_alternative_keeps_the_original_and_records_review(self):
+        self.damaged_asset()
+        self.service.prepare()
+        with self.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=1').fetchone()[0],
+                             '壊\ufffdれた題名')
+        receipt=upgrade_repairs._read(self.service.receipt)
+        self.assertEqual(receipt['local']['changed']['text_fields'],0)
+        self.assertEqual(receipt['local']['changed']['text_review'],1)
+
+    def test_damaged_text_reprocessing_has_an_independent_rule_identity(self):
+        from peach.settings_file import load_config
+        self.service.config=load_config(environ={'PEACH_DATA_ROOT':str(self.root)})
+        self.damaged_asset()
+        receipt={'queued':{'upgrade-library:processing-v2:1':99},
+                 'media_ids':[1],'text_media_ids':[1]}
+        with patch('peach.library_processing._people_allowed',return_value=False), patch(
+                'peach.seed_followup.plan',return_value=[]), patch('peach.media_sources.cost_for',return_value='free'):
+            planned=self.service._plan(receipt)
+        self.assertEqual([row.key for row in planned],['upgrade-library:processing-v2:text-1:1'])
+
+    def test_a_snapshot_for_another_work_cannot_repair_machine_text(self):
+        self.damaged_asset()
+        self.clean_snapshot()
+        path=self.root/'sources/library-metadata/EXM-001-dmm.json'
+        path.write_text(json.dumps({'id':'OTHER-999','title':'別の作品'}),encoding='utf-8')
+        self.service.prepare()
+        with self.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=1').fetchone()[0],
+                             '壊\ufffdれた題名')
+
+    def test_manual_change_after_planning_prevents_the_machine_repair(self):
+        from peach import metadata_text_repair
+        self.damaged_asset()
+        self.clean_snapshot()
+        with self.database.read_connection() as connection:
+            plan=metadata_text_repair.collect(connection,self.root/'sources/library-metadata')
+        with self.database.write_transaction() as connection:
+            connection.execute('UPDATE asset SET catalog_title=?,field_owners=? WHERE id=1',
+                               ('人工题名',json.dumps({'catalog_title':'user:manual'})))
+            result=metadata_text_repair.apply(connection,plan)
+            self.assertEqual(result['text_fields'],0)
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=1').fetchone()[0],
+                             '人工题名')
+
     def setUp(self):
         holder = tempfile.TemporaryDirectory()
         self.addCleanup(holder.cleanup)

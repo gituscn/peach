@@ -40,6 +40,30 @@ from support.ledger import fresh_ledger
 class ReviewQueueTests(unittest.TestCase):
     """复核队列：候选来源、稳定主键、批准的权威值与写入边界。"""
 
+    def test_old_damaged_official_candidate_cannot_win_over_readable_evidence(self):
+        self._asset(400, 'EXM-001', 'EXM-001.mp4')
+        self.write_metadata_rows([{'item_key':'EXM-001:title', 'code':'EXM-001',
+            'field':'title', 'current':'', 'candidates':[
+                {'source':'makers','value':'壊\ufffdれた題名'},
+                {'source':'dmm','value':'元の題名'}]}])
+        self._auto()
+        with sqlite3.connect(self.db_path) as connection:
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=400').fetchone()[0],
+                             '元の題名')
+
+    def test_direct_approval_rejects_damaged_legacy_candidate_before_writing(self):
+        from peach.metadata_auto_apply import _apply_metadata_candidate
+        self._asset(400, 'EXM-001', 'EXM-001.mp4')
+        group = {'item_key':'asset:400:title','asset_id':400,'asset_path':'/x/EXM-001.mp4',
+                 'code':'EXM-001','field':'title'}
+        candidate = {'candidate_key':'old','source':'makers','provider_id':'EXM-001',
+                     'value':'壊\ufffdれた題名','confidence':.75}
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            with self.assertRaisesRegex(ValueError, '无法解码'):
+                _apply_metadata_candidate(connection, group, candidate, 'now', 'review:makers')
+            self.assertIsNone(connection.execute('SELECT catalog_title FROM asset WHERE id=400').fetchone()[0])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)

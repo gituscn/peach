@@ -10,7 +10,7 @@ from pathlib import Path
 from apscheduler.schedulers.background import BackgroundScheduler
 from filelock import FileLock, Timeout
 
-from . import artifact_rules, composite_alias_repair, r18_legacy_repair, upgrade_rules
+from . import artifact_rules, composite_alias_repair, metadata_text_repair, r18_legacy_repair, upgrade_rules
 from .field_owners import SCAN_FILENAME, is_protected, owner_of, write_owned_fields
 from .followups import FollowupType, Attempts, attempts_root, register
 from .fsutil import atomic_write_text
@@ -21,7 +21,8 @@ LOGGER = logging.getLogger(__name__)
 TASK_KEY = 'upgrade-repairs'
 MEDIA_TASK = 'upgrade-library'
 REVISION = ':'.join((upgrade_rules.CATALOG, upgrade_rules.PREVIEWS, upgrade_rules.PROCESSING,
-                     str(upgrade_rules.PUBLIC_SNAPSHOTS), str(upgrade_rules.PROVIDER_EVIDENCE)))
+                     str(upgrade_rules.PUBLIC_SNAPSHOTS), str(upgrade_rules.PROVIDER_EVIDENCE),
+                     str(upgrade_rules.PROVIDER_TEXT)))
 
 
 def _read(path: Path) -> dict:
@@ -74,7 +75,8 @@ def _catalog_plan(connection, sources: Path) -> dict:
     for row in aliases:
         if is_protected(row['source']):
             row.update(verdict='review', note='人工别名保持原样')
-    return {'codes': codes, 'fields': fields, 'names': names, 'aliases': aliases}
+    return {'codes': codes, 'fields': fields, 'names': names, 'aliases': aliases,
+            'text': metadata_text_repair.collect(connection, sources / 'library-metadata')}
 
 
 def _catalog_apply(connection, plan: dict) -> dict:
@@ -94,6 +96,7 @@ def _catalog_apply(connection, plan: dict) -> dict:
     aliases = [row for row in composite_alias_repair.collect(connection)
                if tuple(row[field] for field in fields) in approved and not is_protected(row['source'])]
     changed.update(composite_alias_repair.apply_rows(connection, aliases))
+    changed.update(metadata_text_repair.apply(connection, plan['text']))
     failed = connection.execute("SELECT id FROM asset WHERE medium='video' AND duration<=0 AND disposal IS NULL").fetchall()
     connection.execute("UPDATE asset SET duration=NULL WHERE medium='video' AND duration<=0 AND disposal IS NULL")
     changed['probe_retry'] = len(failed)
@@ -185,6 +188,7 @@ class UpgradeRepairs:
             review = sum(row['reason'] not in ('already-original', 'already-japanese', 'manual-name')
                          and row['action'] not in ('replace', 'rename') for row in plan['fields'] + plan['names'])
             review += sum(row['verdict'] == 'review' for row in plan['aliases'])
+            review += sum(row['action'] == 'review' for row in plan['text']['rows'])
             with contract.database.write_transaction() as connection:
                 violations = {tuple(row) for row in connection.execute('PRAGMA foreign_key_check')}
                 changed = _catalog_apply(connection, plan)
@@ -195,7 +199,9 @@ class UpgradeRepairs:
                 after = _counts(connection)
                 receipt = {'revision': REVISION, 'local': {'state': 'succeeded', 'changed': changed,
                            'review_count': review, 'before': before, 'after': after, 'backup': str(backup)},
-                           'media_ids': sorted(set(failed + [row['id'] for row in plan['codes']])), 'queued': {}}
+                           'text_media_ids': plan['text']['asset_ids'],
+                           'media_ids': sorted(set(failed + [row['id'] for row in plan['codes']]
+                                                   + plan['text']['asset_ids'])), 'queued': {}}
                 connection.execute('INSERT INTO ledger_upgrade_repair(id,applied_at,result_json) VALUES(?,?,?)',
                                    (REVISION, str(time.time()), json.dumps(receipt, ensure_ascii=False)))
             atomic_write_text(self.receipt, json.dumps(receipt, ensure_ascii=False))
@@ -251,7 +257,10 @@ class UpgradeRepairs:
         for row in rows:
             if row['id'] not in selected and not _stale_previews(self.contract, row):
                 continue
-            key = f'{MEDIA_TASK}:{upgrade_rules.PROCESSING}:{row["id"]}'
+            rule = upgrade_rules.PROCESSING
+            if row['id'] in receipt.get('text_media_ids', []):
+                rule += f':text-{upgrade_rules.PROVIDER_TEXT}'
+            key = f'{MEDIA_TASK}:{rule}:{row["id"]}'
             if key in seen:
                 continue
             if cost_for(row['location'], row['path'], config) != 'free':

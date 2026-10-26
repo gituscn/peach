@@ -30,7 +30,7 @@ from .sources.base import SourceFailure
 from .library_nfo import sidecars, SidecarIndex
 from .media_io import directory_files, read_nfo, local_art, root_online, directory_entries, file_stat
 from .genre_decisions import load_genre_decisions
-from .metadata import extract_catalog_evidence, extract_peach_fields, validate_provider_code
+from .metadata import candidate_text_is_valid, extract_catalog_evidence, extract_peach_fields, validate_provider_code
 from . import metadata_routes
 from . import media_identity
 from . import junk
@@ -987,7 +987,7 @@ def _fields(payload, genre_decisions=None):
         values = [value for value in values if value]
         if values:
             fields['tags'] = dict(value=values, display_value='、'.join(values), warnings=[])
-    return fields
+    return {field: value for field, value in fields.items() if candidate_text_is_valid(value)}
 
 
 def _require_writer(config, db_path):
@@ -1206,7 +1206,8 @@ def _answered_sources(groups, target_key, fields):
     for field in fields:
         group = groups.get(f'{target_key}:{field}')
         if group:
-            answered.update(entry.get('source') for entry in json.loads(group.get('candidates_json') or '[]'))
+            answered.update(entry.get('source') for entry in json.loads(group.get('candidates_json') or '[]')
+                            if candidate_text_is_valid(entry))
     return answered
 
 
