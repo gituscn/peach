@@ -58,8 +58,10 @@ from .routes_auth import require_auth
 from .scan import VIDEO
 from .segments import SegmentCancelled, SegmentUnavailable, build_hls_playlist
 from .streaming import (
+    _cancel_and_wait, _wait_for_disconnect,
     BufferedFileResponse, CancellableFileResponse, SplicedMp4Response, run_until_disconnect,
 )
+from .remote_media_cache import MEDIA_SECURITY_HEADERS
 from .transcodes import TranscodeCancelled, TranscodeNeedsSession, TranscodeUnavailable
 
 router = APIRouter()
@@ -109,9 +111,11 @@ def _image_response(request: Request, path: Path, media_type: str | None = None)
         from .smb_response import SmbResponse
         return SmbResponse(path, media_type=media_type)
     response = FileResponse(path, media_type=media_type, stat_result=path.stat())
+    response.headers.update(MEDIA_SECURITY_HEADERS)
     response.headers["Cache-Control"] = "private, no-cache"
     if StaticFiles().is_not_modified(response.headers, request.headers):
         return Response(status_code=304, headers={
+            **MEDIA_SECURITY_HEADERS,
             "ETag": response.headers["etag"],
             "Cache-Control": response.headers["cache-control"],
         })
@@ -465,11 +469,24 @@ async def _hls_segment(request: Request, id: int, index: int, session: str):
         if index < 0 or index >= len(plan):
             return JSONResponse({"error": "invalid segment"}, status_code=416)
         start, duration = plan[index]
-        path = await state.hls_service.generate(
+        generation = asyncio.create_task(state.hls_service.generate(
             source, start, duration, asset_id=id, index=index,
             session=session, registry=state.stream_sessions,
             **({"transcode": True} if conversion else {}),
-        )
+        ))
+        disconnect = asyncio.create_task(_wait_for_disconnect(request.receive))
+        try:
+            done, _ = await asyncio.wait({generation, disconnect}, return_when=asyncio.FIRST_COMPLETED)
+            if disconnect in done:
+                disconnect.result()
+                return Response(status_code=204)
+            path = await generation
+        finally:
+            await _cancel_and_wait(generation, disconnect)
+    except asyncio.CancelledError:
+        if state.stream_sessions.is_cancelled(session):
+            return Response(status_code=410, headers={'Cache-Control':'no-store'})
+        raise
     except SegmentCancelled:
         return Response(status_code=410, headers={"Cache-Control": "no-store"})
     except TranscodeCancelled:
@@ -1747,35 +1764,40 @@ async def avatar_pick(request: Request, args: dict[str, str] = Depends(require_a
     state = request.app.state.web_contract
     providers_root, avatar_root = _picker_roots(state)
     payload, body = await _picker_request(request)
-    entity_id = _picker_entity(state, payload)
-    if entity_id <= 0:
-        return JSONResponse({"error": "缺少实体 id"}, status_code=400)
     kind = _picker_kind(str(payload.get("kind") or "performer"))
     ref = str(payload.get("ref") or "")
     version = payload.get("version")
     box = _picker_crop(payload.get("crop"))
-    try:
+    def confirm():
+        entity_id = _picker_entity(state, payload)
+        if entity_id <= 0:
+            raise avatar_picker.PickerError('缺少实体 id')
+        selected = body
         if ref:
             with state.read_connection() as connection:
-                body, origin = avatar_picker.resolve(
+                selected, origin = avatar_picker.resolve(
                     ref, connection, providers_root, entity_id,
                     request.app.state.http_transport, _picker_artwork(request),
                     version=version if isinstance(version, str) else None,
                     online=_picker_online(request, connection, entity_id))
-            body = avatar_picker.prepare_image(body)
-            _remember_library(providers_root, body, origin, avatar_picker.accept_image(body))
-        elif body:
-            body = await asyncio.to_thread(avatar_picker.prepare_image, body)
+            selected = avatar_picker.prepare_image(selected)
+            _remember_library(providers_root, selected, origin, avatar_picker.accept_image(selected))
+        elif selected:
+            selected = avatar_picker.prepare_image(selected)
             origin = {"source": "avatar picker", "provider": "upload",
                       "external_id": str(payload.get("name") or "")}
         else:
-            return JSONResponse({"error": "没有可用的图片"}, status_code=400)
+            raise avatar_picker.PickerError('没有可用的图片')
         if box not in (None, ""):
-            body, cropped = avatar_picker.crop(body, box)
+            selected, cropped = avatar_picker.crop(selected, box)
             origin = {**origin, **cropped}
         origin = {**origin, "user_selected": True}
         result = avatar_picker.install(providers_root, avatar_root, kind,
-                                       entity_id, body, origin)
+                                       entity_id, selected, origin)
+        return entity_id, result
+
+    try:
+        entity_id, result = await asyncio.to_thread(confirm)
     except avatar_picker.PickerError as error:
         return JSONResponse({"error": str(error)}, status_code=400)
     # 页面按这份索引决定「出 `<img>` 还是首字母垫底」，换完不失效就看不到新图。

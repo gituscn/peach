@@ -908,6 +908,16 @@ CloudDrive2 配置生成复用现有 TOML 模板、mDNS 公布地址和应用服
 Python、npm 与 GitHub Actions 的版本由 `.github/dependabot.yml` 每周检查；固定前端文件由
 `package-lock.json` 和 `scripts/vendor_web_dependencies.mjs` 重建并核对来源、许可证与 SHA-256。
 
+## 来源文字质量与生命周期修复
+
+来源文字中的 Unicode 替换字符 `U+FFFD` 表示解码时已有信息丢失。字段提取、既有候选选择和最终写入共用这一判据；含坏值的字段不参与来源优先级结算，原始快照保留。正常字段与正常中日文、重音字母不受影响，不使用启发式转码猜回原文。
+
+存量文字补修复用字段归属、来源身份核对、候选结算与 `UpgradeRepairs` 的备份、事务和回执。仅机器归属的损坏标量字段可按同番号正常来源恢复；人物规范名及人工判断保留复核。待重采的资产使用独立文字规则身份，先前完成的升级任务不吞掉新补修。
+
+播放生命周期复用 [PR190](https://github.com/peach-mitao/peach/pull/190) 的 `e41222e312443b5d0fc7be87d2f7eca9c1d61055`：共享分片按消费者计数，最后消费者离开才取消生成，并等待子进程回收；文件响应保留外层取消与运行错误。头像确认的图像和数据库工作共用工作线程，安装按实体加锁。当前 ASGI 响应头中间件、SMB 输入和图像预处理保留 Peach 主线实现；未采用该 PR 的界面、依赖和测试调度改动。
+
+匿名签名校验复用 [PR150](https://github.com/peach-mitao/peach/pull/150) 的唯一入口、时间戳表达式及字符串约束，适配已存在的动态变量解析接口。媒体响应复用 [PR131](https://github.com/peach-mitao/peach/pull/131) 的被动类型校验、CSP `sandbox` 和 `nosniff`；HLS 清单继续可读，旧活动文档缓存不命中。以上均使用现有标准库、Starlette 和 filelock，无新增依赖。
+
 ## 静态检查
 
 Windows 媒体子进程复用 Python 标准库 `subprocess.CREATE_NO_WINDOW`：入库探测、抽帧、拼图、预览、关注封面与媒体修复均显式设置，输出捕获、超时和取消按各入口原有契约处理。该标记由 Windows 原生支持，不引入依赖；见 [Python 文档](https://docs.python.org/3/library/subprocess.html#subprocess.CREATE_NO_WINDOW) 与 [Windows 创建标记](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags)。
