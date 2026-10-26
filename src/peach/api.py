@@ -128,7 +128,7 @@ class ResponseHeadersMiddleware:
                 kind = headers.get('content-type','').split(';',1)[0].strip().lower()
                 if kind.startswith(('image/','video/','audio/')):
                     headers.update(MEDIA_SECURITY_HEADERS)
-                if (scope['method']=='GET' and message['status']==200 and kind=='text/html'
+                if (message['status']==200 and kind=='text/html' and scope['method']=='GET'
                         and Request(scope).cookies.get('peach_media_policy')!='1'):
                     headers['Clear-Site-Data']='"cache"'
                     policy=Response()

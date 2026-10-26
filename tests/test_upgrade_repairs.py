@@ -31,10 +31,11 @@ class UpgradeRepairTests(unittest.TestCase):
     def test_readable_source_repairs_machine_title_after_an_older_upgrade_receipt(self):
         self.damaged_asset()
         self.clean_snapshot()
-        with patch.object(upgrade_repairs, 'REVISION', 'legacy-text-rule'), patch(
+        with patch.object(upgrade_repairs, 'REVISION', upgrade_repairs.CATALOG_REVISION), patch(
                 'peach.metadata_text_repair.collect', return_value={'rows':[], 'asset_ids':[]}):
             self.service.prepare()
-        self.service.prepare()
+        with patch('peach.r18_legacy_repair.apply_rows',side_effect=AssertionError('不能重放已完成补修')):
+            self.service.prepare()
         self.service.prepare()
         with self.database.read_connection() as connection:
             row=connection.execute('SELECT catalog_title,field_owners FROM asset WHERE id=1').fetchone()
@@ -81,6 +82,22 @@ class UpgradeRepairTests(unittest.TestCase):
                 'peach.seed_followup.plan',return_value=[]), patch('peach.media_sources.cost_for',return_value='free'):
             planned=self.service._plan(receipt)
         self.assertEqual([row.key for row in planned],['upgrade-library:processing-v2:text-1:1'])
+
+    def test_text_rule_preserves_inherited_running_or_cancelled_media_work(self):
+        from peach.settings_file import load_config
+        self.service.config=load_config(environ={'PEACH_DATA_ROOT':str(self.root)})
+        self.damaged_asset()
+        parent=self.store.start('old-upgrade',trigger='manual')
+        key='upgrade-library:processing-v2:1'
+        child=self.store.enqueue_followups(parent.id,[(key,upgrade_repairs.MEDIA_TASK,'处理')])['queued'][0]
+        self.store.finish(parent.id,'succeeded')
+        receipt={'queued':{key:child},'media_ids':[1],'text_media_ids':[1]}
+        for status in ('pending','cancelled'):
+            if status=='cancelled':
+                self.store.finish(child,'cancelled')
+            with self.subTest(status=status), patch('peach.library_processing._people_allowed',return_value=False), patch(
+                    'peach.seed_followup.plan',return_value=[]), patch('peach.media_sources.cost_for',return_value='free'):
+                self.assertEqual(self.service._plan(receipt),[])
 
     def test_a_snapshot_for_another_work_cannot_repair_machine_text(self):
         self.damaged_asset()
