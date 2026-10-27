@@ -776,9 +776,24 @@ describe('设计决定：作品卡、管理页与复核', () => {
           });
           assert.ok(visible, '键盘选中的来源没有进入正文可见区域');
         }
+        const selected = await choices.locator('input').evaluateAll(inputs =>
+          inputs.map(input => (input as HTMLInputElement).checked));
+        for (const source of ['javdb', 'mgs']) {
+          await opened.page.keyboard.press('Tab');
+          const evidence = card.getByRole('button', { name: new RegExp(`^(展开|收起) ${source} 的来源依据$`) });
+          assert.equal(await evidence.evaluate(node => node === document.activeElement), true,
+            'Tab 应按文档顺序访问独立的来源依据');
+          await opened.page.keyboard.press('Space');
+          assert.equal(await evidence.getAttribute('aria-expanded'), 'true');
+          await opened.page.keyboard.press('Space');
+          assert.equal(await evidence.getAttribute('aria-expanded'), 'false');
+          assert.deepEqual(await choices.locator('input').evaluateAll(inputs =>
+            inputs.map(input => (input as HTMLInputElement).checked)), selected,
+            '展开依据不得改变已选来源');
+        }
         await opened.page.keyboard.press('Tab');
-        assert.equal(await scroller.evaluate(node => node.contains(document.activeElement)), false,
-          'Tab 未离开候选来源');
+        assert.equal(await card.locator('footer').evaluate(node => node.contains(document.activeElement)), true,
+          '访问依据后 Tab 应离开正文并进入判断操作');
         assert.deepEqual(opened.problems, []);
       } finally { await opened.close() }
     });

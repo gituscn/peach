@@ -172,8 +172,8 @@ export function ReviewCard(props: ReviewCardProps) {
       {/* 中段只长不缩：内容短时它吃掉剩下的高度，内容长时卡不变形，由这一段自己滚。
           外面这一层只为放那条覆盖式滚动条的轨道：它按 `absolute` 铺，得有一个只裹着
           滚动块本身的定位祖先，否则会跑到整页的右边缘去。 */}
-      <div className="relative flex min-w-0 min-h-0 flex-1 flex-col">
-        <div ref={body} className="flex min-w-0 min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+      <div className="relative mx-5 flex min-w-0 min-h-0 flex-1 flex-col">
+        <div ref={body} className="flex min-w-0 min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-4">
           {/* 数据库规范名当标题，抓取来源给的写法（多为罗马音）留作副标题。 */}
           {row.source_name
             ? <p className="text-body-2-regular text-text-secondary">{`来源写法：${row.source_name}`}</p>
