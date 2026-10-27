@@ -112,6 +112,14 @@ describe('关注详情岛', () => {
         assert.ok(normal && normal.height > 100);
         await page.locator('#stage [data-player-theater]').dispatchEvent('click');
         await page.locator('#stage[data-theater]').waitFor();
+        const scroll = page.locator('#stage > [data-stage-scroll]');
+        await page.waitForFunction(() => document.querySelector('#stage > [data-stage-scroll]')?.hasAttribute('data-overlay-scrollbar'));
+        assert.equal(await scroll.evaluate(node => getComputedStyle(node).scrollbarWidth), 'none');
+        assert.equal(await page.locator('#stage > .ovtrack.ov-y').count(), 1);
+        await page.waitForFunction(() => {
+          const region=document.querySelector<HTMLElement>('#stage > [data-stage-scroll]')!;
+          return region.scrollHeight<=region.clientHeight+1 || !document.querySelector<HTMLElement>('#stage > .ovtrack.ov-y')?.hidden;
+        });
         const cinema = await player.boundingBox();
         assert.ok(cinema && cinema.height > 100, `影院画面不可见：${JSON.stringify(cinema)}`);
         assert.equal(await node!.evaluate(element => element === document.querySelector('#stage .video-js')), true);
@@ -199,6 +207,8 @@ describe('关注详情岛', () => {
         assert.ok(box && box.height > 120, `详情等待画面高度不足：${JSON.stringify(box)}`);
         assert.equal(await page.locator('#stage [data-skeleton="detail"] [data-stage-side-content]')
           .evaluate((node) => getComputedStyle(node).rowGap), '12px');
+        assert.equal(await page.locator('#stage [data-skeleton="detail"] [data-stage-side-content]')
+          .evaluate((node) => getComputedStyle(node).scrollbarWidth), 'none');
       } finally {
         releaseItem();
       }

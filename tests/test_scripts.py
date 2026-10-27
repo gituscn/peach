@@ -3876,7 +3876,8 @@ class OperationalScriptTests(unittest.TestCase):
 
     @staticmethod
     def _full_payload(code, source):
-        return {"source": source, "id": code, "title": "Catalog title",
+        return {**({'javdb_rule': 2, 'source_id': 'VerifiedWork'} if source == 'javdb' else {}),
+                "source": source, "id": code, "title": "Catalog title",
                 "actresses": [{"japanese_name": "木村さん"}], "maker": "Studio A",
                 "release_date": "2020-09-13T00:00:00Z"}
 
@@ -3984,7 +3985,9 @@ class OperationalScriptTests(unittest.TestCase):
             with output.open(encoding="utf-8-sig", newline="") as handle:
                 tags = next(row for row in csv.DictReader(handle) if row["field"] == "tags")
             self.assertEqual(tags["current_value"], "肛交")
-            self.assertEqual(json.loads(tags["candidates_json"])[0]["source"], "javdb")
+            candidate = json.loads(tags["candidates_json"])[0]
+            self.assertEqual(candidate["source"], "javdb")
+            self.assertEqual((candidate.get('javdb_rule'), candidate.get('source_id')), (2, 'VerifiedWork'))
             self.assertGreaterEqual(auto_apply_metadata(LedgerDatabase(db), candidate_root)["applied"], 1)
             with closing(sqlite3.connect(db)) as con:
                 self.assertEqual(set(con.execute("SELECT tag,source FROM asset_tag WHERE asset_id=1"

@@ -234,7 +234,8 @@ class ProcessingTrafficTests(unittest.TestCase):
         directory.mkdir(parents=True)
         for source in ('r18dev', 'javdb'):
             path = directory / f'ABW-001-{source}.json'
-            path.write_text(json.dumps({'title': '影片'}), encoding='utf-8')
+            payload = {'title': '影片', **({'javdb_rule': 2, 'source_id': 'VerifiedWork'} if source == 'javdb' else {})}
+            path.write_text(json.dumps(payload), encoding='utf-8')
             artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
         traffic = ProcessingTraffic(self.config, self.db, 'collect')
         with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), patch.object(traffic.plan, '_ready', return_value=True):
@@ -260,6 +261,23 @@ class ProcessingTrafficTests(unittest.TestCase):
         restored = ProcessingTraffic(self.config, self.db, 'collect', resume_state={'traffic': traffic.snapshot()})
         restored.refresh_plan([self._video()])
         self.assertEqual(sum(row['estimated_bytes'] for row in restored.snapshot()['sources'] if not row['root']), 100)
+
+    def test_old_javdb_snapshot_plans_its_request_and_preserves_other_current_cache(self):
+        directory = self.config.directory('sources') / 'library-metadata'
+        directory.mkdir(parents=True)
+        for source in ('r18dev', 'javdb'):
+            path = directory / f'ABW-001-{source}.json'
+            path.write_text(json.dumps({'title': '影片'}), encoding='utf-8')
+            artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
+        old_path = directory / 'ABW-001-javdb.json'
+        before = old_path.read_bytes()
+        traffic = ProcessingTraffic(self.config, self.db, 'collect')
+        with patch.object(traffic.plan.remote, '_chain', return_value=('r18dev', 'javdb')), \
+                patch.object(traffic.plan, '_ready', return_value=True):
+            traffic.refresh_plan([self._video()])
+        self.assertEqual(sum(row['estimated_bytes'] for row in traffic.snapshot()['sources'] if not row['root']),
+                         500 * 1024)
+        self.assertEqual(old_path.read_bytes(), before)
 
     def test_source_network_choice_splits_pending_downloads(self):
         traffic = ProcessingTraffic(self.config, self.db, 'collect')

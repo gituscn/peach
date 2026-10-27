@@ -10,6 +10,7 @@
 - ledger 的 `asset.path` 保持 Windows 形态，由 `src/peach/platform.py` 读取转换；不得改写成 POSIX 路径或从 macOS 写 `asset.path`。
 - 代码判据确定、能按来源整批撤回的断言按 ADR-0052 落库；LLM 输出、打分、冲突与多候选只产生候选，不得自行标为 `approved`。真实写入执行 `peach-ledger-write`。
 - 编辑前核对 `git status`。代码任务使用 `scripts/agent_worktree.py create` 的隔离工作树，主检出负责集成；先读 `peach-worktree`。
+- 代码改动经 PR 交付，维护者自身也适用；issue 范围与交付流程见 `peach-issue-delivery`。
 - 服务、端口或重启操作先核对监听与进程归属。已提交且测试通过的适用代码用 `restart_windows_tray.py` 重启并核验；手动或 CLI 发起的主任务仍在跑时先问，其余任务均能续跑时直接重启。
 - `agent_worktree.py prune --apply` 可回收入口判定安全的工作树；只按 PID 清理本任务创建的进程，保护活动工作树、忽略文件与其他任务。
 
@@ -29,7 +30,7 @@
 | 触发条件 | 技能 |
 | --- | --- |
 | 代码任务、创建或交付工作树、暂存、提交、集成、回收、顶层归置 | `.claude/skills/peach-worktree/SKILL.md` |
-| issue、PR 交付与关闭 | `.claude/skills/peach-issue-delivery/SKILL.md` |
+| 代码交付、issue、PR 与关闭 | `.claude/skills/peach-issue-delivery/SKILL.md` |
 | 迁移、实体合并、真相字段、真实 ledger 写入与删除 | `.claude/skills/peach-ledger-write/SKILL.md` |
 | 界面、API、数据层、契约或用户可见文案的影响面验收 | `.claude/skills/peach-surfaces/SKILL.md` |
 | 长跑批处理、刮削、磁盘、流量、限流与续跑 | `.claude/skills/peach-batch-jobs/SKILL.md` |

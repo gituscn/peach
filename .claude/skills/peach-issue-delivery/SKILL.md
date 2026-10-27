@@ -1,12 +1,19 @@
 ---
 name: peach-issue-delivery
-description: 处理 Peach 的 GitHub issue、关联修复 PR、合并交付或判断 issue 是否可以关闭时使用。
+description: Peach 代码交付、issue 与 PR、合并或判断 issue 是否可以关闭时使用。
 ---
 
 # Issue 交付与验证
 
-最后复核：2026-10-26
-证据来源：用户确认的 issue 沟通与验收约定、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
+最后复核：2026-10-28
+证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
+
+## Issue 与 PR 范围
+
+- 维护者自己的代码与社区贡献都经 PR；小修、文档和测试可直接提 PR。复杂缺陷、新功能、默认行为或架构变化先有 issue，复用已有问题记录，不重复建单。已在对话确认的方向沿用，将目标和取舍留在 issue，不重复审批。
+- PR 围绕一个明确目标，相关修复可分提交；无关目标分别评审。交付批次可包含多个 PR，共享组合验证，不把一个批次限制成一个任务或一个 PR。
+- 提交保持 `type(scope): 描述`，实现与测试原子提交。PR 记录目标、实际改动、影响面、验证及适用的升级生效方式，具体格式见 [贡献约定](../../../CONTRIBUTING.md)。
+- 在主线合入前完成 PR 审阅与必要验证；本地组合树可用于统一验收。平台不可写时保存分支、PR 说明和验证回执，明确远端 PR 未完成，不以事后补单替代合入前审阅。
 
 ## 沟通与标记
 
@@ -15,7 +22,7 @@ description: 处理 Peach 的 GitHub issue、关联修复 PR、合并交付或�
 
 ## 合并责任
 
-- 自己维护的项目可以用 PR 保留审阅和 CI 记录，PR 不是必须由用户手动完成的步骤。
+- 在已授权的开发与仓库操作范围内完成 PR 创建、验证及获准的合并；PR 不是必须由用户手动完成的步骤。
 - 用户授权合并后，由你完成必要检查、合并和结果核验；不要把已授权且可执行的合并交回用户。工作树与本地集成按 [peach-worktree](../peach-worktree/SKILL.md) 执行。
 
 ## 验证与关闭

@@ -16,6 +16,11 @@ export function releaseOverlayScrollbars(root:HTMLElement):void{
   for(const [container,control] of controls)if(container===root||root.contains(container))control.destroy();
 }
 
+/** 布局模式改变时，display:contents 子树可能改变内容长度而不触发容器尺寸观察。 */
+export function refreshOverlayScrollbars(root:HTMLElement):void{
+  for(const [container,control] of controls)if(container===root||root.contains(container))control();
+}
+
 /**
  * 覆盖式滚动条：滑块浮在内容上，一列宽度都不占。
  *

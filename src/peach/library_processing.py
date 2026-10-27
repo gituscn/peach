@@ -1078,6 +1078,8 @@ def _merge_candidates(groups, row, code, source, document, evidence_path, genre_
                          provider_id=str(document.get('id') or ''), content_id=str(document.get('content_id') or ''),
                          source_kind='local' if local else spec.kind if spec else 'community', official=official,
                          catalog_evidence=extract_catalog_evidence(document))
+        if source == 'javdb':
+            candidate.update(javdb_rule=document.get('javdb_rule'), source_id=document.get('source_id'))
         if mode == 'review':
             candidate['requires_review'] = True
         # 只有 tags 字段有未收录原文；别的字段挂一个空列表只是让每条候选都胖一圈。
@@ -1367,15 +1369,15 @@ class _MetadataResults:
 class _RemoteSession:
     """一个任务共用的外部来源连接，加上来源说过「没有」的记忆。"""
 
-    def __init__(self, config, provider_factory, misses, *, retrying, routes=None):
+    def __init__(self, config, provider_factory, misses, *, retrying, recheck_existing=False, routes=None):
         self._config = config
         self._factory = provider_factory
         self._provider = None
         self.misses = misses
         #: 用户对每种内容类型的来源链覆盖，形状见 `metadata_routes.parse_route_overrides`。
         self._routes = routes or None
-        # 「重试未完成项」按上一任务的失败集合强制重试，不看记忆；答复仍照记。
-        self._consult = not retrying
+        # 定向重试或明确重采不看旧记忆；本次答复仍照记。
+        self._consult = not (retrying or recheck_existing)
         self._task_evidence = {}
         self._task_absent = set()
 
@@ -1500,6 +1502,10 @@ class _RemoteSession:
                 if time.time() - path.stat().st_mtime > MISS_TTL_SECONDS:
                     continue
                 payload = json.loads(path.read_text(encoding='utf-8'))
+                if name == 'javdb':
+                    from .javdb_identity import current_evidence
+                    if not current_evidence(payload):
+                        continue
                 if not source_text_is_valid(payload):
                     continue
                 entry = (name, payload, path)
@@ -2699,7 +2705,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
 
         update()
         remote = _RemoteSession(config, provider_factory, _MissCache(misses_path(config)),
-                                retrying=retrying, routes=routes)
+                                retrying=retrying, recheck_existing=recheck_existing, routes=routes)
         flush_candidates = lambda force=False: None
 
         try:

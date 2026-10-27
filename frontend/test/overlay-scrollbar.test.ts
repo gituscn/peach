@@ -124,3 +124,53 @@ it('横向手势与纵向滑块各自保留对应方向的操作', () => {
   wireOverlayScrollbars(host);
   expect(host.querySelectorAll('.ovtrack')).toHaveLength(2);
 });
+
+it('影院模式改变 overflow 后自动接管已有容器', async () => {
+  const host=document.createElement('div');
+  host.innerHTML='<style>[data-theater] .cinema-scroll-region{overflow-y:auto}</style><div class="cinema-scroll-region"></div>';
+  document.body.append(host);
+  const region=host.querySelector<HTMLElement>('.cinema-scroll-region')!;
+  const stop=observeScrollRegions(host);
+  try{
+    await new Promise(resolve=>setTimeout(resolve,30));
+    expect(region.hasAttribute('data-overlay-scrollbar')).toBe(false);
+    host.setAttribute('data-theater','');
+    await vi.waitFor(()=>expect(region.dataset.overlayScrollbar).toBe('true'));
+    expect(host.querySelectorAll('.ovtrack')).toHaveLength(2);
+  }finally{stop()}
+});
+
+for(const marker of ['data-skeleton','data-skeleton-tier'])it(`${marker} 移除旧轨道，内容恢复后重新接管`, async () => {
+  const host=document.createElement('div'),region=document.createElement('div');
+  region.style.overflowY='auto';host.append(region);document.body.append(host);
+  const stop=observeScrollRegions(host);
+  try{
+    await vi.waitFor(()=>expect(region.dataset.overlayScrollbar).toBe('true'));
+    host.setAttribute(marker,'');host.setAttribute('inert','');
+    await vi.waitFor(()=>expect(host.querySelector('.ovtrack')).toBeNull());
+    expect(region.hasAttribute('data-overlay-scrollbar')).toBe(false);
+    host.removeAttribute(marker);host.removeAttribute('inert');
+    await vi.waitFor(()=>expect(region.dataset.overlayScrollbar).toBe('true'));
+    expect(host.querySelectorAll('.ovtrack')).toHaveLength(2);
+  }finally{stop()}
+});
+
+it('影院模式只改变内容长度时刷新已绑定轨道', async () => {
+  const host=document.createElement('div'),region=document.createElement('div');
+  region.style.overflowY='auto';host.append(region);document.body.append(host);
+  let content=100;
+  Object.defineProperties(region,{
+    clientHeight:{get:()=>100},scrollHeight:{get:()=>content},
+    clientWidth:{get:()=>200},scrollWidth:{get:()=>200},
+  });
+  const stop=observeScrollRegions(host);
+  try{
+    await vi.waitFor(()=>expect(region.dataset.overlayScrollbar).toBe('true'));
+    const track=host.querySelector<HTMLElement>('.ov-y')!;
+    expect(track.hidden).toBe(true);
+    content=500;host.setAttribute('data-theater','');
+    await vi.waitFor(()=>expect(track.hidden).toBe(false));
+    content=100;host.removeAttribute('data-theater');
+    await vi.waitFor(()=>expect(track.hidden).toBe(true));
+  }finally{stop()}
+});

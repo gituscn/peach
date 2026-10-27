@@ -48,6 +48,13 @@ describe('各页骨架的显示门槛与绘制边界', () => {
         const missing = await page.locator('[data-skeleton] svg use,[data-skeleton-tier] svg use,[data-skeleton-control] svg use').evaluateAll(nodes =>
           nodes.map(node => node.getAttribute('href') || '').filter(href => href.startsWith('#') && !document.getElementById(href.slice(1))));
         assert.deepEqual(missing, [], '骨架使用了未提供的图标');
+        const scrollbars = await page.locator('[data-skeleton],[data-skeleton-tier]').evaluateAll(roots =>
+          roots.flatMap(root => [root,...root.querySelectorAll('*')]).filter(node => {
+            const style=getComputedStyle(node);
+            return /^(auto|scroll)$/.test(style.overflowX) || /^(auto|scroll)$/.test(style.overflowY);
+          }).filter(node => getComputedStyle(node).scrollbarWidth !== 'none')
+            .map(node => `${node.tagName}.${node.className}`));
+        assert.deepEqual(scrollbars, [], '骨架显示了原生滚动条');
         assert.deepEqual((await layout(page)).offenders, []);
         const evidence = process.env.PEACH_SKELETON_EVIDENCE;
         if (evidence) await page.screenshot({ path: join(evidence, `${viewport.name}-${theme}-${index}.png`) });
