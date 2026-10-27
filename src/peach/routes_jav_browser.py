@@ -52,6 +52,15 @@ def updates(request: Request, service=Depends(browser_client)):
     return JSONResponse(snapshot(request.app.state.automatic_updates), headers={'Cache-Control': 'no-store'})
 
 
+def people(request: Request, codes: str, service=Depends(browser_client)):
+    from .jav_browser_people import cached_people
+    try:
+        result = cached_people(service.contract, request.app.state.preview_service, codes)
+        return JSONResponse(result, headers={'Cache-Control': 'no-store'})
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+
+
 def add(body: dict = Body(...), service=Depends(browser_client)):
     try:
         return JSONResponse(service.add(body), headers={"Cache-Control": "no-store"})
@@ -91,6 +100,7 @@ def create_router(local_only) -> APIRouter:
     router.add_api_route("/api/jav-browser", status, methods=["GET"])
     router.add_api_route("/api/jav-browser/identify", identify, methods=["GET"])
     router.add_api_route("/api/jav-browser/updates", updates, methods=["GET"])
+    router.add_api_route("/api/jav-browser/people", people, methods=["GET"])
     router.add_api_route("/api/jav-browser", add, methods=["POST"])
     router.add_api_route("/api/jav-browser/errors", errors, methods=["POST"])
     permissions = [Depends(require_auth), Depends(local_only)]

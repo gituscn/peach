@@ -80,6 +80,66 @@ class BrowserTests(unittest.TestCase):
                          ("115", "/115/Movies", "ABC-123", "browser:" + PAGE))
         self.assertEqual(self.downloads.store.submissions(task.id)[0]["outcome"], "submitted")
 
+    def test_manual_number_queues_without_sending_the_source_page(self):
+        response = self.client.post('/api/jav-browser', headers=self.script_headers,
+                                    json={'code': 'ABC-123', 'manual': True})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['state'], 'queued')
+        self.assertEqual(self.service.rows['ABC-123']['source_url'], '')
+        self.service.process_one()
+        task = self.downloads.store.get(self.status().json()['task_id'])
+        self.assertEqual(task.origin, 'browser:manual')
+
+    def test_manual_number_rejects_source_urls_and_invalid_codes(self):
+        for body in ({'code': 'ABC-123', 'manual': True, 'source_url': 'https://example.org/private'},
+                     {'code': 'not a code', 'manual': True},
+                     {'code': 'ABC-123', 'manual': 'true'}):
+            response = self.client.post('/api/jav-browser', headers=self.script_headers, json=body)
+            self.assertEqual(response.status_code, 400, response.text)
+        self.assertEqual(self.service.rows, {})
+
+    def test_people_reads_local_names_and_avatar_without_starting_source_requests(self):
+        from PIL import Image
+        from peach.entities import upsert_asset_entity
+        contract = self.app.state.web_contract
+        contract.avatar_root = self.root / 'avatars'
+        contract.cover_root = self.root / 'covers'
+        self.app.state.preview_service.avatar_root = contract.avatar_root
+        with contract.database.write_transaction() as connection:
+            asset_id = connection.execute(
+                'INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,?,?,?)',
+                ('R:\\Media\\ABC-123.mp4', 'ABC-123.mp4', 'local', 'video', 'ABC-123')).lastrowid
+            person = upsert_asset_entity(connection, asset_id=asset_id, kind='performer', name='测试演员',
+                                         role='performer', source='user:test')
+        contract.avatar_root.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', (80, 80), 'gray').save(contract.avatar_root / f'performer-{person}.img', format='JPEG')
+        with patch('peach.javdb_public.PUBLIC_API.movie', side_effect=AssertionError('不能联网')):
+            response = self.client.get('/api/jav-browser/people', params={'codes': 'ABC-123,XYZ-999'},
+                                       headers=self.script_headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        result = response.json()
+        self.assertEqual(result['source'], 'local-cache')
+        self.assertEqual(result['items']['XYZ-999'], [])
+        self.assertEqual(result['items']['ABC-123'][0]['name'], '测试演员')
+        self.assertTrue(result['items']['ABC-123'][0]['avatar'].startswith('data:image/jpeg;base64,'))
+        self.assertEqual(self.service.rows, {})
+        self.service.search.assert_not_called()
+
+    def test_people_rejects_unpaired_or_invalid_queries_and_leaves_missing_avatar_empty(self):
+        self.assertEqual(self.client.get('/api/jav-browser/people', params={'codes':'ABC-123'}).status_code, 401)
+        for codes in ('bad code', ','.join(['ABC-123']*51)):
+            self.assertEqual(self.client.get('/api/jav-browser/people', params={'codes':codes},
+                                              headers=self.script_headers).status_code, 400)
+        contract = self.app.state.web_contract
+        contract.cover_root = self.root / 'covers'
+        snapshot = contract.cover_root.parent / 'jav-discovery-metadata.json'
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot.write_text(json.dumps({'version':1,'records':{'ABC-123':{'movie':{'actors':[{'name':'测试女优','gender':'female'}]}}}}),encoding='utf-8')
+        snapshot.with_suffix('.job.json').write_text(json.dumps({'status':'running','codes':['ABC-123']}),encoding='utf-8')
+        with patch('peach.jav_discovery_metadata.DiscoveryMetadata', side_effect=AssertionError('不能恢复后台抓取')):
+            result = self.client.get('/api/jav-browser/people', params={'codes':'ABC-123'}, headers=self.script_headers).json()
+        self.assertEqual(result['items']['ABC-123'], [{'id':None,'name':'测试女优'}])
+
     def test_alias_clicks_and_service_restart_keep_one_job_and_one_cloud_submission(self):
         self.add("abc123")
         self.add("ABC-0123")

@@ -268,7 +268,13 @@ class JavBrowser:
                     "message": row.get("message") or MESSAGES[state]}
 
     def add(self, body: dict) -> dict:
-        code, page = code_key(body.get("code")), source_page(body.get("source_url"))
+        code = code_key(body.get("code"))
+        if body.get("manual") is True:
+            if body.get("source_url") not in (None, ""):
+                raise ValueError("手动添加不接受来源网页地址")
+            page = ""
+        else:
+            page = source_page(body.get("source_url"))
         with self._lock:
             config = self._config()
             if not config.get("token_hash"):
@@ -327,7 +333,7 @@ class JavBrowser:
                 try:
                     submitted = submit_offline_download(
                         self.downloads, magnet=candidate["uri"], provider=provider, code=code,
-                        origin="browser:" + row["source_url"], dedupe_code=True)
+                        origin="browser:" + (row["source_url"] or "manual"), dedupe_code=True)
                     task = submitted["task"]
                     with self._lock:
                         row.update(state="failed" if submitted["outcome"] in {"failed", "refused"} else "submitted",

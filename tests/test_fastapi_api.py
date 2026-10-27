@@ -4108,6 +4108,7 @@ class RouteAuthContractTests(unittest.TestCase):
             ("GET", "/api/jav-browser"): routes_jav_browser.browser_client,
             ("GET", "/api/jav-browser/identify"): routes_jav_browser.browser_client,
             ("GET", "/api/jav-browser/updates"): routes_jav_browser.browser_client,
+            ("GET", "/api/jav-browser/people"): routes_jav_browser.browser_client,
             ("POST", "/api/jav-browser"): routes_jav_browser.browser_client,
             ("POST", "/api/jav-browser/errors"): routes_jav_browser.browser_client,
         }
