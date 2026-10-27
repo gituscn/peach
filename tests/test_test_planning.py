@@ -352,6 +352,39 @@ class TestPlanningTests(unittest.TestCase):
                 patch('scripts.ci_scope.ancestor_of_head', return_value=lambda sha:sha=='ancestor'):
             self.assertEqual(ci_plan.github_verified_base(runner.ROOT), 'ancestor')
 
+    def test_actions_output_passes_a_git_revision_and_json_values_to_downstream_jobs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+
+            def git(*args):
+                return subprocess.check_output(
+                    ['git', '-C', str(root), '-c', 'user.name=Test',
+                     '-c', 'user.email=test@example.invalid', *args],
+                    text=True, encoding='utf-8').strip()
+
+            git('init', '--quiet')
+            readme = root / 'README.md'
+            readme.write_text('first\n', encoding='utf-8')
+            git('add', 'README.md')
+            git('commit', '--quiet', '-m', 'first')
+            base = git('rev-parse', 'HEAD')
+            readme.write_text('second\n', encoding='utf-8')
+            git('add', 'README.md')
+            git('commit', '--quiet', '-m', 'second')
+            output_file = root / 'actions-output'
+            with patch.object(sys, 'argv', ['ci_plan.py', '--event', 'push', '--base', base]), \
+                    patch.object(ci_plan, '__file__', str(root / 'scripts' / 'ci_plan.py')), \
+                    patch.object(ci_plan, 'github_verified_base', return_value=base), \
+                    patch.dict(os.environ, {'GITHUB_OUTPUT': str(output_file)}), \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                ci_plan.main()
+            values = dict(line.split('=', 1) for line in output_file.read_text('utf-8').splitlines())
+            self.assertEqual(values['base'], base)
+            self.assertEqual(git('diff', '--name-only', values['base'] + '...HEAD'), 'README.md')
+            result = json.loads(output.getvalue())
+            for key in result.keys() - {'base'}:
+                self.assertEqual(json.loads(values[key]), result[key])
+
     def test_venv_interpreter_path_keeps_environment_identity(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
