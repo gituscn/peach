@@ -26,7 +26,7 @@ ROW_LIMIT = 30_000
 SNAPSHOT_FIELDS = frozenset({
     'id', 'content_id', 'title', 'original_title', 'release_date', 'release', 'date',
     'actresses', 'actors', 'performers', 'maker', 'studio', 'label', 'series',
-    'genres', 'tags', 'director', 'source', 'source_url', 'catalog_evidence',
+    'genres', 'tags', 'director', 'source', 'source_url', 'catalog_evidence', 'collection_diagnostics',
 })
 CANDIDATE_FIELDS = frozenset({
     'candidate_key', 'source', 'provider', 'value', 'display_value', 'confidence',

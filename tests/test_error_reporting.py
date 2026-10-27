@@ -122,6 +122,24 @@ class ErrorReportingTests(unittest.TestCase):
         with zipfile.ZipFile(io.BytesIO(scraping_diagnostics.bundle_bytes(config, codes='ABC-123'))) as archive:
             self.assertIn('snapshots/0.json', archive.namelist())
 
+    def test_both_exports_preserve_bridge_encoding_provenance(self):
+        config, evidence = self.scraping_config()
+        facts = {'stage': 'bridge_stdio_decode', 'status': 'ok', 'expected_encoding': 'utf-8',
+                 'runtime': 'executable', 'stdout_encoding': 'utf-8', 'stderr_encoding': 'utf-8',
+                 'amane_version': '0.22.1'}
+        (evidence / 'ABC-123-makers.json').write_text(json.dumps({
+            'id': 'ABC-123', 'title': '完整𠮷野标题', 'collection_diagnostics': facts,
+            'Cookie': 'private-cookie'}), encoding='utf-8')
+        with mock.patch.object(error_reporting, 'log_directories', return_value=[]):
+            bundles = [(scraping_diagnostics.bundle_bytes(config, codes='ABC-123'), ''),
+                       (support_bundle.bundle_bytes(config=config), 'scraping/')]
+        for content, prefix in bundles:
+            with self.subTest(prefix=prefix), zipfile.ZipFile(io.BytesIO(content)) as archive:
+                snapshot = json.loads(archive.read(prefix + 'snapshots/0.json'))
+                self.assertEqual(snapshot['fields']['collection_diagnostics'], facts)
+                self.assertEqual(snapshot['fields']['title'], '完整𠮷野标题')
+                self.assertNotIn('private-cookie', str(snapshot))
+
     def test_support_bundle_includes_available_small_records_beyond_manual_code_limit(self):
         config, evidence = self.scraping_config()
         for number in range(25):

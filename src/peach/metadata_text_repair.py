@@ -7,12 +7,48 @@ import json
 from pathlib import Path
 
 from .field_owners import auto_owner, owner_of
-from .metadata import extract_peach_fields, identifies_code, validate_provider_code
+from . import artifact_rules, upgrade_rules
+from .metadata import extract_peach_fields, identifies_code, source_text_is_valid, validate_provider_code
 from .metadata_auto_apply import _apply_metadata_candidate, metadata_auto_apply_candidate
 from .metadata_policy import SOURCE_SPECS
 
 FIELDS = {'title': 'catalog_title', 'original_title': 'original_title',
           'studio': 'studio', 'series': 'series'}
+
+
+def _damaged_snapshots(connection, root: Path) -> tuple[list[dict], list[int]]:
+    """只失效已知来源的损坏文字快照，并选择同番号资产重新采集。"""
+    snapshots, affected = [], []
+    for path in root.glob('*.json'):
+        code, separator, source = path.stem.rpartition('-')
+        if not separator or source not in SOURCE_SPECS or path.is_symlink():
+            continue
+        try:
+            code = validate_provider_code(code)
+            before = artifact_rules.fingerprint(path)
+            payload = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(payload, dict) or source_text_is_valid(payload):
+            continue
+        snapshots.append({'path': str(path), 'fingerprint': before})
+        affected.extend(row[0] for row in connection.execute(
+            "SELECT id FROM asset WHERE code=? AND medium='video' AND disposal IS NULL", (code,)))
+    return snapshots, affected
+
+
+def _invalidate_snapshots(snapshots: list[dict]) -> int:
+    count = 0
+    for item in snapshots:
+        path = Path(item['path'])
+        try:
+            if artifact_rules.fingerprint(path) != item['fingerprint']:
+                continue
+            artifact_rules.remember(path, f'invalid:provider-text-{upgrade_rules.PROVIDER_TEXT}')
+            count += 1
+        except FileNotFoundError:
+            continue
+    return count
 
 
 def _candidates(root: Path, code: str, field: str) -> list[dict]:
@@ -76,7 +112,8 @@ def collect(connection, snapshots: Path) -> dict:
         for role, entity_id in damaged_roles:
             rows.append({'asset_id':asset['id'], 'field':role, 'entity_id':entity_id,
                          'action':'review', 'reason':'entity-identity-requires-review'})
-    return {'rows':rows, 'asset_ids':affected}
+    invalid_snapshots, snapshot_assets = _damaged_snapshots(connection, snapshots)
+    return {'rows':rows, 'asset_ids':sorted(set(affected + snapshot_assets)), 'snapshots':invalid_snapshots}
 
 
 def apply(connection, plan: dict) -> dict:
@@ -93,4 +130,5 @@ def apply(connection, plan: dict) -> dict:
         candidate = row['candidate']
         changed += bool(_apply_metadata_candidate(connection, row['group'], candidate, stamp,
                                                  auto_owner(candidate['source'])))
-    return {'text_fields':changed, 'text_review':sum(r['action']=='review' for r in plan['rows'])}
+    return {'text_fields':changed, 'text_review':sum(r['action']=='review' for r in plan['rows']),
+            'text_snapshots_invalidated':_invalidate_snapshots(plan.get('snapshots', []))}

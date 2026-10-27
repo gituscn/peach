@@ -573,6 +573,47 @@ class BridgeQueryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             bridge.query("ABW-220", ["javdb"])
 
+    def test_invalid_utf8_is_a_diagnostic_failure_instead_of_corrupted_metadata(self):
+        raw = report(fc2club=FOUND).encode('gbk')
+        captured = {}
+
+        def runner(command, **kwargs):
+            captured.update(kwargs)
+            return completed(raw.decode(kwargs['encoding'], kwargs['errors']))
+
+        bridge = metadata_amane.AmaneBridge(self.python, script=None, runner=runner)
+        with self.assertLogs('peach.metadata_amane', level='WARNING') as logs, \
+                self.assertRaises(MetadataProviderError) as caught:
+            bridge.query('FC2-PPV-1234567', ['fc2club'],
+                         proxy_options={'trust_env': False, 'proxy': 'http://user:secret@proxy:8888'})
+        self.assertEqual(captured['errors'], 'strict')
+        self.assertEqual(caught.exception.detail, 'bridge_stdio_decode')
+        self.assertEqual(caught.exception.kind, 'unavailable')
+        message = str(caught.exception)
+        for value in ('FC2-PPV-1234567', 'fc2club', 'expected=utf-8', 'runtime=executable',
+                      f'bytes={len(raw)}', 'offset=', 'sha256='):
+            self.assertIn(value, message)
+        self.assertIn(message, logs.output[0])
+        self.assertNotIn('secret', message)
+        self.assertNotIn('標題', message)
+        self.assertNotIn('\ufffd', message)
+
+    def test_query_preserves_all_unicode_and_exports_collection_provenance(self):
+        title = '標題𠮷野・中文・é・😀'
+        found = {**FOUND, 'metadata': {**FOUND['metadata'], 'title': title}}
+        raw = json.loads(report(fc2club=found))
+        raw['transport'] = {'stdout_encoding': 'utf-8', 'stderr_encoding': 'utf-8', 'frozen': True}
+        bridge = metadata_amane.AmaneBridge(self.python, script=None,
+            runner=lambda *a, **kw: completed(json.dumps(raw, ensure_ascii=False)))
+        result = bridge.query('FC2-PPV-1234567', ['fc2club'], proxy_options={'trust_env': False})
+        payload = metadata_amane.split_report('FC2-PPV-1234567', result)[0][0][1]
+        self.assertEqual(payload['title'], title)
+        self.assertEqual(payload['collection_diagnostics'], {
+            'stage': 'bridge_stdio_decode', 'status': 'ok', 'expected_encoding': 'utf-8',
+            'runtime': 'executable', 'stdout_encoding': 'utf-8', 'stderr_encoding': 'utf-8',
+            'amane_version': '0.16.1',
+        })
+
     @unittest.skipUnless(os.name == 'nt', 'Windows 控制台行为')
     def test_query_child_has_no_console_window(self):
         script = self.tools.resolve() / 'console_probe.py'

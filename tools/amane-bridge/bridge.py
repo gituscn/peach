@@ -193,6 +193,9 @@ async def run(runtime: Runtime, number: str, sites: list[str], *, language: str 
         "language": language or "",
         "sites": dict(zip(sites, records)),
         "amane": {"version": runtime.version},
+        "transport": {"stdout_encoding": sys.stdout.encoding,
+                      "stderr_encoding": sys.stderr.encoding,
+                      "frozen": bool(getattr(sys, 'frozen', False))},
     }
 
 
@@ -263,4 +266,7 @@ def main(argv: list[str] | None = None, runtime: Runtime | None = None,
 
 
 if __name__ == "__main__":
+    # 冻结程序不读取 PYTHONIOENCODING；重定向后的默认编码可能仍是 Windows GBK。
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     sys.exit(main())
