@@ -1,145 +1,162 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "fc3b7f5c-9986-4e0f-93ea-c88573ac7cc9", e._sentryDebugIdIdentifier = "sentry-dbid-fc3b7f5c-9986-4e0f-93ea-c88573ac7cc9");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "0f87cc14-5ced-46c2-88a8-4b571bbb3b85", e._sentryDebugIdIdentifier = "sentry-dbid-0f87cc14-5ced-46c2-88a8-4b571bbb3b85");
 	} catch {}
 })();
-import { $b4f18e3395fe64d7$export$3d96ec278d3efce4 as e, $b4f18e3395fe64d7$export$3e41faf802a29e71 as t, $b4f18e3395fe64d7$export$b2539bed5023c21c as n, $ea3928288112382f$export$439d29a4e110a164 as r, $fe21c36db05242bb$export$a98f0dcb43a68a25 as i, $fe21c36db05242bb$export$d7b12c4107be0d61 as a, Button as o, ButtonLink as s, Checkbox as c, CheckboxGlyph as l, Chip as u, DEFAULT_CATEGORY as d, ENTITY_REVIEW_KINDS as f, Ea as ee, EmptyState as p, ExternalLink as m, FilterGlassRows as te, Gg as h, GlassPill as g, InputBase as _, Note as v, REVIEW_CATEGORIES as y, REVIEW_DECISION_LABELS as b, REVIEW_KEY as ne, REVIEW_LABELS as x, REVIEW_QUEUES as S, REVIEW_QUEUE_LABELS as C, Select as w, SelectItem as T, SelectionActions as E, SelectionDock as D, TextField as O, Wt as k, __toESM as A, avatarInner as j, busyProps as M, canApprove as re, cardClass as N, commonReviewSources as P, currentReviewRow as ie, decisionPayload as F, decisionReceipt as ae, defaultChoice as oe, errorMessage as I, fetchReview as se, filterReviewRows as ce, groupReviewRows as le, isReviewCategory as ue, m7 as de, mirrorText as fe, paginationRange as pe, pendingGenres as L, recordGenre as me, reloadReview as R, require_jsx_runtime as z, require_react as he, reviewGroupingOptions as ge, reviewQueueData as _e, reviewQueueOf as ve, reviewWindow as ye, rowEvidence as be, rowFieldName as xe, rowSubject as Se, rowTags as Ce, rowTitle as B, selectReviewRange as we, settleReviewRows as Te, spinnerHtml as V, submitDecision as Ee, useMutation as De, useOverlayScrollbar as H, useQuery as Oe, useViewGlide as ke } from "./peach-app.js";
+import { $b4f18e3395fe64d7$export$3d96ec278d3efce4 as e, $b4f18e3395fe64d7$export$3e41faf802a29e71 as t, $b4f18e3395fe64d7$export$b2539bed5023c21c as n, $ea3928288112382f$export$439d29a4e110a164 as r, $fe21c36db05242bb$export$a98f0dcb43a68a25 as i, $fe21c36db05242bb$export$d7b12c4107be0d61 as a, Button as o, ButtonLink as s, Checkbox as c, CheckboxGlyph as l, Chip as u, DEFAULT_CATEGORY as d, ENTITY_REVIEW_KINDS as f, Ea as ee, EmptyState as p, ExternalLink as m, FilterGlassRows as te, Gg as h, InputBase as g, Note as _, REVIEW_CATEGORIES as v, REVIEW_DECISION_LABELS as ne, REVIEW_KEY as re, REVIEW_LABELS as y, REVIEW_QUEUES as b, REVIEW_QUEUE_LABELS as x, Select as S, SelectItem as C, SelectionActions as w, SelectionDock as T, TextField as E, Wt as D, __toESM as O, avatarInner as k, busyProps as A, canApprove as ie, cardClass as j, commonReviewSources as M, currentReviewRow as N, decisionPayload as P, decisionReceipt as ae, defaultChoice as oe, errorMessage as F, fetchReview as se, filterReviewRows as ce, groupReviewRows as le, isReviewCategory as ue, l7 as I, m7 as de, mirrorText as fe, paginationRange as pe, pendingGenres as L, recordGenre as me, reloadReview as R, require_jsx_runtime as z, require_react as he, reviewGroupingOptions as ge, reviewQueueData as _e, reviewQueueOf as ve, reviewWindow as ye, rowEvidence as be, rowFieldName as xe, rowSubject as Se, rowTags as Ce, rowTitle as B, selectReviewRange as we, settleReviewRows as Te, spinnerHtml as V, submitDecision as Ee, useMutation as De, useOverlayScrollbar as H, useQuery as Oe, useViewGlide as ke } from "./peach-app.js";
 import { Page as Ae } from "./peach-app.page-QAncjzM1.js";
 import { LEGACY_AVATAR_IMG as U } from "./peach-app.legacy-avatar-NSITxLRS.js";
 import { PillAriaTabList as je } from "./peach-app.pill-aria-tab-list-BMY1ZEv1.js";
 // src/react/review/bulk-toolbar.tsx
-var W = /* @__PURE__ */ A(he(), 1), G = z();
+var W = /* @__PURE__ */ O(he(), 1), G = z();
 function Me(e) {
-	let { groupOptions: t, groupBy: n, onGroupBy: r, groups: i, filter: a, onFilter: s, pageKeys: c, selected: l, onSelected: u, selectedRows: d, metadata: f, approvable: ee, busy: p, feedback: m, onUnifySource: h, onRun: _, queueView: v = "pending", queueCounts: y, onQueueChange: b, locked: ne } = e, x = c.filter((e) => l.has(e)), E = x.length > 0 && x.length === c.length, O = P(d), k = f && d.some((e) => (e.candidates?.length || 0) > 1), A = O.length ? "统一选择来源" : "所选项目无共同来源", j = (0, W.useRef)(null), M = (0, W.useRef)(null), re = ke(j, M, "[data-entity-state][aria-pressed=\"true\"]", v);
-	return /* @__PURE__ */ (0, G.jsxs)(G.Fragment, { children: [/* @__PURE__ */ (0, G.jsx)(te, {
+	let { groupOptions: t, groupBy: n, onGroupBy: r, groups: i, filter: a, onFilter: s, pageKeys: c, selected: l, onSelected: u, selectedRows: d, metadata: f, approvable: ee, busy: p, feedback: m, onUnifySource: h, onRun: g, queueView: _ = "pending", queueCounts: v, onQueueChange: ne, locked: re } = e, y = c.filter((e) => l.has(e)), w = y.length > 0 && y.length === c.length, E = M(d), D = f && d.some((e) => (e.candidates?.length || 0) > 1), O = E.length ? "统一选择来源" : "所选项目无共同来源", k = (0, W.useRef)(null), A = (0, W.useRef)(null), ie = (0, W.useRef)(null), [j, N] = (0, W.useState)(!1), P = ke(k, A, "[data-entity-state][aria-pressed=\"true\"]", _);
+	return (0, W.useLayoutEffect)(() => {
+		let e = A.current, t = ie.current, n = e?.parentElement, r = e?.closest("[data-review-filter]");
+		if (!e || !t || !n || !r) return;
+		let i = () => N(t.offsetHeight > 0 && Math.abs(n.getBoundingClientRect().top - t.getBoundingClientRect().top) < 1), a = new ResizeObserver(i);
+		for (let n of [
+			r,
+			e,
+			t
+		]) a.observe(n);
+		return i(), () => a.disconnect();
+	}, []), /* @__PURE__ */ (0, G.jsxs)(G.Fragment, { children: [/* @__PURE__ */ (0, G.jsx)(te, {
 		label: "复核筛选",
 		topLabel: "处理状态",
 		attrs: { "data-review-filter": "" },
 		className: "mb-0 flex-row flex-wrap",
 		topClassName: "max-w-full flex-none",
 		bottomClassName: c.length ? "min-h-12 max-w-full flex-none flex-wrap" : "hidden",
+		bottomRef: ie,
 		panes: /* @__PURE__ */ (0, G.jsx)("span", {
-			ref: j,
+			ref: k,
 			"data-view-glide": "",
 			"aria-hidden": "true"
 		}),
-		top: /* @__PURE__ */ (0, G.jsx)("div", {
-			ref: M,
+		top: /* @__PURE__ */ (0, G.jsxs)("div", {
+			ref: A,
 			role: "group",
 			"aria-label": "复核状态",
 			"data-entity-states": "",
-			onPointerLeave: re.leave,
-			children: S.map((e) => /* @__PURE__ */ (0, G.jsxs)("button", {
+			onPointerLeave: P.leave,
+			children: [b.map((e) => /* @__PURE__ */ (0, G.jsxs)("button", {
 				type: "button",
 				"data-entity-state": e,
 				"data-entity-press": "",
 				disabled: p,
-				"aria-pressed": v === e,
-				onPointerEnter: re.hover,
+				"aria-pressed": _ === e,
+				onPointerEnter: P.hover,
 				onClick: () => {
-					e !== v && b(e);
+					e !== _ && ne(e);
 				},
 				children: [
 					/* @__PURE__ */ (0, G.jsx)("span", {
 						"data-copy-key": `review.queue.${e}`,
-						children: C[e]
+						children: x[e]
 					}),
 					" ",
 					/* @__PURE__ */ (0, G.jsx)("span", {
 						className: "ms-1.5 tabular-nums text-caption-1-medium text-text-secondary",
-						children: y ? y[e].toLocaleString() : "…"
+						children: v ? v[e].toLocaleString() : "…"
 					})
 				]
-			}, e))
+			}, e)), /* @__PURE__ */ (0, G.jsx)("span", {
+				"data-entity-sep": "",
+				"aria-hidden": "true",
+				className: j ? void 0 : "invisible"
+			})]
 		}),
 		bottom: c.length ? /* @__PURE__ */ (0, G.jsxs)(G.Fragment, { children: [
-			/* @__PURE__ */ (0, G.jsx)(w, {
+			/* @__PURE__ */ (0, G.jsx)(S, {
 				"aria-label": "筛选分组方式",
 				size: "sm",
 				selectedKey: n,
-				triggerClassName: "border-0 bg-transparent px-2.5 text-body-2-regular text-inherit shadow-none hover:bg-transparent",
 				onSelectionChange: (e) => {
 					e !== null && r(String(e));
 				},
-				children: t.map(([e, t]) => /* @__PURE__ */ (0, G.jsx)(T, {
+				children: t.map(([e, t]) => /* @__PURE__ */ (0, G.jsx)(C, {
 					id: e,
 					children: t
 				}, e))
 			}),
-			i.length > 1 ? /* @__PURE__ */ (0, G.jsxs)(w, {
+			i.length > 1 ? /* @__PURE__ */ (0, G.jsxs)(S, {
 				"aria-label": n === "field" ? "筛选字段分类" : "筛选当前分类",
 				size: "sm",
 				prefix: "分类",
-				triggerClassName: "border-0 bg-transparent px-2.5 text-body-2-regular text-inherit shadow-none hover:bg-transparent",
 				selectedKey: a || "*",
 				onSelectionChange: (e) => {
 					e !== null && s(String(e) === "*" ? "" : String(e));
 				},
-				children: [/* @__PURE__ */ (0, G.jsx)(T, {
+				children: [/* @__PURE__ */ (0, G.jsx)(C, {
 					id: "*",
 					children: "全部"
-				}), i.map((e) => /* @__PURE__ */ (0, G.jsx)(T, {
+				}), i.map((e) => /* @__PURE__ */ (0, G.jsx)(C, {
 					id: e.key,
 					children: `${e.title} · ${e.rows.length}`
 				}, e.key))]
 			}) : null,
-			ne ? null : /* @__PURE__ */ (0, G.jsx)(g, {
-				busy: p,
-				onPress: () => {
+			re ? null : /* @__PURE__ */ (0, G.jsx)(o, {
+				variant: "secondary",
+				size: "small",
+				leadingIcon: I,
+				"aria-pressed": w,
+				disabled: p,
+				onClick: () => {
 					let e = new Set(l);
-					for (let t of c) E ? e.delete(t) : e.add(t);
+					for (let t of c) w ? e.delete(t) : e.add(t);
 					u(e);
 				},
-				children: E ? "清空当前选择" : a ? "全选当前分类" : "全选本页"
+				children: w ? "清空当前选择" : a ? "全选当前分类" : "全选本页"
 			})
 		] }) : null
-	}), /* @__PURE__ */ (0, G.jsxs)(D, {
+	}), /* @__PURE__ */ (0, G.jsxs)(T, {
 		label: "复核所选项目",
-		visible: !ne && l.size > 0,
+		visible: !re && l.size > 0,
 		count: `已选 ${l.size} 项`,
 		children: [
-			k && v !== "ignored" ? /* @__PURE__ */ (0, G.jsxs)(w, {
+			D && _ !== "ignored" ? /* @__PURE__ */ (0, G.jsxs)(S, {
 				"aria-label": "统一选择来源",
 				size: "sm",
 				selectedKey: "",
-				isDisabled: p || !O.length,
+				isDisabled: p || !E.length,
 				onSelectionChange: (e) => {
 					e !== null && e !== "" && h(String(e));
 				},
-				children: [/* @__PURE__ */ (0, G.jsx)(T, {
+				children: [/* @__PURE__ */ (0, G.jsx)(C, {
 					id: "",
-					children: A
-				}), O.map((e) => /* @__PURE__ */ (0, G.jsx)(T, {
+					children: O
+				}), E.map((e) => /* @__PURE__ */ (0, G.jsx)(C, {
 					id: e,
 					children: e
 				}, e))]
 			}) : null,
-			v === "ignored" ? null : /* @__PURE__ */ (0, G.jsx)(o, {
+			_ === "ignored" ? null : /* @__PURE__ */ (0, G.jsx)(o, {
 				variant: "ghost",
 				size: "small",
 				disabled: p || !l.size,
-				onClick: () => _("rejected"),
+				onClick: () => g("rejected"),
 				children: "忽略所选"
 			}),
-			v === "pending" ? /* @__PURE__ */ (0, G.jsx)(o, {
+			_ === "pending" ? /* @__PURE__ */ (0, G.jsx)(o, {
 				variant: "secondary",
 				size: "small",
 				disabled: p || !l.size,
-				onClick: () => _("skipped"),
+				onClick: () => g("skipped"),
 				children: "稍后处理所选"
 			}) : /* @__PURE__ */ (0, G.jsx)(o, {
-				variant: v === "ignored" ? "primary" : "secondary",
+				variant: _ === "ignored" ? "primary" : "secondary",
 				size: "small",
 				disabled: p || !l.size,
-				onClick: () => _("restore"),
+				onClick: () => g("restore"),
 				children: "恢复所选"
 			}),
-			v === "ignored" ? null : /* @__PURE__ */ (0, G.jsx)(o, {
+			_ === "ignored" ? null : /* @__PURE__ */ (0, G.jsx)(o, {
 				variant: "primary",
 				size: "small",
 				disabled: p || !l.size || !ee,
-				onClick: () => _("approved"),
+				onClick: () => g("approved"),
 				children: "通过所选"
 			}),
 			/* @__PURE__ */ (0, G.jsx)(o, {
@@ -254,7 +271,7 @@ function Ie({ genre: e, tags: t, locked: n, toast: r }) {
 		onSuccess: async (t, n) => {
 			t.ok ? (r(n ? `已把「${e}」收录为标签「${n}」` : `已把「${e}」判为非内容标签`), await R()) : c(t.error || "服务端拒绝了这次收录");
 		},
-		onError: (e) => c(I(e))
+		onError: (e) => c(F(e))
 	}), u = () => {
 		let e = i.trim();
 		e ? (c(""), l.mutate(e)) : c("先给它一个中文标签");
@@ -267,14 +284,14 @@ function Ie({ genre: e, tags: t, locked: n, toast: r }) {
 				className: "text-body-medium text-text-primary",
 				children: e
 			}),
-			/* @__PURE__ */ (0, G.jsx)(O, {
+			/* @__PURE__ */ (0, G.jsx)(E, {
 				"aria-label": `「${e}」收录成的中文标签`,
 				value: i,
 				onChange: a,
 				maxLength: 40,
 				isDisabled: n || l.isPending,
 				className: "min-w-40 flex-1",
-				children: /* @__PURE__ */ (0, G.jsx)(_, {
+				children: /* @__PURE__ */ (0, G.jsx)(g, {
 					size: "small",
 					list: t.length ? K : void 0,
 					autoComplete: "off",
@@ -447,7 +464,7 @@ function Ve({ row: e, openItem: t, openEntity: n, onReveal: r, revealing: i, not
 				children: [c ? /* @__PURE__ */ (0, G.jsx)(s, {
 					variant: "secondary",
 					size: "small",
-					trailingIcon: k,
+					trailingIcon: D,
 					href: c,
 					target: "_blank",
 					rel: "noopener noreferrer",
@@ -485,7 +502,7 @@ function Ve({ row: e, openItem: t, openEntity: n, onReveal: r, revealing: i, not
 						variant: "ghost",
 						size: "small",
 						"aria-label": `打开 ${e.name} 的文件位置`,
-						...M(i === e.id),
+						...A(i === e.id),
 						onClick: () => r(e.id),
 						children: "文件位置"
 					})]
@@ -517,7 +534,7 @@ function He({ assets: e, picked: t, onPicked: n, locked: i }) {
 	};
 	return /* @__PURE__ */ (0, G.jsxs)("div", {
 		className: "flex flex-col gap-2",
-		children: [/* @__PURE__ */ (0, G.jsx)(E, {
+		children: [/* @__PURE__ */ (0, G.jsx)(w, {
 			prefix: /* @__PURE__ */ (0, G.jsx)("span", {
 				className: "tabular-nums text-body-2-regular text-text-secondary",
 				children: `已选 ${s.size} / ${e.length}`
@@ -569,32 +586,32 @@ function He({ assets: e, picked: t, onPicked: n, locked: i }) {
 	});
 }
 // src/react/review/review-card.tsx
-var Ue = N({
+var Ue = j({
 	variant: "outlined",
 	padding: "none",
 	className: "flex flex-col gap-4 px-5 pt-4"
 }), Z = "flex min-h-6 min-w-0 items-center", We = 2, Q = (e) => e === "western_identity" ? "h-review-card-tall" : "h-review-card";
 function Ge(e) {
-	let { category: t, row: n, choice: r, onChoice: i, selected: a, onSelect: s, locked: l, busy: d, problem: m, genreTags: te, onDecide: h, handlers: g, queueView: _ = "pending" } = e, v = (0, W.useRef)(!1), y = H(), ne = H(), x = t === "metadata_fields", S = f[t] || "", C = String(n.creator || "").trim(), w = !!S && !!C, T = B(t, n), E = xe(t, n), D = Se(t, n), O = be(n), k = Ce(n), A = re(t, n), N = n.comparison_assets || [], P = n.preview_assets || [], ie = b[n.decision || ""], F = N.length > 1 ? /* @__PURE__ */ (0, G.jsxs)("div", {
+	let { category: t, row: n, choice: r, onChoice: i, selected: a, onSelect: s, locked: l, busy: d, problem: m, genreTags: te, onDecide: h, handlers: g, queueView: _ = "pending" } = e, v = (0, W.useRef)(!1), re = H(), y = H(), b = t === "metadata_fields", x = f[t] || "", S = String(n.creator || "").trim(), C = !!x && !!S, w = B(t, n), T = xe(t, n), E = Se(t, n), D = be(n), O = Ce(n), j = ie(t, n), M = n.comparison_assets || [], N = n.preview_assets || [], P = ne[n.decision || ""], ae = M.length > 1 ? /* @__PURE__ */ (0, G.jsxs)("div", {
 		className: "flex flex-col gap-3",
-		children: [N.slice(0, We).map((e) => /* @__PURE__ */ (0, G.jsx)(Y, {
+		children: [M.slice(0, We).map((e) => /* @__PURE__ */ (0, G.jsx)(Y, {
 			asset: e,
 			openItem: g.openItem
-		}, e.id)), N.length > We ? /* @__PURE__ */ (0, G.jsx)("p", {
+		}, e.id)), M.length > We ? /* @__PURE__ */ (0, G.jsx)("p", {
 			className: "text-body-2-regular text-text-secondary",
-			children: `另有 ${(N.length - We).toLocaleString()} 部对照作品`
+			children: `另有 ${(M.length - We).toLocaleString()} 部对照作品`
 		}) : null]
-	}) : w ? /* @__PURE__ */ (0, G.jsx)(X, {
-		kind: S,
-		name: C,
+	}) : C ? /* @__PURE__ */ (0, G.jsx)(X, {
+		kind: x,
+		name: S,
 		works: Number(n.video_count || n.videos || 0),
 		openEntity: g.openEntity,
-		avatar: j(C, n.entity_id ? {
+		avatar: k(S, n.entity_id ? {
 			id: n.entity_id,
 			has_image: !!n.has_image,
 			image_version: n.image_version,
 			avatar_focus: n.avatar_focus
-		} : null, null, S)
+		} : null, null, x)
 	}) : n.asset_id ? /* @__PURE__ */ (0, G.jsx)(Y, {
 		openItem: g.openItem,
 		asset: {
@@ -602,17 +619,17 @@ function Ge(e) {
 			name: n.asset_name,
 			preview_url: n.asset_preview_url
 		}
-	}) : null, ae = x ? /* @__PURE__ */ (0, G.jsx)(q, {
+	}) : null, oe = b ? /* @__PURE__ */ (0, G.jsx)(q, {
 		row: n,
-		fieldName: E,
+		fieldName: T,
 		value: r.candidateKey,
 		onChange: (e) => i({
 			...r,
 			candidateKey: e
 		}),
 		locked: l
-	}) : t === "creator_tags" ? P.length ? /* @__PURE__ */ (0, G.jsx)(He, {
-		assets: P,
+	}) : t === "creator_tags" ? N.length ? /* @__PURE__ */ (0, G.jsx)(He, {
+		assets: N,
 		picked: r.assets,
 		locked: l,
 		onPicked: (e) => i({
@@ -631,31 +648,31 @@ function Ge(e) {
 		onReveal: g.onReveal,
 		revealing: g.revealing,
 		note: g.revealNote
-	}) : /* @__PURE__ */ (0, G.jsx)(ze, { url: n.preview_url }), oe = w ? F : E ? /* @__PURE__ */ (0, G.jsxs)("h4", {
+	}) : /* @__PURE__ */ (0, G.jsx)(ze, { url: n.preview_url }), F = C ? ae : T ? /* @__PURE__ */ (0, G.jsxs)("h4", {
 		className: `${Z} flex-wrap gap-2`,
 		children: [/* @__PURE__ */ (0, G.jsx)("span", {
-			title: E,
+			title: T,
 			className: "flex max-w-full min-w-0 overflow-hidden rounded-md",
 			children: /* @__PURE__ */ (0, G.jsx)(u, {
 				variant: "caption",
 				color: "blue",
-				children: E
+				children: T
 			})
 		}), /* @__PURE__ */ (0, G.jsx)("span", {
-			title: D,
+			title: E,
 			className: "min-w-0 truncate text-body-medium text-text-primary",
-			children: D
+			children: E
 		})]
 	}) : /* @__PURE__ */ (0, G.jsx)("h4", {
 		className: Z,
 		children: /* @__PURE__ */ (0, G.jsx)("span", {
-			title: T,
+			title: w,
 			className: "min-w-0 truncate text-body-medium text-text-primary",
-			children: T
+			children: w
 		})
 	});
 	return /* @__PURE__ */ (0, G.jsxs)("section", {
-		"aria-label": T,
+		"aria-label": w,
 		"data-review-key": n.item_key,
 		className: `${Ue} ${Q(t)} overflow-hidden`,
 		children: [
@@ -672,39 +689,39 @@ function Ge(e) {
 						},
 						children: /* @__PURE__ */ (0, G.jsx)(c, {
 							isSelected: a,
-							"aria-label": `选择 ${T}`,
+							"aria-label": `选择 ${w}`,
 							onChange: (e) => s(v.current, e)
 						})
 					}),
 					/* @__PURE__ */ (0, G.jsx)("div", {
 						className: "min-w-0 flex-1",
-						children: oe
+						children: F
 					}),
-					ie ? /* @__PURE__ */ (0, G.jsx)(u, {
+					P ? /* @__PURE__ */ (0, G.jsx)(u, {
 						variant: "caption",
 						color: "neutral",
-						children: ie
+						children: P
 					}) : null
 				]
 			}),
 			/* @__PURE__ */ (0, G.jsx)("div", {
 				className: "relative flex min-w-0 min-h-0 flex-1 flex-col",
 				children: /* @__PURE__ */ (0, G.jsxs)("div", {
-					ref: y,
+					ref: re,
 					className: "flex min-w-0 min-h-0 flex-1 flex-col gap-3 overflow-y-auto",
 					children: [
 						n.source_name ? /* @__PURE__ */ (0, G.jsx)("p", {
 							className: "text-body-2-regular text-text-secondary",
 							children: `来源写法：${n.source_name}`
 						}) : null,
-						!w && (n.board || n.assets) ? /* @__PURE__ */ (0, G.jsx)("p", {
+						!C && (n.board || n.assets) ? /* @__PURE__ */ (0, G.jsx)("p", {
 							className: "text-body-2-regular text-text-secondary",
 							children: `对照文件：${Number(n.video_count || n.assets || 0).toLocaleString()}`
 						}) : null,
-						!w && F ? F : null,
-						k.length || t === "creator_tags" ? /* @__PURE__ */ (0, G.jsx)("div", {
+						!C && ae ? ae : null,
+						O.length || t === "creator_tags" ? /* @__PURE__ */ (0, G.jsx)("div", {
 							className: "flex flex-wrap gap-1",
-							children: k.length ? k.map((e) => /* @__PURE__ */ (0, G.jsx)(u, {
+							children: O.length ? O.map((e) => /* @__PURE__ */ (0, G.jsx)(u, {
 								variant: "caption",
 								color: "soft",
 								children: e
@@ -713,28 +730,28 @@ function Ge(e) {
 								children: "暂无待确认标签"
 							})
 						}) : null,
-						ae,
+						oe,
 						/* @__PURE__ */ (0, G.jsx)(Le, {
 							row: n,
 							tags: te,
 							locked: l,
 							toast: g.toast
 						}),
-						!x && O ? /* @__PURE__ */ (0, G.jsx)("p", {
+						!b && D ? /* @__PURE__ */ (0, G.jsx)("p", {
 							className: "text-body-2-regular text-text-secondary wrap-anywhere",
-							children: O
+							children: D
 						}) : null
 					]
 				})
 			}),
-			x && O ? /* @__PURE__ */ (0, G.jsx)("div", {
+			b && D ? /* @__PURE__ */ (0, G.jsx)("div", {
 				className: "relative -mx-5 -mb-4 shrink-0",
 				children: /* @__PURE__ */ (0, G.jsx)("p", {
-					ref: ne,
+					ref: y,
 					role: "region",
 					"aria-label": "当前信息",
 					className: "max-h-22 overflow-y-auto border-t border-separator-border px-5 py-2.5 text-body-2-regular text-text-secondary wrap-anywhere",
-					children: O
+					children: D
 				})
 			}) : null,
 			/* @__PURE__ */ (0, G.jsxs)("footer", {
@@ -744,7 +761,7 @@ function Ge(e) {
 						variant: "ghost",
 						size: "small",
 						disabled: l,
-						...M(d),
+						...A(d),
 						onClick: () => h("rejected"),
 						children: "忽略"
 					}),
@@ -752,25 +769,25 @@ function Ge(e) {
 						variant: "secondary",
 						size: "small",
 						disabled: l,
-						...M(d),
+						...A(d),
 						onClick: () => h("skipped"),
 						children: "稍后处理"
 					}) : /* @__PURE__ */ (0, G.jsx)(o, {
 						variant: _ === "ignored" ? "primary" : "secondary",
 						size: "small",
 						disabled: l,
-						...M(d),
+						...A(d),
 						onClick: () => h("restore"),
 						children: "恢复待处理"
 					}),
 					_ === "ignored" ? null : /* @__PURE__ */ (0, G.jsx)(o, {
 						variant: "primary",
 						size: "small",
-						disabled: l || !A,
-						...M(d),
-						title: A ? void 0 : "没有可采用的资料，可先保留或忽略",
+						disabled: l || !j,
+						...A(d),
+						title: j ? void 0 : "没有可采用的资料，可先保留或忽略",
 						onClick: () => h("approved"),
-						children: A ? "通过" : "不可通过"
+						children: j ? "通过" : "不可通过"
 					}),
 					m ? /* @__PURE__ */ (0, G.jsx)("p", {
 						role: "status",
@@ -828,12 +845,12 @@ function $(r) {
 		let e = matchMedia("(max-width:900px)"), t = () => a(e.matches);
 		return e.addEventListener("change", t), () => e.removeEventListener("change", t);
 	}, []);
-	let { route: s, openItem: c, openEntity: l, revealSource: u, toast: f, readOnly: ee, readOnlyMessage: te, writerUrl: h } = r, [g, _] = (0, W.useState)(ue(r.category) ? r.category : d), [b, w] = (0, W.useState)(() => ve(r.queue)), [T, E] = (0, W.useState)("candidates"), [D, O] = (0, W.useState)(""), [k, A] = (0, W.useState)(1), [j, M] = (0, W.useState)(/* @__PURE__ */ new Set()), [N, P] = (0, W.useState)(/* @__PURE__ */ new Map()), [pe, L] = (0, W.useState)(/* @__PURE__ */ new Map()), [me, R] = (0, W.useState)(""), z = (0, W.useRef)(null), [he, be] = (0, W.useState)(0), [xe, Se] = (0, W.useState)(""), Ce = (0, W.useRef)(!0);
+	let { route: s, openItem: c, openEntity: l, revealSource: u, toast: f, readOnly: ee, readOnlyMessage: te, writerUrl: h } = r, [g, ne] = (0, W.useState)(ue(r.category) ? r.category : d), [S, C] = (0, W.useState)(() => ve(r.queue)), [w, T] = (0, W.useState)("candidates"), [E, D] = (0, W.useState)(""), [O, k] = (0, W.useState)(1), [A, j] = (0, W.useState)(/* @__PURE__ */ new Set()), [M, I] = (0, W.useState)(/* @__PURE__ */ new Map()), [pe, L] = (0, W.useState)(/* @__PURE__ */ new Map()), [me, R] = (0, W.useState)(""), z = (0, W.useRef)(null), [he, be] = (0, W.useState)(0), [xe, Se] = (0, W.useState)(""), Ce = (0, W.useRef)(!0);
 	(0, W.useEffect)(() => () => {
 		Ce.current = !1;
 	}, []);
 	let B = Oe({
-		queryKey: ne,
+		queryKey: re,
 		queryFn: ({ signal: e }) => se(e)
 	}), V = B.data || {
 		sections: {},
@@ -848,13 +865,13 @@ function $(r) {
 				counts: {}
 			}
 		}
-	}, H = _e(V, b), ke = B.data ? Object.fromEntries(S.map((e) => [e, y.reduce((t, n) => t + Number(_e(V, e).counts[n] || 0), 0)])) : void 0, U = H.sections[g] || [], Ne = g === "metadata_fields", K = ee;
+	}, H = _e(V, S), ke = B.data ? Object.fromEntries(b.map((e) => [e, v.reduce((t, n) => t + Number(_e(V, e).counts[n] || 0), 0)])) : void 0, U = H.sections[g] || [], Ne = g === "metadata_fields", K = ee;
 	(0, W.useEffect)(() => {
 		let e = new Set(U.map((e) => e.item_key));
-		M((t) => {
+		j((t) => {
 			let n = [...t].filter((t) => e.has(t));
 			return n.length === t.size ? t : new Set(n);
-		}), P((t) => {
+		}), I((t) => {
 			let n = [...t].filter(([t]) => e.has(t));
 			return n.length === t.size ? t : new Map(n);
 		}), L((t) => {
@@ -862,30 +879,30 @@ function $(r) {
 			return n.length === t.size ? t : new Map(n);
 		});
 	}, [U]);
-	let Fe = ge(U, Ne), q = Fe.some(([e]) => e === T) ? T : "candidates", Ie = le(U, q), Le = Ie.some((e) => e.key === D) ? D : "", J = ye(ce(U, q, Le), k), Re = J.rows.map((e) => e.item_key), ze = new Set(Re), Be = Ie.map((e) => ({
+	let Fe = ge(U, Ne), q = Fe.some(([e]) => e === w) ? w : "candidates", Ie = le(U, q), Le = Ie.some((e) => e.key === E) ? E : "", J = ye(ce(U, q, Le), O), Re = J.rows.map((e) => e.item_key), ze = new Set(Re), Be = Ie.map((e) => ({
 		...e,
 		rows: e.rows.filter((e) => ze.has(e.item_key))
-	})).filter((e) => e.rows.length), Y = (e) => N.get(e.item_key) || oe(e), X = U.filter((e) => j.has(e.item_key)), Ve = (e) => {
+	})).filter((e) => e.rows.length), Y = (e) => M.get(e.item_key) || oe(e), X = U.filter((e) => A.has(e.item_key)), Ve = (e) => {
 		let t = new Set(e);
-		M((e) => new Set([...e].filter((e) => !t.has(e)))), P((e) => new Map([...e].filter(([e]) => !t.has(e)))), L((e) => new Map([...e].filter(([e]) => !t.has(e))));
+		j((e) => new Set([...e].filter((e) => !t.has(e)))), I((e) => new Map([...e].filter(([e]) => !t.has(e)))), L((e) => new Map([...e].filter(([e]) => !t.has(e))));
 	}, He = (e, t) => L((n) => new Map(n).set(e, t)), Ue = () => {
-		E("candidates"), O(""), A(1), M(/* @__PURE__ */ new Set()), P(/* @__PURE__ */ new Map()), L(/* @__PURE__ */ new Map()), R(""), z.current = null;
+		T("candidates"), D(""), k(1), j(/* @__PURE__ */ new Set()), I(/* @__PURE__ */ new Map()), L(/* @__PURE__ */ new Map()), R(""), z.current = null;
 	}, Z = (e) => {
-		_(e), Ue(), s({
+		ne(e), Ue(), s({
 			category: e === "metadata_fields" ? "" : e,
-			queue: b === "pending" ? "" : b
+			queue: S === "pending" ? "" : S
 		});
 	}, We = (e) => {
-		w(e), Ue(), s({
+		C(e), Ue(), s({
 			category: g === "metadata_fields" ? "" : g,
 			queue: e === "pending" ? "" : e
 		});
 	}, Q = De({
-		mutationFn: ({ row: e, status: t, category: n }) => Ee(F(n, ie(n, e), t, Y(e))),
+		mutationFn: ({ row: e, status: t, category: n }) => Ee(P(n, N(n, e), t, Y(e))),
 		onSuccess: (e, { row: t, status: n, category: r }) => {
 			e.ok ? (Te(r, [t.item_key], n), Ve([t.item_key]), f(ae(n))) : He(t.item_key, e.error || "服务端拒绝了这次判定");
 		},
-		onError: (e, { row: t }) => He(t.item_key, I(e))
+		onError: (e, { row: t }) => He(t.item_key, F(e))
 	}), $ = De({
 		mutationFn: async ({ status: e, category: t, rows: n }) => {
 			let r = [], i = [];
@@ -893,11 +910,11 @@ function $(r) {
 				if (!Ce.current) break;
 				R(`正在处理 ${a} / ${n.length}`);
 				try {
-					let n = await Ee(F(t, ie(t, o), e, Y(o)));
+					let n = await Ee(P(t, N(t, o), e, Y(o)));
 					if (!n.ok) throw Error(n.error || "服务端未采用该项");
 					r.push(o.item_key);
 				} catch (e) {
-					i.push([o.item_key, I(e)]);
+					i.push([o.item_key, F(e)]);
 				}
 			}
 			return {
@@ -918,7 +935,7 @@ function $(r) {
 			f(`已${i} ${n.length} 项` + (r.length ? `，${r.length} 项未完成` : ""));
 		},
 		onError: (e) => {
-			R(I(e));
+			R(F(e));
 		}
 	}), Je = (e) => {
 		!$.isPending && X.length && (e === "approved" && Ne && X.some((e) => !Y(e).candidateKey) ? R("请先为所选资料选择要采用的来源。") : (R(""), $.mutate({
@@ -927,7 +944,7 @@ function $(r) {
 			rows: X
 		})));
 	}, Ye = (e) => {
-		P((t) => {
+		I((t) => {
 			let n = new Map(t);
 			for (let t of X) {
 				let r = t.candidates?.find((t) => t.source === e);
@@ -954,7 +971,7 @@ function $(r) {
 	return /* @__PURE__ */ (0, G.jsx)(Ae, { children: /* @__PURE__ */ (0, G.jsxs)("div", {
 		className: "flex flex-col gap-5 pb-10",
 		children: [
-			K ? /* @__PURE__ */ (0, G.jsx)(v, {
+			K ? /* @__PURE__ */ (0, G.jsx)(_, {
 				tone: "warning",
 				title: "本机只能浏览",
 				extra: h ? /* @__PURE__ */ (0, G.jsx)("p", {
@@ -986,7 +1003,7 @@ function $(r) {
 						"aria-labelledby": "reviewcategories",
 						"data-section-items": !0,
 						className: "flex review-split:flex-col review-split:items-stretch",
-						children: y.map((e) => {
+						children: v.map((e) => {
 							let n = Number(H.counts[e] || 0);
 							return /* @__PURE__ */ (0, G.jsxs)(t, {
 								id: e,
@@ -994,7 +1011,7 @@ function $(r) {
 								isDisabled: Q.isPending || $.isPending,
 								"data-pill-selected": g === e ? "" : void 0,
 								"data-pill-variant": "gray",
-								children: [x[e], n ? /* @__PURE__ */ (0, G.jsx)("span", {
+								children: [y[e], n ? /* @__PURE__ */ (0, G.jsx)("span", {
 									className: "tabular-nums text-caption-1-medium text-text-secondary",
 									children: n.toLocaleString()
 								}) : null]
@@ -1006,26 +1023,26 @@ function $(r) {
 					className: "flex min-w-0 flex-1 flex-col gap-5",
 					children: [
 						/* @__PURE__ */ (0, G.jsx)(Me, {
-							queueView: b,
+							queueView: S,
 							queueCounts: ke,
 							onQueueChange: We,
 							locked: K,
 							groupOptions: Fe,
 							groupBy: q,
 							onGroupBy: (e) => {
-								E(e), O(""), A(1);
+								T(e), D(""), k(1);
 							},
 							groups: Ie,
 							filter: Le,
 							onFilter: (e) => {
-								O(e), A(1);
+								D(e), k(1);
 							},
 							pageKeys: Re,
-							selected: j,
-							onSelected: M,
+							selected: A,
+							onSelected: j,
 							selectedRows: X,
 							metadata: Ne,
-							approvable: X.every((e) => re(g, e)),
+							approvable: X.every((e) => ie(g, e)),
 							busy: $.isPending || Q.isPending,
 							feedback: me,
 							onUnifySource: Ye,
@@ -1042,22 +1059,22 @@ function $(r) {
 									variant: "ghost",
 									size: "small",
 									onClick: () => {
-										let t = e.rows.map((e) => e.item_key), n = t.every((e) => j.has(e)), r = new Set(j);
+										let t = e.rows.map((e) => e.item_key), n = t.every((e) => A.has(e)), r = new Set(A);
 										for (let e of t) n ? r.delete(e) : r.add(e);
-										M(r);
+										j(r);
 									},
-									children: e.rows.every((e) => j.has(e.item_key)) ? "清空本组" : "全选本组"
+									children: e.rows.every((e) => A.has(e.item_key)) ? "清空本组" : "全选本组"
 								})]
 							}) : null, /* @__PURE__ */ (0, G.jsx)("div", {
 								className: "review-grid gap-5",
 								children: e.rows.map((e) => /* @__PURE__ */ (0, G.jsx)(Ge, {
 									category: g,
 									row: e,
-									queueView: b,
+									queueView: S,
 									choice: Y(e),
-									onChoice: (t) => P((n) => new Map(n).set(e.item_key, t)),
-									selected: j.has(e.item_key),
-									onSelect: (t, n) => M((r) => {
+									onChoice: (t) => I((n) => new Map(n).set(e.item_key, t)),
+									selected: A.has(e.item_key),
+									onSelect: (t, n) => j((r) => {
 										let i = new Set(r);
 										return z.current = we(i, Re, z.current, e.item_key, t, n), i;
 									}),
@@ -1075,7 +1092,7 @@ function $(r) {
 									handlers: $e
 								}, e.item_key))
 							})]
-						}, e.key)) : B.isError && !B.data ? /* @__PURE__ */ (0, G.jsx)(v, {
+						}, e.key)) : B.isError && !B.data ? /* @__PURE__ */ (0, G.jsx)(_, {
 							tone: "error",
 							title: "复核队列读取失败",
 							action: /* @__PURE__ */ (0, G.jsx)(o, {
@@ -1085,24 +1102,24 @@ function $(r) {
 								onClick: () => void B.refetch(),
 								children: "立即重试"
 							}),
-							children: I(B.error)
+							children: F(B.error)
 						}) : /* @__PURE__ */ (0, G.jsx)(p, {
 							icon: de,
-							title: `此分类没有${C[b]}项目`,
-							actions: y.some((e) => e !== g && Number(H.counts[e] || 0) > 0) ? /* @__PURE__ */ (0, G.jsx)(o, {
+							title: `此分类没有${x[S]}项目`,
+							actions: v.some((e) => e !== g && Number(H.counts[e] || 0) > 0) ? /* @__PURE__ */ (0, G.jsx)(o, {
 								size: "small",
 								onClick: () => {
-									let e = y.find((e) => e !== g && Number(H.counts[e] || 0) > 0);
+									let e = v.find((e) => e !== g && Number(H.counts[e] || 0) > 0);
 									e && Z(e);
 								},
 								children: "查看其他分类"
 							}) : void 0,
-							children: b === "pending" ? "可切换分类查看其他待确认资料。" : `${C[b]}的资料会保留在这里，可恢复到待处理。`
+							children: S === "pending" ? "可切换分类查看其他待确认资料。" : `${x[S]}的资料会保留在这里，可恢复到待处理。`
 						}),
 						/* @__PURE__ */ (0, G.jsx)(qe, {
 							page: J.page,
 							pages: J.pages,
-							onPage: A
+							onPage: k
 						})
 					]
 				})]
@@ -1112,4 +1129,4 @@ function $(r) {
 }
 export { $ as ReviewPage };
 
-//# debugId=fc3b7f5c-9986-4e0f-93ea-c88573ac7cc9
+//# debugId=0f87cc14-5ced-46c2-88a8-4b571bbb3b85

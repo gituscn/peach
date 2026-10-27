@@ -43,6 +43,8 @@ describe('设计决定：控件、状态与首页顶部', () => {
           return Math.abs(top.top - bottom.top) < 1;
         });
         assert.equal(sameRow, !viewport.mobile, '足宽同排、窄屏换排');
+        const divider = await filter.locator('[data-entity-sep]').evaluate(element => getComputedStyle(element).visibility);
+        assert.equal(divider, viewport.mobile ? 'hidden' : 'visible');
         await filter.getByRole('button', { name: /^已忽略/ }).click();
         await settle(opened.page);
         const geometry = await filter.evaluate(element => {
