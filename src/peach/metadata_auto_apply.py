@@ -57,6 +57,7 @@ from .metadata_policy import (
     blacklisted, chain_rank, preferred_tag_source, source_tier,
 )
 from .review_csv import read_candidates
+from .javdb_identity import current_candidate as current_javdb_candidate
 from .sources import fc2
 
 #: 一个写事务里最多落多少条。整批一个事务在本机实测是几千条候选压着写锁不放，
@@ -762,6 +763,7 @@ def _evidence_candidates(row: dict, field: str = "") -> list[dict]:
             if (str(c.get("source") or "").strip() in SOURCE_SPECS
                 or str(c.get("source") or "").strip() == LOCAL_NFO_SOURCE)
             and not blacklisted(field, str(c.get("source") or "").strip())
+            and (str(c.get('source') or '').strip() != 'javdb' or current_javdb_candidate(c))
             and candidate_text_is_valid(c)
             and _original_title_candidate(field, c, str(row.get('code') or ''))]
 
@@ -1516,6 +1518,9 @@ def auto_apply_metadata(database, candidate_root, *, batch_size=AUTO_APPLY_BATCH
                 if str(row.get("status") or "").strip() != "candidate":
                     continue
                 row["candidates"] = _row_candidates(row, genres)
+                row['candidates'] = [candidate for candidate in row['candidates']
+                                     if str(candidate.get('source') or '').strip() != 'javdb'
+                                     or current_javdb_candidate(candidate)]
                 prior = decided.get(item_key)
                 if overwrite_requires_review(connection, row):
                     skipped += 1
