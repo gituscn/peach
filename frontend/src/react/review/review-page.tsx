@@ -9,7 +9,7 @@
  * - 分组、筛选、页码是组件状态。复核队列是消耗性的：判一条它就少一条，第 3 页指的是
  *   哪二十行随每一次判定而变，写进地址栏分享出去只会指向另一批东西。换分类、换分组、
  *   换筛选都回第 1 页，也正说明页码依附于此刻这一屏的看法，不是这一页的身份。 */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { RiCheckboxCircleLine } from '@remixicon/react';
 import { Tab, TabPanel, Tabs } from 'react-aria-components';
@@ -123,12 +123,13 @@ export function ReviewPage(props: ReviewProps) {
     });
   }, [queue]);
 
-  const groupOptions = reviewGroupingOptions(queue, metadata);
+  const groupOptions = useMemo(() => reviewGroupingOptions(queue, metadata), [queue, metadata]);
   const activeGroupBy: ReviewGrouping =
     groupOptions.some(([key]) => key === groupBy) ? groupBy : 'candidates';
-  const groups = groupReviewRows(queue, activeGroupBy);
+  const groups = useMemo(() => groupReviewRows(queue, activeGroupBy), [queue, activeGroupBy]);
   const activeFilter = groups.some((group) => group.key === filter) ? filter : '';
-  const win = reviewWindow(filterReviewRows(queue, activeGroupBy, activeFilter), page);
+  const win = useMemo(() => reviewWindow(filterReviewRows(queue, activeGroupBy, activeFilter), page),
+    [queue, activeGroupBy, activeFilter, page]);
   const pageKeys = win.rows.map((row) => row.item_key);
   const onPage = new Set(pageKeys);
   /* 这一页上一张都没有的组不画分组条：条子底下空着，读起来像加载坏了。 */
@@ -137,7 +138,7 @@ export function ReviewPage(props: ReviewProps) {
     .filter((group) => group.rows.length);
 
   const choiceOf = (row: ReviewRow): RowChoice => choices.get(row.item_key) || defaultChoice(row);
-  const selectedRows = queue.filter((row) => selected.has(row.item_key));
+  const selectedRows = useMemo(() => queue.filter((row) => selected.has(row.item_key)), [queue, selected]);
 
   const forget = (keys: string[]) => {
     const gone = new Set(keys);

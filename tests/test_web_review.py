@@ -92,6 +92,61 @@ class ReviewQueueTests(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_large_metadata_queue_reuses_identity_lookups_only_within_one_snapshot(self):
+        self.write_metadata_rows([
+            {'item_key': f'EXM-{index:03d}:studio', 'code': f'EXM-{index:03d}',
+             'field': 'studio', 'current': 'Example Studio',
+             'candidates': ['Example Alias']}
+            for index in range(100)
+        ])
+        with mock.patch.object(rm_review, '_entity_identity_key', wraps=rm_review._entity_identity_key) as identity:
+            rows, _, _ = rm_review._review_rows(self.contract, 'metadata_fields')
+            self.assertEqual(len(rows), 100)
+            self.assertEqual(identity.call_count, 2)
+        with self.contract.write_transaction() as connection:
+            connection.execute("INSERT INTO entity(id,kind,canonical_name,normalized_name,created_at,updated_at) "
+                               "VALUES(900,'studio','Example Studio','example studio','now','now')")
+            connection.execute("INSERT INTO entity_alias(entity_id,alias,normalized_alias,source,confidence) "
+                               "VALUES(900,'Example Alias','example alias','manual',1)")
+        self.assertEqual(self.queue_keys('metadata_fields'), [])
+
+    def test_settled_creator_rows_do_not_load_asset_previews(self):
+        self.write_candidates('creator-tags-candidate-20260818.csv', [
+            {'board': str(index), 'creator': 'ukiru', 'tags': 'x', 'status': 'candidate'}
+            for index in range(100)
+        ])
+        with self.contract.write_transaction() as connection:
+            connection.executemany("INSERT INTO review_decision(category,item_key,status,reviewer,note,updated_at) "
+                                   "VALUES('creator_tags',?,'approved','本人','','now')",
+                                   [(str(index),) for index in range(99)])
+        with mock.patch.object(rm_review, '_creator_previews', wraps=rm_review._creator_previews) as previews:
+            rows, _, _ = rm_review._review_rows(self.contract, 'creator_tags', queue=None)
+        self.assertEqual([row['item_key'] for row in rows], ['99'])
+        self.assertEqual(previews.call_args.args[1], ['ukiru'])
+
+    def test_review_response_carries_structured_candidates_without_duplicate_csv_json(self):
+        self.write_metadata_rows([{'item_key': 'EXM-001:title', 'code': 'EXM-001',
+                                   'field': 'title', 'current': '', 'candidates': ['新标题']}])
+        row = rm_review.q_review(self.contract)['sections']['metadata_fields'][0]
+        self.assertNotIn('candidates_json', row)
+        self.assertEqual(row['candidates'][0]['display_value'], '新标题')
+        self.assertTrue(row['candidates'][0]['candidate_key'])
+        self.assertIn('candidates_json', rm_candidates.read_candidates('metadata_fields', self.candidates)[0][0])
+
+    def test_review_cover_presence_uses_the_served_file_without_loading_crop_indexes(self):
+        self._asset(400, 'EXM-001', 'EXM-001.mp4')
+        self.contract.cover_root = Path(self.tmp.name) / 'covers'
+        self.contract.cover_root.mkdir()
+        cover = self.contract.cover_root / 'EXM-001.jpg'
+        cover.write_bytes(b'cached image')
+        self.write_metadata_rows([{'item_key': 'EXM-001:title', 'code': 'EXM-001',
+                                   'field': 'title', 'current': '', 'candidates': ['新标题']}])
+        with mock.patch.object(self.contract, 'cover_index', side_effect=AssertionError('无需全库取景')):
+            row = self.queue_row('metadata_fields', 'EXM-001:title')
+            self.assertEqual(row['asset_preview_url'], '/cover?code=EXM-001')
+            cover.with_suffix('.scraping.json').write_text(json.dumps({'source': 'javdb'}), encoding='utf-8')
+            self.assertEqual(self.queue_row('metadata_fields', 'EXM-001:title')['asset_preview_url'], '')
+
     def write_candidates(self, name, rows):
         path = self.candidates / name
         with path.open("w", encoding="utf-8-sig", newline="") as handle:

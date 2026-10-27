@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from functools import cache, partial
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 from urllib.parse import quote
@@ -42,7 +43,6 @@ from .metadata_auto_apply import (
     _offers_another_stage_name,
     _only_mib_official,
     _parsed_candidates,
-    _performer_identity_keys,
     _row_candidates,
     _split_multi,
     genres_still_pending,
@@ -64,7 +64,7 @@ class ReviewContract(Protocol):
 
     def cache_bust(self) -> None: ...
     def read_connection(self): ...
-    def has_cover(self, code: str) -> bool: ...
+    def cover_path(self, code: str) -> Path | None: ...
     def has_entity_image(self, kind: str, entity_id) -> bool: ...
     def entity_image_version(self, kind: str, entity_id) -> str: ...
     def write_transaction(self): ...
@@ -322,13 +322,14 @@ def _metadata_queue_rows(connection, rows: list[dict],
     # 的行照旧留着，它讲的是另一件事（这个番号问过、谁都没给值）。
     rows = [row for row in rows if row["candidates"] or not _parsed_candidates(row)]
     refresh_current_values(connection, rows)
+    identity_key = cache(partial(_entity_identity_key, connection))
     # 和账本已有的值比一遍，只把真差异留在队列里。实测 43 条候选里 24 条
     # 没有任何新信息：17 条与当前值逐字相同、7 条标签只是顺序不同。
     # 例外是标签部分落库（ADR-0038）留下的行：认得出的标签已经写进账本，所以
     # 它对账本「没有新信息」，可留在页面上要判的本来也不是标签，是那几个谁都
     # 不认的词。按新信息剔掉它，那几个词就再没有出现的地方了。
     rows = [row for row in rows
-            if _metadata_row_adds_information(connection, row)
+            if _metadata_row_adds_information(connection, row, identity_key=identity_key)
             or genres_still_pending(genre_decisions, decisions.get(row["item_key"], {}))]
     # 韩国 MIB 的番号不适用 JAV 规则，`metadata_routes` 给它的链是空的。但候选件是
     # 历史产物，闸门只管以后不再生成，管不了已经落盘的那些：2026-09-04 实测队列里
@@ -345,6 +346,8 @@ def _metadata_queue_rows(connection, rows: list[dict],
 
 
 def _review_rows(contract: ReviewContract, category: str, *, queue: str | None = 'pending') -> tuple[list[dict], str | None, int]:
+    # 复核卡片只需知道 /cover 能否取图，不加载全库的裁剪和人脸 sidecar。
+    has_cover = cache(lambda code: contract.cover_path(code) is not None)
     #: 用户对来源 genre 的决定。判「这一行还有没有词等着收录」要用它，而那一步在库
     #: 连接关掉之后才跑，所以先取出来。
     genre_decisions: dict[str, str | None] = {}
@@ -356,6 +359,19 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
                 (category,),
             )
         }
+        if category == "metadata_fields":
+            rows, genre_decisions = _metadata_queue_rows(connection, rows, decisions)
+        for position, row in enumerate(rows):
+            row['queue_order'] = position
+            decision = decisions.get(row["item_key"], {})
+            if category == "studio_logos" and row.get("content_state") == "changed":
+                # 同一厂牌的新图片仍需确认，不沿用旧图片的批准。
+                decision = {}
+            if category == "metadata_fields":
+                decision = _metadata_decision_in_force(decision, row, genre_decisions)
+            row["decision"] = decision.get("status", "pending")
+            row["decision_note"] = decision.get("note", "")
+        rows = _select_review_queue(rows, queue)
         if category in {"creator_tags", "western_identity"}:
             names = [str(row.get("creator") or "").strip() for row in rows]
             previews = _creator_previews(connection, names, include_unpictured=category == "western_identity")
@@ -366,24 +382,13 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
                 name = str(row.get("creator") or "").strip()
                 row["preview_assets"] = previews.get(name, [])
                 row["entity_id"] = entities.get(name, row.get("entity_id", ""))
-        elif category == "metadata_fields":
-            rows, genre_decisions = _metadata_queue_rows(connection, rows, decisions)
         elif category == "performer_avatars":
             # 候选 CSV 里的 `current_name` 是抓取来源给的罗马音；账本早就有更好的
             # 规范名（`Alice Shaku` 的规范名是 `释爱丽丝`），罗马音本身也已经登记
             # 为别名。复核页该显示账本认的那个名字，来源写法降为副标题。
             _use_canonical_entity_names(connection, rows)
         _attach_review_asset_context(connection, rows)
-    for position, row in enumerate(rows):
-        row['queue_order'] = position
-        decision = decisions.get(row["item_key"], {})
-        if category == "studio_logos" and row.get("content_state") == "changed":
-            # 同一厂牌上游头像变化是新的事实；旧批次 approved 不得把变化静默藏掉。
-            decision = {}
-        if category == "metadata_fields":
-            decision = _metadata_decision_in_force(decision, row, genre_decisions)
-        row["decision"] = decision.get("status", "pending")
-        row["decision_note"] = decision.get("note", "")
+    for row in rows:
         row["preview_url"] = (row.get("resolved_url") or row.get("source_url")
                               or row.get("avatar_url") or row.get("portrait_url") or "")
         if category == "video_endcards":
@@ -399,7 +404,7 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
             row["preview_url"] = f"/cover?code={quote(str(row.get('code') or ''))}"
         asset_code = str(row.get("asset_code") or row.get("code") or "")
         if row.get("asset_id"):
-            if asset_code and contract.has_cover(asset_code):
+            if asset_code and has_cover(asset_code):
                 row["asset_preview_url"] = f"/cover?code={quote(asset_code)}"
             elif row.get("asset_has_snapshot"):
                 row["asset_preview_url"] = f"/poster?id={row['asset_id']}&c=4"
@@ -407,7 +412,7 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
                 row["asset_preview_url"] = ""
         for comparison in row.get("comparison_assets") or []:
             comparison_code = str(comparison.get("code") or "")
-            if comparison_code and contract.has_cover(comparison_code):
+            if comparison_code and has_cover(comparison_code):
                 comparison["preview_url"] = f"/cover?code={quote(comparison_code)}"
             elif comparison.get("snapshot_path"):
                 comparison["preview_url"] = f"/poster?id={comparison['id']}&c=4"
@@ -427,7 +432,7 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
             #: 取景与索引页、资料页同一份 sidecar、同一个换算。这张脸是复核时认人的
             #: 唯一线索，几何居中把脑袋裁掉就等于没有这一格。
             row["avatar_focus"] = contract.avatar_focus(face_kind, row.get("entity_id"))
-    return _select_review_queue(rows, queue), source, skipped
+    return rows, source, skipped
 
 
 #: 元数据里的多值字段用顿号分隔；比较时按集合而不是按字符串。
@@ -438,7 +443,7 @@ MULTI_VALUE_FIELDS = {"performers", "tags"}
 ENTITY_BACKED_FIELDS = {"studio", "series"}
 
 
-def _metadata_row_adds_information(connection, row: dict) -> bool:
+def _metadata_row_adds_information(connection, row: dict, *, identity_key=None) -> bool:
     """这一行候选相对账本现值有没有新东西；没有就不该占复核队列。
 
     复核的成本是人的注意力：把「和现在一模一样」的行混在里面，真正要判的那些
@@ -449,6 +454,12 @@ def _metadata_row_adds_information(connection, row: dict) -> bool:
         return True                      # 补空值总是有信息，例如发行日期
     field = str(row.get("field") or "").strip()
     candidates = row.get("candidates") or []
+    identity_key = identity_key or partial(_entity_identity_key, connection)
+
+    def performer_keys(value):
+        return frozenset(key for name in _split_multi(value)
+                         for key in identity_key('performer', name))
+
     if not candidates:
         return False
     if field in MULTI_VALUE_FIELDS:
@@ -457,11 +468,9 @@ def _metadata_row_adds_information(connection, row: dict) -> bool:
             # libredmm 与 mgstage 给的是 `桜井奈々 28歳 某企業広報担当` 和
             # `佐倉井さん 28歳 某企業広報担当`——那是这部片给她起的称呼，不是她本人的
             # 艺名。两者不在同一层，不构成分歧（用户 2026-09-16 定「取主艺名」）。
-            current_key = _performer_identity_keys(connection, _split_multi(current))
+            current_key = performer_keys(current)
             return any(
-                _performer_identity_keys(
-                    connection, _split_multi(str(c.get("display_value") or ""))
-                ) != current_key
+                performer_keys(str(c.get("display_value") or "")) != current_key
                 for c in candidates
                 if _offers_another_stage_name(c)
             )
@@ -474,11 +483,9 @@ def _metadata_row_adds_information(connection, row: dict) -> bool:
         # 同一家厂牌在三处各有写法：账本存规范名 `Prestige`，javbus 给日文名
         # `プレステージプレミアム(PRESTIGEPREMIUM)`，libredmm 给日英并写的那一串。
         # 三者都指向同一条实体，按字符串比就成了要人判的「冲突」。
-        current_key = _entity_identity_key(connection, field, current)
+        current_key = identity_key(field, current)
         return any(
-            _entity_identity_key(
-                connection, field, str(c.get("display_value") or "").strip()
-            ) != current_key
+            identity_key(field, str(c.get("display_value") or "").strip()) != current_key
             for c in candidates
         )
     return any(str(c.get("display_value") or "").strip() != current for c in candidates)
@@ -619,7 +626,8 @@ def _review_queue(row: dict) -> str | None:
 
 
 def _select_review_queue(rows: list[dict], queue: str | None) -> list[dict]:
-    return [row for row in rows if queue is None or _review_queue(row) == queue]
+    return [row for row in rows if (state := _review_queue(row)) is not None
+            and (queue is None or state == queue)]
 
 
 def _review_evidence(category: str, row: dict) -> str:
@@ -681,6 +689,9 @@ def q_review(contract: ReviewContract):
     sources, skipped = {}, {}
     for category in REVIEW_CATEGORIES:
         rows, source, dropped = _review_rows(contract, category, queue=None)
+        for row in rows:
+            # 页面使用折叠后的 candidates；CSV 原文留在磁盘，批准仍从原文件核验。
+            row.pop('candidates_json', None)
         for key, sections in groups.items():
             sections[category] = _select_review_queue(rows, key)
         sources[category] = source
