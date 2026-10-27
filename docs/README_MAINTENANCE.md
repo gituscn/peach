@@ -1,8 +1,11 @@
 # README 维护
 
+默认入口 `README.md` 使用英文，简体中文版为 `README.zh-CN.md`；两种语言同批核对。
+
 1. 按下表核对本次涉及的能力、安装方式与限制。
 2. 同批核对中英文 README，修改需要调整的内容，保留使用入口和安全说明。
-3. 按 [文档与界面文案](WRITING.md#检查与复核) 检查，再运行 [正式测试入口](TESTING.md#正式入口)。
+3. 用 documd 提供当前稿的可视化预览，取得用户明确确认后才能推送 README；继续修改时确认对应的新稿。
+4. 按 [文档与界面文案](WRITING.md#检查与复核) 检查，再运行 [正式测试入口](TESTING.md#正式入口)。
 
 README 面向初次访问项目的人，依次讲它是什么、界面导览与截图、能做什么、怎么装、常见问题、
 问题反馈和文档入口。用使用者的话写：说能做什么、会不会动文件，不写账本、候选、实体这类内部
@@ -24,8 +27,8 @@ README 迭代绑定 Codex 与 Claude 共用的工作树交付流程。每次提�
 | 判断 | 提交消息末尾的独立字段 |
 | --- | --- |
 | 已更新两份 README | `README-Impact: updated; 同步了哪些用户说明` |
-| 只需修改中文 README | `README-Impact: updated; 中文修改原因`，另加 `README-Reviewed: README.en.md; 英文无需修改的原因` |
-| 只需修改英文 README | `README-Impact: updated; 英文修改原因`，另加 `README-Reviewed: README.md; 中文无需修改的原因` |
+| 只需修改中文 README | `README-Impact: updated; 中文修改原因`，另加 `README-Reviewed: README.md; 英文无需修改的原因` |
+| 只需修改英文 README | `README-Impact: updated; 英文修改原因`，另加 `README-Reviewed: README.zh-CN.md; 中文无需修改的原因` |
 | 不影响 README | `README-Impact: none; 具体原因` |
 
 声明与 `Co-Authored-By` 等其它 trailer 连续写在提交消息末尾的同一块里，彼此之间不留空行。
@@ -114,6 +117,5 @@ SHA-256 对不上是硬错误，不降级放行。
   使用条款，Peach 的边界以 AGPL 与 `SECURITY.md` 为准。
 - **演示素材**：README 里任何截图或视频都按上面「演示数据集」一节的边界取图，换素材时重新核对
   那几条边界。
-- **篇幅取舍（2026-10-17）**：复读已登记的 amane、Stash 与 OpenAver 原文，并核对线上 README。采用 amane 的短功能列表与安装入口，保留 Peach 的演示、全部五张截图、六条特色和必要安全说明；源码安装步骤集中在 [运行与配置](OPERATIONS.md#从源码运行windowsmacos)。路由、字段判据、缓存周期、更新包机制与开发流程由专题文档承载。
-- **截图与 Star 历史（2026-10-17）**：截图沿用 `a5f979d6^` 的双列表格，播放墙独占一行，五张 WebP 均链接 PNG 原图。Star History 依据官方 [`EmbedMarkdownSection.tsx`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/frontend/components/EmbedMarkdownSection.tsx) 使用 `/svg`，保留深浅主题并链接用户指定的交互页。实测 `/chart` 与 `/svg` 均返回 HTTP 200、SVG 类型及 `Cache-Control: public, s-maxage=86400, max-age=86400`；同版本 [`cache.ts`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/backend/cache.ts) 将数据与 SVG 缓存各设为 24 小时。交互页 URL 仅改变点击去向，不能保证嵌入图片即时刷新；README 不显示实时性承诺。
-- **交互图与嵌入图（2026-10-17）**：用户截图显示纵轴为 0、10、100；嵌入接口使用 `logscale` 得到相同刻度。官方同版本 [`StarChartViewer.tsx`](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/frontend/components/StarChartViewer.tsx) 在浏览器调用 GitHub，并在页面内存中复用结果；24 小时服务端缓存针对嵌入图片接口，不能据此判断官网交互图的数据新鲜度。官网 `https://peach.video` 位于中英文 README 顶部导航。
+- **篇幅取舍（2026-10-27）**：参考 amane 的一行一功能与安装入口，以及 SakuraMedia 的主图与折叠截图。README 保留六条特色、安装表、文档导航和必要限制；参数、缓存、任务恢复、诊断与升级细节由专题文档承载。当前原文版本见 `docs/reference-sources.json`，不复制外部文案或使用条款。
+- **截图与 Star 历史（2026-10-27）**：五张电影演示库截图保留，首页主图直接展示，其余四张折叠；WebP 均链接 PNG 原图。Star History 使用 `/svg`，按用户要求展示累计 Star 数的线性坐标，图表与交互页均不传 `logscale`；保留深浅主题。接口缓存不代表实时数据，README 不承诺即时刷新。

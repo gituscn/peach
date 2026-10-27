@@ -208,13 +208,13 @@ class CommitMessageGuardTests(_WorktreeCase):
                 self.assertIn("README-Impact", result.stderr)
 
     def test_counterpart_review_trailer_requires_a_file_reason_and_contiguous_block(self):
-        for declaration in ("README-Reviewed: README.en.md; 已核对\n\n",
-                            "README-Reviewed: README.en.md;\n",
+        for declaration in ("README-Reviewed: README.zh-CN.md; 已核对\n\n",
+                            "README-Reviewed: README.zh-CN.md;\n",
                             "README-Reviewed: unknown.md; 已核对\n"):
             result = self.attempt("test: 核对声明\n\n" + declaration + AUTHOR)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("README-Reviewed", result.stderr)
-        result = self.attempt("test: 核对声明\n\nREADME-Reviewed: README.en.md; 英文正确\n" + AUTHOR)
+        result = self.attempt("test: 核对声明\n\nREADME-Reviewed: README.zh-CN.md; 中文正确\n" + AUTHOR)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_valid_trailers_and_amend_preserve_the_message(self):
@@ -606,8 +606,8 @@ class ReadmeImpactTests(unittest.TestCase):
         git(self.repo, "init", "-b", "master")
         git(self.repo, "config", "user.name", "Test")
         git(self.repo, "config", "user.email", "test@example.invalid")
-        self.save("README.md", "中文")
-        self.save("README.en.md", "English")
+        self.save("README.md", "English")
+        self.save("README.zh-CN.md", "中文")
         git(self.repo, "commit", "-m", "base")
         self.base = git(self.repo, "rev-parse", "HEAD").strip()
         git(self.repo, "checkout", "-b", "worker")
@@ -637,23 +637,23 @@ class ReadmeImpactTests(unittest.TestCase):
     def test_single_language_typo_accepts_explicit_counterpart_review(self):
         self.save("README.md", "修正错字")
         self.assertEqual(self.commit("README-Impact: updated; 中文错字\n"
-                                     "README-Reviewed: README.en.md; 英文表述正确，无需修改"), [])
+                                     "README-Reviewed: README.zh-CN.md; 中文表述正确，无需修改"), [])
 
     def test_counterpart_review_requires_correct_file_and_reason(self):
         self.save("README.md", "修正错字")
-        for trailer in ("README-Reviewed: README.md; 已核对", "README-Reviewed: README.en.md;",
-                        "README-Reviewed: README.en.md; 已核对\nREADME-Reviewed: README.en.md; 重复"):
+        for trailer in ("README-Reviewed: README.md; 已核对", "README-Reviewed: README.zh-CN.md;",
+                        "README-Reviewed: README.zh-CN.md; 已核对\nREADME-Reviewed: README.zh-CN.md; 重复"):
             self.assertTrue(self.commit("README-Impact: updated; 中文错字\n" + trailer))
             git(self.repo, "reset", "--soft", "HEAD^")
 
     def test_bilingual_update_accepts_review(self):
         self.save("README.md", "新内容")
-        self.save("README.en.md", "New content")
+        self.save("README.zh-CN.md", "New content")
         self.assertEqual(self.commit("README-Impact: updated; 功能说明"), [])
 
     def test_none_cannot_describe_document_changes(self):
         self.save("README.md", "新内容")
-        self.save("README.en.md", "New content")
+        self.save("README.zh-CN.md", "New content")
         self.assertTrue(self.commit("README-Impact: none; 内部改动"))
 
     def test_test_only_change_needs_no_declaration(self):
@@ -664,7 +664,7 @@ class ReadmeImpactTests(unittest.TestCase):
         self.save("frontend/package.json", "{}")
         self.commit("README-Impact: updated; 工具要求")
         self.save("README.md", "新内容")
-        self.save("README.en.md", "New content")
+        self.save("README.zh-CN.md", "New content")
         self.assertTrue(check(self.repo, self.base))
 
     def test_missing_reason_and_duplicate_trailers_are_rejected(self):
