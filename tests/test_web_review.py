@@ -10,8 +10,6 @@ import importlib.util
 import io
 import json
 import os
-import re
-import pathlib
 import sqlite3
 import tempfile
 import unittest
@@ -3388,23 +3386,22 @@ class PerformerAvatarApplyTests(ReviewQueueTests):
         self.assertEqual(result["applied_assets"], 0)
         self.assertFalse((self.avatar_root / "performer-9.img").exists())
 
-    def test_every_approvable_category_can_land(self):
-        """每个能被批准的类别，要么有落地分支，要么明确声明只记决定。
-
-        `w_review_decision` 的落地分支是一条条手写的，把类别加进白名单却忘了写分支，
-        表现就是「点通过、什么也没发生」——这个组合最糟：留痕说通过、实际没写。
-        已经犯过三次，所以这里不再靠人记。
-        """
-        source = pathlib.Path(rm_review.__file__).read_text(encoding="utf-8")
-        block = source.split("if category not in {", 1)[1].split("}", 1)[0]
-        whitelist = set(re.findall(r'"(\w+)"', block))
-        self.assertGreaterEqual(len(whitelist), 10, "没解析到分类白名单，门槛会空转")
-        lands = set(re.findall(r'elif category == "(\w+)" and status == "approved"', source))
-        lands |= set(re.findall(r'if category == "(\w+)" and status == "approved"', source))
-        declared = set(rm_review.DECISION_ONLY_CATEGORIES)
-        missing = sorted(whitelist - lands - declared)
-        self.assertEqual(
-            missing, [],
-            "这些类别能被批准却既没有落地分支、也没声明只记决定："
-            "补一个 _install_* 分支，或把它写进 DECISION_ONLY_CATEGORIES 并说明原因",
-        )
+    def test_each_approval_category_validates_evidence_or_explicitly_records_only(self):
+        """需落库的分类拒绝缺失候选并回滚；声明只记决定的分类保存批准。"""
+        for category in rm_review.REVIEW_CATEGORIES:
+            with self.subTest(category=category):
+                payload = {'category': category, 'item_key': 'missing-candidate',
+                           'status': 'approved', 'candidate_key': 'missing-source'}
+                if category in rm_review.DECISION_ONLY_CATEGORIES:
+                    result = rm_review.w_review_decision(self.contract, payload)
+                    self.assertEqual(result['applied_assets'], 0)
+                    expected = ('approved',)
+                else:
+                    with self.assertRaisesRegex(ValueError, '所选.*不在当前批次'):
+                        rm_review.w_review_decision(self.contract, payload)
+                    expected = None
+                with self.contract.read_connection() as connection:
+                    decision = connection.execute(
+                        'SELECT status FROM review_decision WHERE category=? AND item_key=?',
+                        (category, 'missing-candidate')).fetchone()
+                self.assertEqual(tuple(decision) if decision else None, expected)
