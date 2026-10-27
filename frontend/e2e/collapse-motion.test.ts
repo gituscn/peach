@@ -11,20 +11,27 @@ async function motion(page: Page, trigger: Locator) {
     const arrow = button.querySelector('svg')!;
     const initialTransform = getComputedStyle(arrow).transform;
     const height = body.getBoundingClientRect().height;
-    let transitioned = false;
-    body.addEventListener('transitionrun', event => { if ((event as TransitionEvent).propertyName === 'height') transitioned = true });
     (button as HTMLElement).click();
-    await new Promise(resolve => setTimeout(resolve, 80));
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const transition = body.getAnimations().find(animation =>
+      animation instanceof CSSTransition && animation.transitionProperty === 'height');
+    if (transition) {
+      transition.pause();
+      transition.currentTime = Number(transition.effect!.getComputedTiming().duration) / 2;
+    }
     const middle = body.getBoundingClientRect().height;
     const inert = body.inert;
-    await new Promise(resolve => setTimeout(resolve, 240));
-    return { height, middle, inert, transitioned, hidden: body.hidden, stableArrow: button.querySelector('svg') === arrow,
-      duration: getComputedStyle(arrow).transitionDuration, transform: getComputedStyle(arrow).transform, initialTransform };
+    const stableArrow = button.querySelector('svg') === arrow;
+    const duration = getComputedStyle(arrow).transitionDuration;
+    for (const animation of [...body.getAnimations(), ...arrow.getAnimations()]) animation.finish();
+    return { height, middle, inert, transitioned: Boolean(transition), stableArrow,
+      duration, transform: getComputedStyle(arrow).transform, initialTransform };
   });
   assert.ok(result.height > 0 && result.middle > 0 && result.middle < result.height, JSON.stringify(result));
   assert.equal(result.transitioned, true);
   assert.equal(result.inert, true);
-  assert.equal(result.hidden, true);
+  const body = page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
+  await page.waitForFunction(node => (node as HTMLElement).hidden, await body.elementHandle());
   assert.equal(result.stableArrow, true);
   assert.notEqual(result.duration, '0s');
   assert.notEqual(result.transform, result.initialTransform);
@@ -33,9 +40,9 @@ async function motion(page: Page, trigger: Locator) {
   await trigger.click();
   await page.waitForTimeout(40);
   await trigger.click();
-  await page.waitForTimeout(320);
+  await page.waitForFunction(node => (node as HTMLElement).classList.contains('ui-fcollapse-settled'),
+    await body.elementHandle());
   assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
-  const body = page.locator(`[id="${await trigger.getAttribute('aria-controls')}"]`);
   assert.equal(await body.evaluate(node => (node as HTMLElement).inert || (node as HTMLElement).hidden), false);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(await trigger.locator('svg').evaluate(node => getComputedStyle(node).transitionDuration), '0s');
