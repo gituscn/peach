@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .field_owners import auto_owner, owner_of
 from . import artifact_rules, upgrade_rules
+from .javdb_identity import current_evidence
 from .metadata import extract_peach_fields, identifies_code, source_text_is_valid, validate_provider_code
 from .metadata_auto_apply import _apply_metadata_candidate, metadata_auto_apply_candidate
 from .metadata_policy import SOURCE_SPECS
@@ -17,7 +18,7 @@ FIELDS = {'title': 'catalog_title', 'original_title': 'original_title',
 
 
 def _damaged_snapshots(connection, root: Path) -> tuple[list[dict], list[int]]:
-    """只失效已知来源的损坏文字快照，并选择同番号资产重新采集。"""
+    """失效损坏文字或旧 JavDB 绑定快照，保留原文并选择对应资产重采。"""
     snapshots, affected = [], []
     for path in root.glob('*.json'):
         code, separator, source = path.stem.rpartition('-')
@@ -29,7 +30,8 @@ def _damaged_snapshots(connection, root: Path) -> tuple[list[dict], list[int]]:
             payload = json.loads(path.read_text(encoding='utf-8'))
         except (OSError, ValueError):
             continue
-        if not isinstance(payload, dict) or source_text_is_valid(payload):
+        if not isinstance(payload, dict) or (source_text_is_valid(payload)
+                and (source != 'javdb' or current_evidence(payload))):
             continue
         snapshots.append({'path': str(path), 'fingerprint': before})
         affected.extend(row[0] for row in connection.execute(
@@ -61,22 +63,26 @@ def _candidates(root: Path, code: str, field: str) -> list[dict]:
             continue
         except (ValueError, UnicodeError):
             continue
-        if not isinstance(payload, dict) or not identifies_code(code, payload):
+        if (not isinstance(payload, dict) or not identifies_code(code, payload)
+                or source == 'javdb' and not current_evidence(payload)):
             continue
         value = extract_peach_fields(payload).get(field)
         if not value:
             continue
         key = hashlib.sha256(json.dumps([source, value['value']], ensure_ascii=False,
                                        sort_keys=True).encode()).hexdigest()
-        candidates.append({**value, 'candidate_key': key, 'source': source,
-                           'provider_id': payload.get('id'), 'content_id': payload.get('content_id'),
-                           'source_url': payload.get('source_url'), 'raw_snapshot': str(path),
-                           'confidence': .75})
+        candidate = {**value, 'candidate_key': key, 'source': source,
+                     'provider_id': payload.get('id'), 'content_id': payload.get('content_id'),
+                     'source_url': payload.get('source_url'), 'raw_snapshot': str(path),
+                     'confidence': .75}
+        if source == 'javdb':
+            candidate.update(javdb_rule=payload['javdb_rule'], source_id=payload.get('source_id'))
+        candidates.append(candidate)
     return candidates
 
 
 def collect(connection, snapshots: Path) -> dict:
-    """只选中有损坏机器字段或来源关系的资产；人物规范名保留给复核。"""
+    """选中损坏文字与失效来源快照的资产；人物规范名保留给复核。"""
     marker = '\ufffd'
     tests = ' OR '.join(f'instr(COALESCE(a.{column},\'\'),?)>0' for column in FIELDS.values())
     assets = connection.execute(
