@@ -183,19 +183,20 @@ export interface ItemVisit extends Visit {
   stub: ItemStub;
 }
 
-/** 打开一页：桩与设置装好之后重新载入，等到 `ready` 出现、等待态结束。 */
+/** 打开一页：导航前装好桩与设置，等到 `ready` 出现、等待态结束。 */
 export async function openItemPage(browser: Browser, path: string, viewport: Viewport,
   { settings = {}, ready = '#stage[open] [data-item-side]', catalogIds }: {
     settings?: Record<string, unknown>; ready?: string; catalogIds?: readonly number[];
   } = {},
 ): Promise<ItemVisit> {
-  const opened = await visit(browser, '/', viewport);
+  let stubbed!: ItemStub;
+  const opened = await visit(browser, path, viewport, async page => {
+    await page.context().addInitScript((value) => {
+      localStorage.setItem('peach.settings.v1', JSON.stringify(value));
+    }, { detailAutoplay: false, relatedLimit: 12, ...settings });
+    stubbed = await stub(page, catalogIds);
+  });
   const page = opened.page;
-  await page.context().addInitScript((value) => {
-    localStorage.setItem('peach.settings.v1', JSON.stringify(value));
-  }, { detailAutoplay: false, relatedLimit: 12, ...settings });
-  const stubbed = await stub(page, catalogIds);
-  await page.goto(new URL(path, page.url()).toString(), { waitUntil: 'load' });
   await page.locator(ready).first().waitFor({ timeout: 15_000 });
   await settle(page);
   return { ...opened, stub: stubbed };
