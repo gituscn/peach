@@ -19,6 +19,9 @@ export interface BulkToolbarProps {
   queueCounts?: Record<ReviewQueue, number>;
   onQueueChange(queue: ReviewQueue): void;
   locked: boolean;
+  fields: ReviewGroup[];
+  fieldFilter: string;
+  onFieldFilter(field: string): void;
   groupOptions: [ReviewGrouping, string][];
   groupBy: ReviewGrouping;
   onGroupBy(next: ReviewGrouping): void;
@@ -44,7 +47,7 @@ export function BulkToolbar(props: BulkToolbarProps) {
   const {
     groupOptions, groupBy, onGroupBy, groups, filter, onFilter, pageKeys, selected, onSelected,
     selectedRows, metadata, approvable, busy, feedback, onUnifySource, onRun, queueView = 'pending',
-    queueCounts, onQueueChange, locked,
+    queueCounts, onQueueChange, locked, fields, fieldFilter, onFieldFilter,
   } = props;
   const shown = pageKeys.filter((key) => selected.has(key));
   const allShown = shown.length > 0 && shown.length === pageKeys.length;
@@ -95,6 +98,15 @@ export function BulkToolbar(props: BulkToolbarProps) {
           <span data-entity-sep="" aria-hidden="true" className={joinedRows ? undefined : 'invisible'} />
         </div>}
         bottom={pageKeys.length ? <>
+        {metadata && fields.length ? <Select aria-label="筛选资料字段" size="sm"
+          prefix={<span data-copy-key="review.filter.field" className="pointer-events-auto">字段</span>}
+          selectedKey={fieldFilter || '*'} isDisabled={busy}
+          onSelectionChange={(key) => { if (key !== null) onFieldFilter(String(key) === '*' ? '' : String(key)) }}>
+          <SelectItem id="*">全部</SelectItem>
+          {fields.map(field => <SelectItem key={field.key} id={field.key}>
+            {`${field.title} · ${field.rows.length}`}
+          </SelectItem>)}
+        </Select> : null}
         <Select aria-label="筛选分组方式" size="sm" selectedKey={groupBy}
           onSelectionChange={(key) => { if (key !== null) onGroupBy(String(key) as ReviewGrouping) }}>
           {groupOptions.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}

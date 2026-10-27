@@ -671,6 +671,29 @@ describe('设计决定：作品卡、管理页与复核', () => {
     }
   });
 
+  it('来源依据使用无下划线的展开按钮，文字差异清晰可见', { timeout: 60_000 }, async () => {
+    const row = { ...REVIEW_ROW, field: 'title', field_label: '标题', current_value: '共同旧标题。',
+      candidates: ['dmm', 'javdb'].map(source => ({ candidate_key: `${source}:title`, source,
+        display_value: '共同新标题。', catalog_evidence: { title: { display_value: '共同新标题。' } } })) };
+    const opened = await openReview(browser, [row]);
+    try {
+      const card = opened.page.locator('section[data-review-key]').first();
+      const toggle = card.getByRole('button', { name: '展开 dmm 的来源依据', exact: true });
+      await toggle.hover();
+      const observed = await toggle.evaluate(node => ({ tag: node.tagName,
+        underline: [node, ...node.querySelectorAll('*')].some(element =>
+          getComputedStyle(element).textDecorationLine.includes('underline')) }));
+      assert.deepEqual(observed, { tag: 'BUTTON', underline: false });
+      const mark = card.locator('label:has(input[type="radio"]) mark').first();
+      assert.equal(await mark.textContent(), '新');
+      const color = await mark.evaluate(node => ({ text: getComputedStyle(node).color,
+        parent: getComputedStyle(node.parentElement!).color, background: getComputedStyle(node).backgroundColor }));
+      assert.notEqual(color.text, color.parent);
+      assert.notEqual(color.background, 'rgba(0, 0, 0, 0)');
+      assert.deepEqual(opened.problems, []);
+    } finally { await opened.close() }
+  });
+
   for (const viewport of [DESKTOP, MOBILE]) {
     it(`复核长资料只在正文滚动，卡头和判断操作仍在卡内 ${viewport.width}`, { timeout: 60_000 }, async () => {
       const row = { ...REVIEW_ROW, current_value: '当前已登记的完整资料。'.repeat(20),

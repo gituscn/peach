@@ -17,6 +17,7 @@ import { useOverlayScrollbar } from '../components/overlay-scrollbar';
 import { RiImageLine } from '@remixicon/react';
 import { busyProps } from '../settings/use-action';
 import { CandidateChoices, PendingGenres } from './candidate-form';
+import { ComparisonText } from './comparison-text';
 import { AssetPicker, EntityHead, IdentityEvidence, OriginAsset, SourceImage } from './review-evidence';
 import type { DecisionStatus, ReviewCategory, ReviewQueue, ReviewRow, RowChoice } from './review';
 import { REVIEW_DECISION_LABELS } from './review';
@@ -193,7 +194,11 @@ export function ReviewCard(props: ReviewCardProps) {
                 ? <Chip variant="caption" color="neutral">人工确认</Chip> : null}
             </div>
             <p className="text-body-2-regular text-text-primary wrap-anywhere">
-              {row.current_value === undefined ? evidence : row.current_value || '尚无资料'}
+              {row.current_value === undefined ? evidence : row.current_value
+                ? <ComparisonText value={row.current_value}
+                    reference={(row.candidates?.find(candidate => candidate.candidate_key === choice.candidateKey)
+                      || row.candidates?.[0])?.display_value} />
+                : '尚无资料'}
             </p>
             {row.videos !== undefined ? <p className="text-caption-1-regular text-text-secondary">
               {`${Number(row.videos).toLocaleString()} 个${row.asset_path ? '匹配文件' : '同番号文件'}`}
@@ -206,9 +211,16 @@ export function ReviewCard(props: ReviewCardProps) {
                 : <small className="text-body-2-regular text-text-secondary">暂无待确认标签</small>}
             </div>
           ) : null}
-          {metadata ? <h5 className="text-caption-1-medium text-text-secondary">
-            <span data-copy-key="review.card.candidate_sources">候选来源</span>{` · ${row.candidates?.length || 0}`}
-          </h5> : null}
+          {metadata ? <div className="flex flex-wrap items-center justify-between gap-2">
+            <h5 className="text-caption-1-medium text-text-secondary">
+              <span data-copy-key="review.card.candidate_sources">候选来源</span>{` · ${row.candidates?.length || 0}`}
+            </h5>
+            {row.current_value || (row.candidates?.length || 0) > 1 ? <span
+              data-copy-key={row.current_value ? 'review.card.compare_current' : 'review.card.compare_sources'}
+              className="text-caption-1-regular text-text-tertiary">
+              {row.current_value ? '与当前值比较' : '来源间差异'}
+            </span> : null}
+          </div> : null}
           {preview}
           <PendingGenres row={row} tags={genreTags} locked={locked} toast={handlers.toast} />
           {!metadata && evidence

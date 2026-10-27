@@ -81,6 +81,7 @@ export function ReviewPage(props: ReviewProps) {
   const [queueView, setQueueView] = useState<ReviewQueue>(() => reviewQueueOf(props.queue));
   const [groupBy, setGroupBy] = useState<ReviewGrouping>('candidates');
   const [filter, setFilter] = useState('');
+  const [fieldFilter, setFieldFilter] = useState('');
   const [page, setPage] = useState(1);
   /* 勾选、选中的来源值、勾上的作品样本、失败原因，身份都是 `item_key`：翻页、换分组
      之后手里还是同一批东西。它们不进地址栏——那是这一刻手里的一批，不是这一页的身份。 */
@@ -123,13 +124,17 @@ export function ReviewPage(props: ReviewProps) {
     });
   }, [queue]);
 
-  const groupOptions = useMemo(() => reviewGroupingOptions(queue, metadata), [queue, metadata]);
+  const fields = useMemo(() => metadata ? groupReviewRows(queue, 'field') : [], [queue, metadata]);
+  const activeField = fields.some(field => field.key === fieldFilter) ? fieldFilter : '';
+  const fieldQueue = useMemo(() => metadata ? filterReviewRows(queue, 'field', activeField) : queue,
+    [queue, metadata, activeField]);
+  const groupOptions = useMemo(() => reviewGroupingOptions(fieldQueue, metadata), [fieldQueue, metadata]);
   const activeGroupBy: ReviewGrouping =
     groupOptions.some(([key]) => key === groupBy) ? groupBy : 'candidates';
-  const groups = useMemo(() => groupReviewRows(queue, activeGroupBy), [queue, activeGroupBy]);
+  const groups = useMemo(() => groupReviewRows(fieldQueue, activeGroupBy), [fieldQueue, activeGroupBy]);
   const activeFilter = groups.some((group) => group.key === filter) ? filter : '';
-  const win = useMemo(() => reviewWindow(filterReviewRows(queue, activeGroupBy, activeFilter), page),
-    [queue, activeGroupBy, activeFilter, page]);
+  const win = useMemo(() => reviewWindow(filterReviewRows(fieldQueue, activeGroupBy, activeFilter), page),
+    [fieldQueue, activeGroupBy, activeFilter, page]);
   const pageKeys = win.rows.map((row) => row.item_key);
   const onPage = new Set(pageKeys);
   /* 这一页上一张都没有的组不画分组条：条子底下空着，读起来像加载坏了。 */
@@ -154,6 +159,7 @@ export function ReviewPage(props: ReviewProps) {
   const resetView = () => {
     setGroupBy('candidates');
     setFilter('');
+    setFieldFilter('');
     setPage(1);
     setSelected(new Set());
     setChoices(new Map());
@@ -301,6 +307,8 @@ export function ReviewPage(props: ReviewProps) {
 
         <TabPanel id={category} className="flex min-w-0 flex-1 flex-col gap-5">
             <BulkToolbar queueView={queueView} queueCounts={queueCounts} onQueueChange={goQueue} locked={locked}
+              fields={fields} fieldFilter={activeField}
+              onFieldFilter={(next) => { setFieldFilter(next); setFilter(''); setPage(1) }}
               groupOptions={groupOptions} groupBy={activeGroupBy}
               onGroupBy={(next) => { setGroupBy(next); setFilter(''); setPage(1) }}
               groups={groups} filter={activeFilter}

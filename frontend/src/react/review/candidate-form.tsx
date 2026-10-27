@@ -9,12 +9,12 @@ import { RadioGroup } from '@/components/base/radio/radio';
 import { RadioCard } from '@/components/base/radio/radio-card';
 
 import { Button } from '@/components/base/buttons/button';
-import { LinkButton } from '@/components/base/buttons/link-button';
 import { InputBase, TextField } from '@/components/base/input/input';
 import { CollapseChevron, CollapseRegion } from '../components/collapse-region';
 import { errorMessage } from '../../api';
 import type { ReviewCandidate, ReviewRow } from './review';
 import { pendingGenres, recordGenre, reloadReview } from './review';
+import { ComparisonText } from './comparison-text';
 
 /** 候选顺带交回来的那些字段在界面上叫什么。表里没有的按原名显示。 */
 const EVIDENCE_LABELS: Record<string, string> = {
@@ -37,7 +37,7 @@ export function GenreTagList({ tags }: { tags: string[] }) {
 }
 
 /** 来源依据独立展开，点击说明不会同时选中另一个来源。 */
-function CandidateEvidence({ candidate }: { candidate: ReviewCandidate }) {
+function CandidateEvidence({ candidate, row }: { candidate: ReviewCandidate; row: ReviewRow }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   const evidence = Object.entries(candidate.catalog_evidence || {})
@@ -45,12 +45,12 @@ function CandidateEvidence({ candidate }: { candidate: ReviewCandidate }) {
   if (!evidence.length) return null;
   return (
     <div className="min-w-0">
-      <LinkButton variant="secondary" size="small" leadingIcon={CollapseChevron}
+      <Button variant="secondary" size="small" leadingIcon={CollapseChevron}
         aria-expanded={open} aria-controls={panel}
         aria-label={`${open ? '收起' : '展开'} ${candidate.source || '该来源'} 的来源依据`}
         onClick={() => setOpen(!open)}>
         <span data-copy-key="review.card.source_evidence">来源依据</span>{` · ${evidence.length}`}
-      </LinkButton>
+      </Button>
       <CollapseRegion id={panel} open={open}>
         <dl className="flex min-w-0 flex-col gap-2 px-3 pt-2 pb-1">
           {evidence.map(([field, item]) => (
@@ -59,7 +59,11 @@ function CandidateEvidence({ candidate }: { candidate: ReviewCandidate }) {
                 {EVIDENCE_LABELS[field] || field}
               </dt>
               <dd className="min-w-0 text-body-2-regular break-words text-text-primary">
-                {item.display_value}
+                <ComparisonText value={item.display_value || ''}
+                  reference={field === row.field && row.current_value
+                    ? row.current_value
+                    : row.candidates?.find(peer => peer.candidate_key !== candidate.candidate_key
+                        && peer.catalog_evidence?.[field]?.display_value)?.catalog_evidence?.[field]?.display_value} />
               </dd>
               {(item.warnings || []).map((warning) => (
                 <small key={warning} className="w-full text-caption-1-regular text-status-yellow-text">
@@ -79,9 +83,11 @@ function candidateHeading(candidate: ReviewCandidate) {
   return `${candidate.source || '未标注来源'}${candidate.official ? ' · 官方优先' : ''}${id ? ` · ID ${id}` : ''}`;
 }
 
-function CandidateValue({ candidate }: { candidate: ReviewCandidate }) {
+function CandidateValue({ candidate, reference }: { candidate: ReviewCandidate; reference?: string }) {
   return <span className="flex min-w-0 flex-col gap-2 whitespace-normal wrap-anywhere">
-    <span className="text-body-regular text-text-primary">{candidate.display_value || ''}</span>
+    <span className="text-body-regular text-text-primary">
+      <ComparisonText value={candidate.display_value || ''} reference={reference} />
+    </span>
     {(candidate.warnings || []).map(warning => (
       <span key={warning} className="text-body-2-regular text-status-yellow-text">{warning}</span>
     ))}
@@ -106,9 +112,9 @@ export function CandidateChoices(
       <div className="flex min-w-0 flex-col gap-2">
         <div className="flex min-w-0 flex-col gap-2 rounded-2lg bg-background-primary-default px-4 py-3">
           <p className="text-body-medium text-text-primary">{candidateHeading(candidates[0]!)}</p>
-          <CandidateValue candidate={candidates[0]!} />
+          <CandidateValue candidate={candidates[0]!} reference={row.current_value || undefined} />
         </div>
-        <CandidateEvidence candidate={candidates[0]!} />
+        <CandidateEvidence candidate={candidates[0]!} row={row} />
       </div>
     );
   }
@@ -120,8 +126,9 @@ export function CandidateChoices(
         <div key={candidate.candidate_key} className="flex min-w-0 flex-col gap-1">
           <RadioCard value={candidate.candidate_key} className="relative items-start"
             title={<span title={candidateHeading(candidate)}>{candidateHeading(candidate)}</span>}
-            description={<CandidateValue candidate={candidate} />} />
-          <CandidateEvidence candidate={candidate} />
+            description={<CandidateValue candidate={candidate}
+              reference={row.current_value || candidates.find(peer => peer.candidate_key !== candidate.candidate_key)?.display_value} />} />
+          <CandidateEvidence candidate={candidate} row={row} />
         </div>
       ))}
       </div>

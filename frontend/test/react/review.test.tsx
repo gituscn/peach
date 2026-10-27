@@ -136,6 +136,50 @@ it('当前值独立显示人工归属，不混入旧说明中的维护实现细�
   expect(current.textContent).toContain('人工确认');
   expect(current.textContent).not.toContain('旧说明里的维护脚本名称');
 });
+
+it('标题只标出不同文字，保留共同内容和原始候选值', async () => {
+  const before = '共同开头，旧的内容；共同结尾 😀';
+  const after = '共同开头，新的内容；共同结尾 😀';
+  const entry = { ...row(1, ['nfo']), current_value: before,
+    candidates: [candidate('nfo', after)] };
+  const { host, fetcher } = await open({ data: review({ sections: { metadata_fields: [entry] } }) });
+  const card = cards(host)[0]!;
+  const current = card.querySelector('[aria-label="当前信息"]')!;
+  expect(current.textContent).toContain(before);
+  expect(card.textContent).toContain(after);
+  expect([...card.querySelectorAll('mark')].map(mark => mark.textContent)).toEqual(['旧', '新']);
+  await click(buttonIn(card, '通过'));
+  const request = fetcher.mock.calls.find(([url]) => url === REVIEW_DECISION_URL)!;
+  expect(JSON.parse(request[1]!.body as string)).toMatchObject({ candidate_key: entry.candidates[0]!.candidate_key });
+});
+
+it('来源依据只对照同名字段，不把演员与标题当作差异', async () => {
+  const entry = { ...row(1), field: 'performers', field_label: '演员', current_value: '演员甲',
+    candidates: ['javdb', 'nfo'].map((source, at) => ({ ...candidate(source, '演员甲'),
+      catalog_evidence: { title: { display_value: `共同开头，${at ? '新的' : '旧的'}内容；共同结尾` } } })) };
+  const { host } = await open({ data: review({ sections: { metadata_fields: [entry] } }) });
+  const card = cards(host)[0]!;
+  const trigger = card.querySelector('button[aria-label="展开 javdb 的来源依据"]')!;
+  await click(trigger);
+  const panel = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  expect(panel.textContent).toContain('共同开头，旧的内容；共同结尾');
+  expect([...panel.querySelectorAll('mark')].map(mark => mark.textContent)).toEqual(['旧']);
+  expect(card.querySelector('[aria-label="当前信息"]')!.querySelectorAll('mark')).toHaveLength(0);
+});
+
+it('资料字段独立于来源分组筛选，并在全队列计数后重新分页', async () => {
+  const entries = [...QUEUE, ...[201, 202].map(at => ({ ...row(at), field: 'performers', field_label: '演员' }))];
+  const { host } = await open({ data: review({ sections: { metadata_fields: entries } }) });
+  await click(buttonIn(host, '下一页'));
+  await choose(host.querySelector('button[aria-label="筛选资料字段"]'), '演员 · 2');
+  expect(keys(host)).toEqual(['row-201', 'row-202']);
+  expect(buttonIn(host, '下一页')).toBeNull();
+  await choose(host.querySelector('button[aria-label="筛选分组方式"]'), '按来源');
+  expect(keys(host)).toEqual(['row-201', 'row-202']);
+  await choose(host.querySelector('button[aria-label="筛选资料字段"]'), '标题 · 25');
+  expect(cards(host)).toHaveLength(REVIEW_PAGE_SIZE);
+  expect(keys(host)[0]).toBe('row-0');
+});
 /** Note 按语气落在 `note`／`status`／`alert` 三种角色上。 */
 const noteText = (root: ParentNode) =>
   [...root.querySelectorAll('[role="note"], [role="status"], [role="alert"]')]

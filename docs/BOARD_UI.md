@@ -371,6 +371,8 @@ Radio card 沿用 2026-09-08 取得的 `r/checkbox-card.json`（`checkbox-card.t
 
 ### 复核卡片现行组合（2026-10-27）
 
+资料字段使用独立的 BoardUI Select，不要求先按字段分组。来源依据为中性 secondary Button 与 CollapseRegion，不使用带悬停下划线的 LinkButton。文本差异使用 mark，并复用黄色背景及文字语义 token；共同文字保持原样，来源选择与写入值不受高亮影响。
+
 复核候选已改用官方 `RadioCard` 与 `RadioGroup`，替代前述基于 CheckboxCard 的早期组合。源码摘要、复用与差异见[复核卡片取证](reference-snapshots/boardui-review-cards.md)。外层使用管理页填充卡，字段徽章保持中性；当前值、来源选择及可展开依据共用一个正文滚动区。底部复用 Fieldset 操作带，忽略为中性文字键，通过保留蓝色主动作。来源依据的展开独立于单选和资料提交。
 
 ### 艺人／厂牌资料页与关注页（2026-09-12）
