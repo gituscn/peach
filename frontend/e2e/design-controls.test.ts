@@ -7,12 +7,63 @@ import { ITEM, openItemPage } from './item-fixture.ts';
 import {
   DESKTOP, MOBILE, tokenColor, openAccess, settledRun, openActivity, qualityGoal, openQualityGoals,
   openScraping, openProcessing, openCatalog, openCatalogBars, openCatalogFixture, RUNNING_JOB, FAILED_JOB,
-  installDesignBrowser,
+  installDesignBrowser, openReview,
 } from './design-fixture.ts';
 
 describe('设计决定：控件、状态与首页顶部', () => {
   let browser: Browser;
   installDesignBrowser((next) => { browser = next; });
+
+  it('复核状态沿用首页玻璃控件尺寸，空分类保留选中玻璃与状态入口', { timeout: 60_000 }, async () => {
+    for (const viewport of [DESKTOP, MOBILE]) {
+      const home = await openCatalogBars(browser, viewport);
+      let reference;
+      try {
+        reference = await home.page.locator('[data-catalog-view]').first().evaluate(element => {
+          const style = getComputedStyle(element);
+          return { height: element.getBoundingClientRect().height, fontSize: style.fontSize,
+            padding: style.padding, background: style.backgroundColor };
+        });
+      } finally {
+        await home.close();
+      }
+      const opened = await openReview(browser, undefined, viewport);
+      try {
+        const filter = opened.page.locator('[data-review-filter]');
+        const state = filter.locator('[data-entity-state]').first();
+        const style = await state.evaluate(element => {
+          const computed = getComputedStyle(element);
+          return { height: element.getBoundingClientRect().height, fontSize: computed.fontSize,
+            padding: computed.padding, background: computed.backgroundColor };
+        });
+        assert.deepEqual(style, reference);
+        const sameRow = await filter.evaluate(element => {
+          const top = element.querySelector('[data-filter-row="top"]')!.getBoundingClientRect();
+          const bottom = element.querySelector('[data-filter-row="bottom"]')!.getBoundingClientRect();
+          return Math.abs(top.top - bottom.top) < 1;
+        });
+        assert.equal(sameRow, !viewport.mobile, '足宽同排、窄屏换排');
+        const divider = await filter.locator('[data-entity-sep]').evaluate(element => getComputedStyle(element).visibility);
+        assert.equal(divider, viewport.mobile ? 'hidden' : 'visible');
+        await filter.getByRole('button', { name: /^已忽略/ }).click();
+        await settle(opened.page);
+        const geometry = await filter.evaluate(element => {
+          const button = element.querySelector('[data-entity-state][aria-pressed="true"]')!;
+          const pane = element.querySelector<HTMLElement>('[data-view-glide]')!;
+          const active = button.getBoundingClientRect(), glass = pane.getBoundingClientRect();
+          return { visible: !pane.hidden, delta: Math.abs(active.left - glass.left),
+            widthDelta: Math.abs(active.width - glass.width),
+            overflow: document.documentElement.scrollWidth > innerWidth };
+        });
+        assert.equal(geometry.visible, true);
+        assert.ok(geometry.delta < 1 && geometry.widthDelta < 1, JSON.stringify(geometry));
+        assert.equal(geometry.overflow, false);
+        assert.equal(await filter.getByRole('button', { name: /^待处理/ }).count(), 1);
+      } finally {
+        await opened.close();
+      }
+    }
+  });
 
   it('聚焦 React 输入框只画 BoardUI 外框，旧样式表的焦点环不进来', { timeout: 60_000 }, async () => {
     const opened = await openAccess(browser);

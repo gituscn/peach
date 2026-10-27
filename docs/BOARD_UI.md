@@ -369,6 +369,12 @@ Radio card 沿用 2026-09-08 取得的 `r/checkbox-card.json`（`checkbox-card.t
 | 复核骨架 | Skeleton 只是占位形状 | 骨架直接用最终容器的类名（`.review-workspace`、`.reviewcontrols`、`.reviewbulktoolbar`、`.reviewlist`），分栏、列宽、卡高全由复核页自己那套规则给；`renderInitialSurfaceLoading()` 先写 `data-surface` 才画，否则深链冷启动会先按默认版式铺一遍再跳。分类名是静态文案直接显示，只有计数和三件工具条控件是占位 |
 | 骨架里的悬浮框 | 无对应 | 骨架没有分组条可接，工具条自己封口：四角都圆、四边都描，也不吸顶，因为 `updateReviewSticky` 要等数据到货才有东西可量 |
 
+### 复核卡片现行组合（2026-10-27）
+
+资料字段使用独立的 BoardUI Select，不要求先按字段分组。来源依据为中性 secondary Button 与 CollapseRegion，不使用带悬停下划线的 LinkButton。文本差异使用 mark，并复用黄色背景及文字语义 token；共同文字保持原样，来源选择与写入值不受高亮影响。
+
+复核候选已改用官方 `RadioCard` 与 `RadioGroup`，替代前述基于 CheckboxCard 的早期组合。源码摘要、复用与差异见[复核卡片取证](reference-snapshots/boardui-review-cards.md)。外层使用管理页填充卡，字段徽章保持中性；当前值、来源选择及可展开依据共用一个正文滚动区。底部复用 Fieldset 操作带，忽略为中性文字键，通过保留蓝色主动作。来源依据的展开独立于单选和资料提交。
+
 ### 艺人／厂牌资料页与关注页（2026-09-12）
 
 证据在 `<私有验证记录>`：`tabs.json`（SHA-256

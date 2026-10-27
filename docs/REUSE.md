@@ -1,5 +1,9 @@
 # 复用清单
 
+## 复核字段筛选与文本差异
+
+复核文本差异复用 [jsdiff](https://github.com/kpdecker/jsdiff) 的 `diffChars`，前端精确固定 `diff@9.0.0`（BSD-3-Clause，自带类型），按 Unicode 码点比较并仅展示当前文本中的差异片段。当前值和候选相互对照，尚无当前值时对照其他来源；来源依据只比较同名字段。Peach 保留参照选择、语义高亮与字段筛选，不自行实现通用差异算法；原始候选值、提交契约和 ledger 均不改变。
+
 ## 任务历史关联清理
 
 采用 RAAMENN 的 [PR #151](https://github.com/peach-mitao/peach/pull/151)，固定来源提交 `eb5f6b49210ed330c767166ea204103a8193250a`，许可证沿用本项目 AGPL-3.0-or-later。复用 SQLite 的 `SET NULL` 语义和删除触发器，在外键开关两种连接下维护父任务与根任务关联。当前迁移编号为 `0049`，只清空不存在的任务引用；任务内容、有效关联、活跃后继和媒体记录保留。隔离回归覆盖旧库升级、重放、批量删除回滚及跨任务类型后继，无新增依赖。
@@ -410,6 +414,16 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 账号归属复用 `review_decision`、`creator_collection_base`、`write_owned_fields` 和全库归属审计。明确拒绝的资产与账号组合在自动摄取时跳过；用户写入保留复核入口。网黄博主只命中可信个人、内容创作者或发布账号断言，未分类账号保留全部名册入口。`attach_avatar_availability` 集中处理资料页、索引、搜索与统计的作品头像：发布账号缺少本人或出演职业证据时作品帧照常兜底，另标 `avatar_stand_in`，已安装图片独立保留。个人博主的补头像复用 `avatar_cover_face.face_square`、`readable_cut` 与 ADR-0074 的 `agreeing` 两部互证，画面取自接触印相九格（ADR-0099）。来源核查清单、逐关系回执和备份存于 `peach-data/review/`。
 
 `entity_identity_research` 与 `apply_entity_identity_research.py` 复用规范实体写入、字段归属保护、只读预览、SQLite 备份及冻结计划。逐行撤回回执核对后续修改，新增实体有额外引用时拒绝删除；观看历史和人工判断不被回滚覆盖。资料站调研复用 `performer_alias_followup.WikiSitePages`（包着 `sources/seesaa.py` 的 `WikiPages`，加 404 记忆与按站冷却）、作品表解析 `rows()` 与 `person_profile`，以及 EUC-JP 页名直取写法，不新增依赖；`creator_identity_followup` 的后继壳照抄补厂牌、补别名两条。
+
+## 复核队列
+
+复核快照在一次请求内复用人物、厂牌和系列的身份解析，下一份快照重新读取账本，别名合并后不会沿用旧身份。已批准及当前自动否决的候选在加载作品预览、头像和取景前移出显示集合；稍后和人工忽略仍各自保留。封面存在性复用 `/cover` 的文件及来源判定，不加载全库封面取景边车。接口只传结构化候选，不重复携带 CSV 的 `candidates_json`，批准仍从原候选文件核验。缓存按实际读取的资料、身份、复核和标签决定表失效，同一版本的并发请求复用一次计算；未提供版本号的旧库仍按提交通知失效，不保留为无限期快照；前端分组与分页计算随输入变化更新。复用标准库 `functools.cache`、现有聚合缓存和 React `useMemo`，无新增依赖或存量数据转换。
+
+复核状态复用 `review_decision`、候选 CSV、TanStack Query 和 BoardUI `Tabs`。`/api/review` 的根段提供待处理，`queues.later` 与 `queues.ignored` 提供独立分类和计数；页面地址保存状态与分类。旧 `skipped` 直接投影为稍后处理，人工 `rejected` 投影为已忽略，自动判定不混入人工忽略。迁移 `0050` 只新增 `review_decision_history`，不重写旧决定。显式恢复先在同一事务保存原决定，再删除当前拒绝或跳过决定；已批准和不在当前候选中的资料不可恢复。只读镜像校验三个状态完整性，旧缓存缺状态时报告未取得。无新增依赖。
+
+筛选浮窗复用首页的 `FilterGlassRows`、`useViewGlide` 和透明状态键。状态与分组、筛选按控件实际宽度自然排列，足宽同排并以首页同款竖线分组，放不下时换排并隐藏竖线；空分类保留状态入口，只读模式不提供全选或写入。分组下拉与全选保留原 Select、Button 样式。字号、状态键高度、玻璃材质和吸顶沿用同一维护源，不另设页签皮肤。
+
+复核卡片的来源选择复用官方 `RadioCard` 与 `RadioGroup`；当前值与候选共用一个正文滚动区，来源依据通过现有 `CollapseRegion` 独立展开。外框与操作带复用管理页卡面和 Fieldset 布局，字段徽章及忽略操作保持中性，通过使用原主按钮。来源、取值和资料采用规则不变；官方源码与差异见[复核卡片取证](reference-snapshots/boardui-review-cards.md)。
 
 ## 发现推荐缓存
 

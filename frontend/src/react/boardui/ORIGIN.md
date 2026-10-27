@@ -14,6 +14,8 @@
 
 | 条目 | 注册表 JSON 的 SHA-256 | 复制的文件 |
 | --- | --- | --- |
+| `radio`（2026-10-27） | `e2b75fb0560c2dcceb66ca323680af83ff36f8b2238515712d22af176f48ddbb` | `components/base/radio/radio.tsx` |
+| `radio-card`（2026-10-27） | `7ac63768bce4d854890cb3138bf605764436e0f7361cadf82fc9198f309d3d5a` | `components/base/radio/radio-card.tsx` |
 | `textarea`（2026-10-22） | `b370013f5257c38d05c5c3b7778e343ff5e42ea8e1fb0ba4db58d818b2730e16` | `components/base/textarea/textarea.tsx` |
 | `tree-view`（2026-10-17） | `72b06e3187ae7738bd1eabd46bc15ebe1d2d49be768e44306b266d91206eeb9c` | `components/base/tree-view/tree-view.tsx` |
 | `breadcrumb`（2026-10-17） | `15ec77574bb50fd5e37bf6d157905ffe7eb03226585cc77983c0beea92abd811` | `components/base/breadcrumb/breadcrumb.tsx` |

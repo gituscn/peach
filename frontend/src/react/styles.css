@@ -116,8 +116,6 @@
    * 来源图 220px、原视频封面 132px（窄屏 110px）、作品样本一格 92px。 */
   --container-review-tabs: 184px;
   --container-review-card: 340px;
-  --container-review-cover: 132px;
-  --container-review-cover-narrow: 110px;
   --container-review-asset: 92px;
   --spacing-review-card: 440px;
   --spacing-review-card-tall: 560px;
@@ -130,7 +128,6 @@
   --radius-glass-key: 7px;
   /* 分类列并回正文上方的那一档，以及药丸缩一号的那一档。 */
   --breakpoint-review-split: 900px;
-  --breakpoint-review-tight: 600px;
   /* 模态弹层的遮罩。注册表里没有模态弹层，也就没有它的底色；取值同
    * `ui-kit/modal.css` 里 `.ui-geist-modal::backdrop` 的黑 60%，深浅两档共用一个。 */
   --color-scrim: color-mix(in srgb, var(--color-black) 60%, transparent);
