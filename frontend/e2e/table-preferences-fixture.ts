@@ -61,9 +61,11 @@ export async function verifyTablePreferences(page: Page, table: Locator, label: 
   const initial = await width();
   const handle = header.getByRole('slider');
   await handle.focus(); await handle.press('Enter');
-  await handle.press('ArrowRight'); await handle.press('ArrowRight'); await handle.press('Tab');
+  await header.locator('.react-aria-ColumnResizer[data-resizing]').waitFor();
+  await handle.press('ArrowRight'); await handle.press('ArrowRight');
   await page.waitForFunction(({ node, initial }) => node && node.getBoundingClientRect().width > initial,
     { node: await header.elementHandle(), initial }, { timeout: 5000 });
+  await handle.press('Tab');
   const resized = await width(); assert.ok(resized > initial, `${label}: ${initial} → ${resized}`);
   const scroll = table.locator('..');
   const range = await scroll.evaluate(node => node.scrollWidth - node.clientWidth);

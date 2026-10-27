@@ -579,9 +579,7 @@ describe('设计决定：人物与厂牌资料页', () => {
 
   it('看片那一行：两枚标识隔 32px、按 22px 字高对齐；MISSAV 按它站上的排字，AV 用它的粉；第二枚带序号', { timeout: 60_000 }, async () => {
     const name = '七沢みあ';
-    const opened = await visit(browser, '/', DESKTOP);
-    try {
-      const page = opened.page;
+    const opened = await visit(browser, `/performers/${encodeURIComponent(name)}`, DESKTOP, async page => {
       await page.route(/\/api\/entity\?/, (route) => route.fulfill({ json: {
         id: 90_001, kind: 'performer', canonical_name: name, aliases: [], display_aliases: [],
         user_aliases: [], asset_count: 0, tags: [], related_performers: [], links: [], metadata: {},
@@ -591,7 +589,9 @@ describe('设计决定：人物与厂牌资料页', () => {
           { site: 'missav', label: 'MISSAV', ordinal: '2', slot: 'mark', mark: '', url: 'https://missav.ws/actresses/x' },
         ],
       } }));
-      await page.goto(new URL(`/performers/${encodeURIComponent(name)}`, page.url()).href, { waitUntil: 'load' });
+    });
+    try {
+      const page = opened.page;
       await page.locator('[data-missav-mark]').waitFor({ timeout: 15_000 });
       const marks = await page.locator('[data-entry-marks]').evaluate((row) => {
         const wordmark = row.querySelector('[data-missav-mark]')!;

@@ -381,7 +381,8 @@ class MediaResponseLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 mock.patch.object(SplicedMp4Response, "_respond", slow_headers), \
                 mock.patch("peach.api._server_error_headers", return_value={"X-Peach-Error-ID": "test"}) as errors:
             task, _, sent = self.request("/owned-session")
-            await asyncio.wait_for(entered.wait(), 1)
+            # 首次请求还包含应用路由准备；取消完成的时限从响应进入后单独计算。
+            await asyncio.wait_for(entered.wait(), 10)
             self.assertEqual(self.app.state.stream_sessions.cancel("owned"), 1)
             observed = None
             try:
