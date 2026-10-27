@@ -282,6 +282,7 @@ class FaceDetector:
     def __init__(self, model: Path | None = None, *, score: float = DEFAULT_SCORE,
                  nms: float = DEFAULT_NMS, allow_download: bool = True) -> None:
         import cv2
+        import numpy
 
         self._cv2 = cv2
         self.score = score
@@ -291,8 +292,10 @@ class FaceDetector:
             raise FaceModelUnavailable(
                 "当前 OpenCV 没有 FaceDetectorYN；需要 4.5.4 以上")
         # 模型那道门只管「算不算一次读数」，留不留这张脸由 `detect` 按中位数判。
-        self._detector = create(str(self.model_path), "", (320, 320),
-                                min(score, READ_FLOOR), nms, 5000)
+        # Python 读取支持中文路径；原生文件接口不参与模型路径解码。
+        model_bytes = numpy.frombuffer(self.model_path.read_bytes(), dtype=numpy.uint8)
+        self._detector = create("ONNX", model_bytes, numpy.empty(0, dtype=numpy.uint8),
+                                (320, 320), min(score, READ_FLOOR), nms, 5000)
 
     def detect(self, image) -> list[Face]:
         """返回归一化坐标的人脸，按面积从大到小。
