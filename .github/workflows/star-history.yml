@@ -1,0 +1,83 @@
+name: Star History
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '43 5 * * *'
+  push:
+    branches: [master]
+    paths: [.github/workflows/star-history.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: star-history
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: 生成蜜桃色绝对值图表
+        uses: leereilly/star-chart@e7fa78bdf8f78da6c3feeb3a97b528fd97d62727 # v0.3
+        with:
+          repository: ${{ github.repository }}
+          output: build/star-history.svg
+          style: neon-glow-stream
+          dual_theme: 'true'
+          scale: absolute
+          period: all
+          width: '900'
+          animation: none
+          level_1_color: '#ffded4'
+          level_2_color: '#ffb099'
+          level_3_color: '#f68168'
+          level_4_color: '#df533b'
+      - name: 保留渲染器许可
+        run: curl --fail --location https://raw.githubusercontent.com/leereilly/star-chart/e7fa78bdf8f78da6c3feeb3a97b528fd97d62727/LICENSE --output build/star-chart-LICENSE.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: star-history
+          path: |
+            build/star-history-light.svg
+            build/star-history-dark.svg
+            build/star-chart-LICENSE.txt
+          if-no-files-found: error
+
+  publish:
+    needs: render
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: publication
+      - uses: actions/download-artifact@v8
+        with:
+          name: star-history
+          path: incoming
+      - name: 发布到独立图表分支
+        working-directory: publication
+        shell: bash
+        run: |
+          branch_ref=$(git ls-remote --heads origin refs/heads/star-history)
+          if [ -n "$branch_ref" ]; then
+            git fetch --depth=1 origin star-history
+            git switch -C star-history FETCH_HEAD
+          else
+            git switch --orphan star-history
+          fi
+          cp ../incoming/star-history-light.svg star-history-light.svg
+          cp ../incoming/star-history-dark.svg star-history-dark.svg
+          cp ../incoming/star-chart-LICENSE.txt star-chart-LICENSE.txt
+          git add -- star-history-light.svg star-history-dark.svg star-chart-LICENSE.txt
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'docs(stats): 更新 Star 图'
+          git push origin HEAD:refs/heads/star-history

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterable
+from contextlib import nullcontext
 from pathlib import Path
 
 if not __package__:
@@ -152,10 +153,17 @@ def integrate(repo: Path, worker_branch: str, target_branch: str = "master", *,
     folder.mkdir(parents=True, exist_ok=True)
     try:
         with test_evidence.held(folder / "integration.lock",
-                                branch=worker_branch, root=str(repo)), \
-                test_evidence.held(folder / "full-suite.lock", wait_seconds=lock_timeout,
-                                   scope="integrate", branch=worker_branch, root=str(repo)):
-            return _integrate_locked(repo, worker_branch, target_branch)
+                                branch=worker_branch, root=str(repo)):
+            base = _git(repo, "merge-base", target_branch, worker_branch).stdout.strip()
+            files = _lines(_git(repo, "diff", "--name-only", f"{base}..{worker_branch}"))
+            documents = bool(files) and all(
+                path in {"README.md", "README.zh-CN.md"}
+                or path.startswith("docs/") and path.endswith(".md") for path in files)
+            guard = nullcontext() if documents else test_evidence.held(
+                folder / "full-suite.lock", wait_seconds=lock_timeout,
+                scope="integrate", branch=worker_branch, root=str(repo))
+            with guard:
+                return _integrate_locked(repo, worker_branch, target_branch)
     except test_evidence.Timeout as error:
         raise WorkspaceError(
             f"另一任务正在集成或全量验证（{test_evidence.describe_holder(Path(error.lock_file))}）；"

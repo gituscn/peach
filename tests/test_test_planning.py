@@ -130,6 +130,15 @@ class TestPlanningTests(unittest.TestCase):
         self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/upgrade-smoke.yml'])['wheel'])
         self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/unknown.yml'])['wide'])
 
+    def test_chart_workflow_checks_tooling_and_preserves_mixed_runtime_coverage(self):
+        path = '.github/workflows/star-history.yml'
+        self.assertEqual(runner.scopes_for_changes([path])[0], ('tooling',))
+        plan = ci_plan.plan('pull_request', [path])
+        for job in ('wide', 'browser', 'frontend', 'vendor', 'wheel'):
+            with self.subTest(job=job):
+                self.assertFalse(plan[job])
+        self.assertTrue(ci_plan.plan('pull_request', [path, 'src/peach/server.py'])['browser'])
+
     def setUp(self):
         environment = patch.dict(os.environ, {'PEACH_TEST_FOCUS': '', 'PEACH_E2E_FILES': ''})
         environment.start()

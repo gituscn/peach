@@ -1,5 +1,11 @@
 # 复用清单
 
+## README Star 图
+
+复用 [Star Chart](https://github.com/leereilly/star-chart) 的稳定版 v0.3，固定提交 `e7fa78bdf8f78da6c3feeb3a97b528fd97d62727`，MIT，版权为 Lee Reilly。使用 `neon-glow-stream` 霓虹流图、线性绝对值坐标、浅深双主题与蜜桃粉橙配色；不新增应用运行依赖。数据来自 GitHub 原生公开 Star 历史，不补造缺失记录，也不把历史累计增加数当作完整取消 Star 的净变化账本。
+
+独立 `Star History` 工作流生成 SVG 并保留上游许可，只在 `star-history` 分支保存产物，不触发主线测试或阻塞发版。静态 SVG 发布思路参考 SakuraMedia；未复制其受 PolyForm Noncommercial 约束的生成脚本。
+
 ## 复核字段筛选与文本差异
 
 复核文本差异复用 [jsdiff](https://github.com/kpdecker/jsdiff) 的 `diffChars`，前端精确固定 `diff@9.0.0`（BSD-3-Clause，自带类型），按 Unicode 码点比较并仅展示当前文本中的差异片段。当前值和候选相互对照，尚无当前值时对照其他来源；来源依据只比较同名字段。Peach 保留参照选择、语义高亮与字段筛选，不自行实现通用差异算法；原始候选值、提交契约和 ledger 均不改变。
