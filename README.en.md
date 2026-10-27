@@ -4,7 +4,7 @@
 
 <h1 align="center">Peach</h1>
 
-<p align="center">A private video library: local drives, cloud drives and the creators you follow, all in one place.</p>
+<p align="center">A local-first video metadata scraper and media manager for local drives, cloud drives and creator updates.</p>
 
 <p align="center">
   <a href="https://peach.video">Website</a> ·
@@ -24,10 +24,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&amp;logoColor=white" alt="license"></a>
   <a href="docs/TESTING_DESKTOP.md"><img src="https://img.shields.io/badge/Windows-x64-0078D4" alt="Windows x64"></a>
   <a href="docs/OPERATIONS.md#macos-独立测试包"><img src="https://img.shields.io/badge/macOS-DMG-555555?logo=apple&amp;logoColor=white" alt="Build and install the standalone macOS app"></a>
-  <img src="https://img.shields.io/badge/18%2B-adult%20content-critical" alt="18+ adult content">
 </p>
 
-> Use Peach to manage media you own or are authorized to use. Adult content is for adults only and remains subject to applicable laws, copyright and source-platform terms. Peach does not provide video resources or access to paid content.
+> Use Peach to manage media you own or are authorized to use, subject to applicable laws, copyright and source-platform terms, including age and regional restrictions. Peach does not provide video resources or access to paid content.
 
 Public screenshots use movie demo data with documented sources and licenses, without personal collection media; see [asset credits and licenses](https://peach.video/en/credits/). The repository includes a seed of public textual metadata and brand marks, without collection media or user databases. Access to outside sites requires the appropriate accounts and permissions.
 
@@ -45,7 +44,7 @@ Public screenshots use movie demo data with documented sources and licenses, wit
 - **Review in batches**: browse and count pending, deferred and ignored candidates separately. Restore individual or selected candidates to pending while preserving their previous decisions; approved metadata is not undone.
 - **Find your next watch**: subscribe to performers' new releases, discover titles based on your taste and save them to your want list.
 - **Cloud download**: search by video code or paste a magnet link, send it to a library with cloud download support and organize the downloaded video automatically. Channels follow configured libraries and provider capabilities, through CloudDrive2 or a direct PikPak connection. Confirm your rights to access and use the content before submitting it.
-- **Add JAV from your browser**: detect or select a video code on a supported metadata page, then send it to Peach for cloud download and library ingestion. The [userscript](https://github.com/peach-mitao/peach-userscript) is maintained independently; see [supported sources, installation and pairing](docs/JAV_BROWSER.md).
+- **Add videos from your browser**: detect or select a video code on a supported metadata page, then send it to Peach for cloud download and library ingestion. The [userscript](https://github.com/peach-mitao/peach-userscript) is maintained independently; see [supported sources, installation and pairing](docs/JAV_BROWSER.md).
 - **Taste preferences**: combine viewing, feedback, your library, browser history, bookmarks and follows to understand your preferences. Read history and bookmarks from supported local browsers in one action, or import HTML bookmarks and Chromium Bookmarks JSON. Stop reading a source or remove it when needed. See [taste data sources](docs/TASTE_SOURCES.md).
 
 Watch history, favorites and settings stay on your computer. Scanning leaves original files untouched; manual organization offers a preview and an undo for the last batch. Release codes are recognized even when the file name carries a title; for other naming schemes, add [recognition rules](docs/OPERATIONS.md#配置页) on the configuration page instead of renaming files.
@@ -60,7 +59,7 @@ System diagnostics generate reports and selected scraping records in the backgro
 
 First-time setup lets you choose the Peach proxy for metadata requests and dependency downloads. Windows, macOS and Docker distributions include an isolated amane runtime; source and wheel installations prepare Peach's locked version automatically when first needed. If preparation fails, pending items remain available for retry after fixing the network or runtime.
 
-Scanning and collection show video and recognizable JAV counts, with incremental checks for new folders. Traffic estimates use pending work, local caches, deduplicated release codes, and local samples of similar operations. Before starting, you can also review estimated additional disk usage, temporary frame files, and free space on each output drive. Library settings read and save CloudDrive API and data proxies; traffic totals follow each linked folder's connection setting. Proxy protection limits automatic video reads. See [configuration](docs/OPERATIONS.md#配置页) for measurement coverage and estimation limits.
+Scanning and collection show video and recognizable code counts, with incremental checks for new folders. Traffic estimates use pending work, local caches, deduplicated release codes, and local samples of similar operations. Before starting, you can also review estimated additional disk usage, temporary frame files, and free space on each output drive. Library settings read and save CloudDrive API and data proxies; traffic totals follow each linked folder's connection setting. Proxy protection limits automatic video reads. See [configuration](docs/OPERATIONS.md#配置页) for measurement coverage and estimation limits.
 
 The combined "Send version statistics and error diagnostics (recommended)" option is checked by default. Clear it during installation, first setup or in settings to disable both. Saved opt-out choices are preserved. While enabled, it sends the listed technical fields to Sentry; full logs, diagnostic ZIPs, media details and watch history are excluded. See [remote diagnostics](docs/DIAGNOSTICS.md#可选远程诊断).
 
@@ -138,7 +137,7 @@ For LAN access on fnOS or another NAS, set Compose's `PEACH_BIND` to the NAS LAN
 
 ## Reporting problems
 
-Check [user feedback](https://github.com/peach-mitao/peach/issues), or [open an issue](https://github.com/peach-mitao/peach/issues/new/choose) with the version, steps, expected result and actual result. Hide credentials, LAN addresses and full paths in screenshots; do not upload databases or media. Report security issues privately through the [security policy](SECURITY.md).
+Check [user feedback](https://github.com/peach-mitao/peach/issues), or [open an issue](https://github.com/peach-mitao/peach/issues/new/choose) with the version, steps, expected result and actual result. Use demo data without sexually explicit imagery in public screenshots, and hide credentials, LAN addresses and full paths; do not upload databases or media. Report security issues privately through the [security policy](SECURITY.md).
 
 ## Documentation
 

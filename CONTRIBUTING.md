@@ -11,6 +11,10 @@ Peach 是单人自托管应用，由一个人维护。欢迎提 Issue 和 PR。
 
 ## 开 Issue
 
+公开截图、录屏和附件使用不含露骨画面的演示资料，并遮盖隐私信息；不要上传影片、封面原图或数据库。公开内容与素材许可要求见[文档规范](docs/WRITING.md#公开与私有记录)。
+
+Use demo data without sexually explicit imagery in public screenshots, recordings and attachments. Redact private information, and do not upload videos, original cover images or databases.
+
 - **报缺陷**：写清 Peach 版本或构建、系统版本及架构、安装方式、复现步骤、期望结果和实际结果，附上完整报错。无法稳定复现时说明发生条件，不要求自行判断根因。Python 版本仅用于源码部署，可选；`/healthz` 返回也可选，服务无法启动时写「无法访问」即可。贴日志或诊断报告前先遮盖本机路径、网络地址、账号及凭据。
 - **提需求**：写清问题和使用场景。开放需求见 [公开路线图](https://github.com/orgs/peach-mitao/projects/7)，设计边界见 [总体架构](docs/ARCHITECTURE.md#明确不做)。涉及多用户、云托管、微服务或 PostgreSQL 的提案，先讨论是否需要新增 ADR。
 - **安全问题**：不要开公开 issue，按 [`SECURITY.md`](SECURITY.md) 私下报告。
