@@ -73,6 +73,25 @@ def run_main(argv, runtime):
 
 
 class BridgeContractTests(unittest.TestCase):
+    def test_cli_outputs_utf8_even_when_redirected_streams_start_as_gbk(self):
+        wrapper = (
+            "import runpy, sys; "
+            "sys.stdout.reconfigure(encoding='gbk'); "
+            "sys.stderr.reconfigure(encoding='gbk'); "
+            "sys.argv = sys.argv[1:]; "
+            "runpy.run_path(sys.argv[0], run_name='__main__')"
+        )
+        for arguments in ([], ['--未知参数']):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run([sys.executable, '-I', '-c', wrapper, str(SCRIPT), *arguments],
+                                        capture_output=True, check=False, timeout=30)
+                self.assertEqual(result.returncode, bridge.EXIT_USAGE)
+                if not arguments:
+                    self.assertEqual(json.loads(result.stdout.decode('utf-8')),
+                                     {'error': '番号与站名都不能为空'})
+                else:
+                    self.assertIn('--未知参数', result.stderr.decode('utf-8'))
+
     def test_self_check_loads_every_site_without_creating_a_client(self):
         runtime = make_runtime({})
         factory = mock.Mock(side_effect=AssertionError("离线自检不能创建 HTTP 客户端"))

@@ -2063,6 +2063,29 @@ class LibraryNfoTests(unittest.TestCase):
                          [('javdb', ['高跟', '屁眼'])])
         self.assertEqual(Path(rows['tags'][0]['raw_snapshot']), directory / 'DASS-468-javdb.json')
 
+    def test_damaged_snapshot_is_not_reused_even_with_a_current_receipt(self):
+        from peach.library_processing import _MissCache, _RemoteSession, misses_path
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        path = config.directory('sources') / 'library-metadata' / 'DASS-468-makers.json'
+        path.parent.mkdir(parents=True)
+        for field, value in (('title', '坏\ufffd标题'),
+                             ('actresses', [{'japanese_name': '坏\ufffd姓名'}]),
+                             ('genres', ['坏\ufffd标签'])):
+            with self.subTest(field=field):
+                path.write_text(json.dumps({'id': 'DASS-468', field: value}), encoding='utf-8')
+                artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
+                before = path.read_bytes()
+                session = _RemoteSession(config, None, _MissCache(misses_path(config)), retrying=False)
+                self.assertEqual(session._cached_evidence(['makers'], 'DASS-468'), [])
+                self.assertEqual(path.read_bytes(), before, '原始损坏证据保留供诊断')
+
+        payload = {'id': 'DASS-468', 'title': '完整标题',
+                   'collection_diagnostics': {'detail': '历史诊断\ufffd'}}
+        path.write_text(json.dumps(payload), encoding='utf-8')
+        artifact_rules.remember(path, str(upgrade_rules.PROVIDER_EVIDENCE))
+        session = _RemoteSession(config, None, _MissCache(misses_path(config)), retrying=False)
+        self.assertEqual(session._cached_evidence(['makers'], 'DASS-468'), [('makers', payload, path)])
+
     def test_expired_javdb_snapshot_is_requested_once_and_answered_sources_are_skipped(self):
         from peach.library_processing import _MissCache, _RemoteSession, misses_path
         config = PeachConfig(self.root, self.root / 'config.toml', present=True)

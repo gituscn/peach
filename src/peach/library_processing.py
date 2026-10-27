@@ -31,7 +31,8 @@ from .sources.base import SourceFailure
 from .library_nfo import sidecars, SidecarIndex
 from .media_io import directory_files, read_nfo, local_art, root_online, directory_entries, file_stat
 from .genre_decisions import load_genre_decisions
-from .metadata import candidate_text_is_valid, extract_catalog_evidence, extract_peach_fields, validate_provider_code
+from .metadata import (candidate_text_is_valid, source_text_is_valid,
+                       extract_catalog_evidence, extract_peach_fields, validate_provider_code)
 from . import metadata_routes
 from . import media_identity
 from . import junk
@@ -1492,7 +1493,10 @@ class _RemoteSession:
                     continue
                 if time.time() - path.stat().st_mtime > MISS_TTL_SECONDS:
                     continue
-                entry = (name, json.loads(path.read_text(encoding='utf-8')), path)
+                payload = json.loads(path.read_text(encoding='utf-8'))
+                if not source_text_is_valid(payload):
+                    continue
+                entry = (name, payload, path)
                 self._task_evidence[name, code] = entry
                 found.append(entry)
             except (OSError, ValueError):

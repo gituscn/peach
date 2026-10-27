@@ -449,6 +449,13 @@ def candidate_text_is_valid(candidate: dict) -> bool:
                    for key in ('value', 'display_value', 'unmapped_genres'))
 
 
+def source_text_is_valid(payload: dict) -> bool:
+    """来源文字必须完整；原始旁证、路径和诊断文字不决定缓存有效性。"""
+    return not any(contains_replacement_character(payload.get(key)) for key in (
+        'title', 'original_title', 'actresses', 'actors', 'performers', 'maker', 'studio',
+        'label', 'series', 'genres', 'tags', 'director'))
+
+
 def extract_catalog_evidence(payload: dict) -> dict[str, dict]:
     """Preserve source-only catalog fields without mapping them to ledger truth.
 
