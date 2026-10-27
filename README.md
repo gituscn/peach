@@ -6,6 +6,13 @@ A local-first video metadata scraper and media manager.
 
 [Website](https://peach.video) · [Download](https://peach.video/#download) · [Live demo](https://demo.peach.video) · [Documentation](#documentation) · [简体中文](README.zh-CN.md)
 
+[![Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownloads.peach.video%2Freleases.json&query=%24%5B0%5D.tag_name&label=release)](https://gitgud.io/peach-mitao/peach/-/releases)
+[![CI pipelines](https://img.shields.io/badge/CI-GitGud-554488?logo=gitlab&logoColor=white)](https://gitgud.io/peach-mitao/peach/-/pipelines?ref=master)
+[![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&logoColor=white)](LICENSE)
+[![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4)](docs/TESTING_DESKTOP.md)
+[![macOS DMG](https://img.shields.io/badge/macOS-DMG-555555?logo=apple&logoColor=white)](docs/OPERATIONS.md#macos-独立测试包)
+[![Age restrictions](https://img.shields.io/badge/age-18%2B-555555)](#license)
+
 ## Screenshots
 
 [![Video library with search, filters and posters](https://peach.video/assets/screenshots/home-wide-20261025-2-1280.webp)](https://peach.video/assets/screenshots/home-wide-20261025-2.png)

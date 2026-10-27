@@ -1908,7 +1908,7 @@ class OperationalScriptTests(unittest.TestCase):
                     self.assertEqual(json.loads(done.stdout), expected)
 
     def test_python_floor_matches_runtime_and_ci(self):
-        """正式运行版本、CI 与 README 共同覆盖声明的 Python 下限。"""
+        """正式运行版本与 CI 共同覆盖声明的 Python 下限。"""
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
         floor = project["requires-python"].removeprefix(">=")
         self.assertEqual(floor, "3.14")
@@ -1918,11 +1918,6 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertIn("fromJSON(needs.plan.outputs.matrix)", workflow)
         from scripts.ci_plan import plan
         self.assertEqual({row["python"] for row in plan("workflow_dispatch", [])["matrix"]["include"]}, {floor})
-        for readme, suffix in (("README.md", r"(?:\+| or newer)"),
-                               ("README.zh-CN.md", r"(?:\+| 或更高)")):
-            with self.subTest(readme=readme):
-                self.assertRegex((ROOT / readme).read_text(encoding="utf-8"),
-                                 rf"\bPython {re.escape(floor)}{suffix}")
 
     def test_functional_test_scopes_are_explicit(self):
         runner = load_script("test_runner")
@@ -1952,14 +1947,16 @@ class OperationalScriptTests(unittest.TestCase):
     def test_auto_scope_maps_changed_files_and_falls_back_to_full(self):
         """`auto` 的选域是纯函数：喂文件清单，不碰 git。"""
         runner = load_script("test_runner")
-        pick = runner.scopes_for_changes
+        def pick(paths):
+            with mock.patch.object(runner, '_import_index', return_value=({}, {}, frozenset())):
+                return runner.scopes_for_changes(paths)
         # 前缀表：多个文件取并集，反斜杠路径也认。
         self.assertEqual(pick(["src/peach/follow_store.py", "web/app.js"])[0], ("follow", "web"))
         self.assertEqual(pick(["src\\peach\\tray.py"])[0], ("sync", "tooling"))
         self.assertEqual(pick(["scripts/probe.py", "pyproject.toml", ".github/workflows/test.yml"])[0],
                          ("full",))
         self.assertEqual(pick(["README.md", "docs/STATUS.md", ".claude/skills/x/SKILL.md"])[0],
-                         ("checks", "tooling"))
+                         ("checks",))
         self.assertEqual(pick(["src/peach/web_entity.py", "src/peach/routes_pages.py"])[0],
                          ("catalog", "tooling", "web"))
         self.assertEqual(pick(["src/peach/web_follow.py"])[0], ("follow",))

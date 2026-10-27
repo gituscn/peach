@@ -475,6 +475,7 @@ class DependencyPolicyTests(unittest.TestCase):
         message = adopt.commit_message("web", ["lucide-static 1.38.0 → 1.40.0"],
                                        "4", signature)
         self.assertIn("\nREADME-Impact: none; ", message)
+        self.assertIn("\nRefs #4\n", message)
         self.assertRegex(message, r"README-Impact: none; [^\n]+\nCo-Authored-By: ")
         self.assertIn("PR #4", message)
         self.assertIn("npm run vendor:web", message)

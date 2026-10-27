@@ -792,15 +792,13 @@ class SubprocessResumeTests(unittest.TestCase):
     def check_resume_after_failure(self, scope, *options, check_full_modes=False):
         source = Path(__file__).resolve().parents[1]
         modules = ('test_runner', 'test_evidence', 'test_history', 'test_resume', 'test_run_progress',
-                   'test_shard_results', 'test_environment_identity', 'test_focus', 'change_impact')
+                   'test_shard_results', 'test_environment_identity', 'test_focus', 'change_impact', 'test_inputs')
         files = {'scripts/__init__.py': '', '.gitignore': 'build/\nruntime/\n__pycache__/\n*.pyc\n',
                  '.gitattributes': '* text=auto eol=lf\n'}
         files.update({'scripts/' + name + '.py': (source / 'scripts' / (name + '.py')).read_text(encoding='utf8')
                       for name in modules})
         files['entry.py'] = (
-            'from pathlib import Path\nfrom unittest import mock\nfrom scripts import test_runner as runner\n'
-            'with mock.patch.object(runner.test_evidence, "machine_lock_path", '
-            'return_value=Path.cwd()/"runtime/machine.lock"):\n    raise SystemExit(runner.main())\n')
+            'from scripts import test_runner as runner\nraise SystemExit(runner.main())\n')
         sample = ('from pathlib import Path\nimport unittest\nclass Suite(unittest.TestCase):\n'
                   '    def test_value(self):\n        root=Path(__file__).resolve().parents[1]/"runtime"\n'
                   '        with (root/(__name__+".calls")).open("a", encoding="utf8") as output:\n'
@@ -1075,6 +1073,16 @@ class VerificationTests(unittest.TestCase):
         (self.repo / "README.md").unlink()
         self.assertNotEqual(baseline, evidence.snapshot(self.repo))
 
+    def test_committing_a_deleted_file_preserves_the_verified_snapshot(self):
+        original = evidence.manifest(self.repo)
+        (self.repo / 'README.md').unlink()
+        removed = evidence.manifest(self.repo)
+        paths, _ = runner.change_impact.delta(original, removed)
+        self.assertIn('README.md', paths)
+        self.git('add', '--', 'README.md')
+        self.git('commit', '-m', 'test: remove fixture document')
+        self.assertEqual(removed, evidence.manifest(self.repo))
+
     def test_git_execute_mode_changes_require_full_even_without_content_changes(self):
         original = evidence.manifest(self.repo)
         self.git("update-index", "--chmod=+x", "README.md")
@@ -1089,11 +1097,13 @@ class VerificationTests(unittest.TestCase):
         path.write_text("value = 1\n", encoding="utf-8")
         self.git("add", "--", name)
         contents = runner.changed_contents(self.repo, "HEAD", [name])
-        self.assertEqual(runner.scopes_for_changes([name], contents=contents)[0], ("follow",))
+        with mock.patch.object(runner, '_import_index', return_value=({}, {}, frozenset())):
+            self.assertEqual(runner.scopes_for_changes([name], contents=contents)[0], ("follow",))
         self.git("commit", "-m", "test: fixture")
         path.unlink()
         contents = runner.changed_contents(self.repo, "HEAD", [name])
-        self.assertEqual(runner.scopes_for_changes([name], contents=contents)[0], ("follow",))
+        with mock.patch.object(runner, '_import_index', return_value=({}, {}, frozenset())):
+            self.assertEqual(runner.scopes_for_changes([name], contents=contents)[0], ("follow",))
 
     def test_known_python_file_execute_mode_requires_full(self):
         name = "src/peach/web_follow.py"
@@ -1530,7 +1540,7 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(runner, "build_suite", side_effect=self.scope_suite) as build:
             self.assertEqual(runner.main(["--scope", "auto"]), 0)
         self.assertTrue(build.called)
-        self.assertTrue(all(call.args == ('checks', 'tooling') for call in build.call_args_list))
+        self.assertTrue(all(call.args == ('checks',) for call in build.call_args_list))
         record = evidence.read(self.repo, evidence.key(self.repo))
         self.assertEqual(record["baseline"], original)
         self.assertEqual(record["validated"]["full"], stamp)

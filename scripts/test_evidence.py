@@ -65,7 +65,7 @@ def manifest(root: Path) -> dict:
                 except UnicodeError:
                     pass
         elif not path.exists():
-            files[name] = "deleted"
+            continue
         else:
             raise ValueError(f"无法为文件生成验证快照：{name}")
     version = root / "src/peach/__init__.py"
@@ -365,17 +365,6 @@ def write(root: Path, state: str, scopes: tuple[str, ...], *, success: bool,
 
 def holder_path(lock_path: Path) -> Path:
     return lock_path.with_name(lock_path.name + ".holder.json")
-
-
-def machine_lock_path() -> Path:
-    """整台机器共用的重负载锁：所有工作树、所有会话和本机 CI runner 的作业都排这一把。
-
-    放在用户目录而不是仓库里：runner 的作业检出在别处，仓库级的全量锁管不到它；
-    浏览器、vitest 与构建同时跑会把机器压满，固定时限的用例随之偶发超时。
-    """
-    base = os.environ.get("LOCALAPPDATA") or str(Path.home() / ".local" / "state")
-    # 不放进应用自己的 `%LOCALAPPDATA%\Peach`：那是已装 Peach 的目录，测试设施不往里写。
-    return Path(base) / "peach-test-locks" / "test-machine.lock"
 
 
 QUEUE_POLL_SECONDS = 0.1

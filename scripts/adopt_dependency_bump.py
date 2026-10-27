@@ -248,6 +248,7 @@ def commit_message(key: str, versions: list[str], pr: str | None,
                "所以接管到本地分支。")
     return (f"chore(deps): 接管 {recipe['label']} 的升级\n\n{why}\n\n"
             + ("升级：" + "、".join(versions) + "\n\n" if versions else "")
+            + (f"Refs #{pr}\n\n" if pr else "")
             + "README-Impact: none; 依赖版本与派生产物，README 不涉及。\n"
             + f"Co-Authored-By: {signature}\n")
 
