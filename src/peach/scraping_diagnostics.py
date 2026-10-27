@@ -296,6 +296,8 @@ def _issues(config, asset_ids, export):
                     continue
                 record = {key: row[key] for key in ('asset_id', 'message', 'severity', 'failed_action',
                                                    'retryable', 'last_failed_at') if key in row}
+                if isinstance(row.get('diagnostics'), dict):
+                    record['diagnostics'] = error_reporting.scrub(row['diagnostics'])
                 record['job_id'] = path.name[len('library-processing-'):-len('.issues.jsonl')]
                 records.append(record)
                 if len(records) > ROW_LIMIT:

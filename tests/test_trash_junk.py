@@ -71,6 +71,30 @@ class TrashJunkTests(unittest.TestCase):
         self.assertIsNone(self.disposal(1))
         self.assertTrue(self.out.is_file())
 
+    def test_strm_pointers_stay_out_of_junk_and_existing_decisions_are_preserved(self):
+        from peach import junk
+
+        for asset_id, name in enumerate(('SHKD791.FHD@b1b1s9.com.strm',
+                                         'ADN174.FHD@b1b1s9.com.STRM',
+                                         'RBD899.FHD@b1b1s9.com.strm'), 1):
+            self.add(asset_id, '115', 'B:\\Films\\' + name, 'video', 1024)
+        self.add(4, '115', r'B:\Films\tuu26.com.mp4', 'video', 1024, 60)
+        self.add(5, '115', r'B:\Films\previous.strm', 'video', 1024)
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute("UPDATE asset SET disposal='trash',disposal_reason='junk' WHERE id=5")
+            connection.execute("INSERT INTO review_decision(category,item_key,status,note,updated_at) "
+                               "VALUES('junk_file','1','rejected','用户保留','2026-01-01')")
+        before = self.db_path.read_bytes()
+        queued = self.trash_junk.select_candidates(self.db_path, min_score=40)
+        self.assertEqual({row['id'] for row in queued}, {4})
+        self.assertEqual(self.db_path.read_bytes(), before)
+        result = junk.isolate(self.db_path, asset_ids=[1, 2, 3, 4, 5])
+        self.assertEqual(result['ids'], [4])
+        self.assertEqual([self.disposal(i) for i in (1, 2, 3, 5)], [None, None, None, 'trash'])
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            self.assertEqual(connection.execute("SELECT status FROM review_decision "
+                "WHERE category='junk_file' AND item_key='1'").fetchone()[0], 'rejected')
+
     def test_apply_trashes_only_candidates_at_or_above_the_bar(self):
         self.add(1, "115", r"B:\广告\tuu26.com.mp4", "video", 10 * 1024**2, 60)
         self.add(2, "115", r"B:\番号\正片.mp4", "video", 400 * 1024**2, 900)

@@ -1,5 +1,15 @@
 # 复用清单
 
+## 首页筛选聚合与缓存
+
+采用 bbingz 的 [PR #205](https://github.com/peach-mitao/peach/pull/205)，固定来源提交 `bbf5aac8e9562211c324c2019bff35888266df84`，许可证沿用本项目 AGPL-3.0-or-later。作品筛选集合先在独立子查询中求出，厂牌、标签和演员按既有关系聚合，保留去重计数与标签可见性。没有选中标签时移除无效 `tag_match`，复用既有修订缓存、同键锁与跨连接写入失效机制，不在线改写 SQLite 统计或增加索引迁移。
+
+## 混合媒体根与模型读取
+
+馆藏采集复用 `platform.within_root` 的 SMB 根身份判断，本地路径保留字面归属比较，不逐影片访问挂载目录。STRM 是链接文件，其大小和推广名不作为远端影片的垃圾证据；垃圾队列读取时重新评分，既有人工决定与回收站记录保持原样。
+
+YuNet 与 SFace 沿用既有模型哈希校验，Python 读取模型字节后交给 OpenCV 的 ONNX buffer 入口，避免 Windows 原生文件读取对非 ASCII 路径的限制。没有新增模型副本、依赖或路径重试。隔离验证用同一哈希的模型分别从普通路径与中文路径加载，并用合成数组执行检测和特征计算。
+
 ## README Star 图
 
 复用 [Star Chart](https://github.com/leereilly/star-chart) 的稳定版 v0.3，固定提交 `e7fa78bdf8f78da6c3feeb3a97b528fd97d62727`，MIT，版权为 Lee Reilly。使用 `neon-glow-stream` 霓虹流图、线性绝对值坐标、浅深双主题与蜜桃粉橙配色；不新增应用运行依赖。数据来自 GitHub 原生公开 Star 历史，不补造缺失记录，也不把历史累计增加数当作完整取消 Star 的净变化账本。
