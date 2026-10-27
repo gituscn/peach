@@ -3,6 +3,7 @@ import json
 import io
 from pathlib import Path
 import tempfile
+import threading
 import time
 from types import SimpleNamespace
 import unittest
@@ -674,6 +675,67 @@ class BrowserFallbackTests(unittest.TestCase):
             self.assertTrue(describe(self.root, "minnano-av")["browser"])
         save(self.root, "minnano-av", {"network": "direct"})
         self.assertTrue(fixed_to_browser(self.root, "minnano-av"), "改连接方式不丢固定")
+
+    def test_user_pause_between_http_and_browser_waits_before_opening_the_browser(self):
+        from peach.processing_control import ProcessingControl
+
+        control = ProcessingControl(self.root / 'control.json')
+        paused = threading.Event()
+        finished = threading.Event()
+        errors = []
+        browser = self.browser(lambda request: HttpResponse(200, {}, b'<title>actress</title>'))
+        transport = SourceTransport(self.root)
+        self.addCleanup(transport.close)
+
+        def http(*args):
+            control.request('pause', 'job')
+            return HttpResponse(403, {}, b'')
+
+        transport.transports['minnano-av'] = http
+
+        def run():
+            try:
+                with control.bind('job', publish=lambda **values: paused.set() if values.get('status') == 'paused' else None,
+                                  active=lambda: True, db_path=self.root / 'database/ledger.db', mode='high'):
+                    transport(self.request, 1, 100)
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        with patch('peach.browser_transport.shared', return_value=browser):
+            thread = threading.Thread(target=run)
+            thread.start()
+            try:
+                self.assertTrue(paused.wait(2))
+                self.assertEqual(browser.calls, [])
+                self.assertFalse(finished.is_set())
+            finally:
+                control.request('resume', 'job')
+                thread.join(2)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(browser.calls, [self.SEARCH])
+
+    def test_user_cancel_between_http_and_browser_does_not_open_the_browser(self):
+        from peach.jobs import JobCancelled
+        from peach.processing_control import ProcessingControl
+
+        control = ProcessingControl(self.root / 'control.json')
+        transport = SourceTransport(self.root)
+        self.addCleanup(transport.close)
+
+        def http(*args):
+            control.request('cancel', 'job')
+            return HttpResponse(403, {}, b'')
+
+        transport.transports['minnano-av'] = http
+        with patch('peach.browser_transport.shared') as browser, \
+                control.bind('job', publish=lambda **values: None, active=lambda: True,
+                             db_path=self.root / 'database/ledger.db', mode='high'):
+            with self.assertRaises(JobCancelled):
+                transport(self.request, 1, 100)
+        browser.assert_not_called()
 
     def test_a_challenge_page_over_http_also_gets_the_browser_check(self):
         challenge = HttpResponse(200, {}, b"<html><head><title>Just a moment...</title></head></html>")

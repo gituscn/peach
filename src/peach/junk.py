@@ -244,9 +244,10 @@ def _junk_rows(connection, *, asset_ids=None, roots=None):
 
 
 def _junk_file_eligible(row) -> bool:
-    """资料边车和文件自身带番号的分卷不属于垃圾附件。"""
+    """资料边车、STRM指针和文件自身带番号的分卷不属于垃圾附件。"""
     item = PureWindowsPath(row["name"] or row["path"] or "")
-    if item.suffix.casefold() in MEDIA_SIDECAR_SUFFIXES:
+    # STRM 的大小与名字描述的是链接文件，不能作为远端影片的垃圾证据。
+    if item.suffix.casefold() in MEDIA_SIDECAR_SUFFIXES or item.suffix.casefold() == '.strm':
         return False
     identity = PART_MARK.sub("", PROMO_DOMAIN.sub("", item.stem)).strip("@._- ")
     return not (row["medium"] == "video" and PART_MARK.search(item.stem)

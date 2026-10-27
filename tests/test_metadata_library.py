@@ -89,6 +89,72 @@ def _archive_pages(url):
 
 
 class LibraryNfoTests(unittest.TestCase):
+    def test_cover_failure_retains_redacted_exception_in_scraping_export_and_remains_retryable(self):
+        from peach.library_processing import _MissCache, _ProcessingIssues, _RemoteSession
+        from peach.scraping_diagnostics import _issues
+
+        config = PeachConfig(self.root, self.root / 'config.toml', present=True)
+        path = issues_path(config, 'cover-job')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        provider = stub_provider()
+        failure = RuntimeError('model unreadable token=hidden-secret C:\\private\\model.onnx')
+        provider.cover.side_effect = [failure, False]
+        remote = _RemoteSession(config, lambda: provider, _MissCache(self.root / 'misses.json'), retrying=False)
+        state = dict(job_id='cover-job', notes={}, issue_count=0, paused_count=0,
+                     issue_preview=[], retryable_asset_ids=[], issues_truncated=False)
+        issue = _ProcessingIssues(state, path, lambda: None, lambda values: None)
+        row = {'id': 1, 'name': 'ABC-199_AI.mp4', 'path': 'R:/Films/ABC-199_AI.mp4'}
+        remote._cover(row, 'ABC-199', self.root / 'covers', update=lambda **values: None, issue=issue)
+        remote._cover(dict(row, id=2), 'ABC-200', self.root / 'covers', update=lambda **values: None, issue=issue)
+        self.assertEqual(provider.cover.call_count, 2)
+        self.assertFalse(remote.misses.fresh('cover', 'ABC-199'))
+        recorded = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual(recorded['diagnostics']['code'], 'ABC-199')
+        self.assertEqual(recorded['diagnostics']['stage'], 'fetching_cover')
+        self.assertEqual(recorded['diagnostics']['exception'][0]['type'], 'RuntimeError')
+        self.assertTrue(recorded['diagnostics']['frames'])
+        self.assertNotIn('hidden-secret', json.dumps(recorded))
+        self.assertNotIn('private', json.dumps(recorded))
+        self.assertEqual((state['issue_count'], state['retryable_asset_ids']), (1, [1]))
+        exported = {}
+        export = SimpleNamespace(add=lambda name, value: exported.update({name: value}),
+                                 unavailable=lambda *args: self.fail(str(args)))
+        _issues(config, {1}, export)
+        self.assertEqual(exported['issues.json']['records'][0]['diagnostics'], recorded['diagnostics'])
+        self.assertEqual(exported['issues.json']['records'][0]['job_id'], 'cover-job')
+
+    def test_collection_keeps_local_and_smb_resources_in_their_online_roots(self):
+        from peach.library_processing import _collection_rows, _online_source_root
+        from peach.smb_media import SmbResource
+
+        db = fresh_ledger(self.root)
+        remote = SmbResource('nas', 'R:/Films', 'smb://files.invalid/films', (), None)
+        outside = SmbResource('other', 'R:/Films', 'smb://other.invalid/films', (), None)
+        local = self.root / 'local'
+        names = ['ABC-101.mp4', 'ABC-102.mp4', 'ABC-103.mp4']
+        paths = ['R:/Films/' + names[0], str(local / names[1]), 'R:/Other/' + names[2]]
+        resources = [remote / names[0], local / names[1], outside / names[2]]
+        translated = dict(zip(paths, resources))
+        translated['R:/Films'] = remote
+        with closing(sqlite3.connect(db)) as connection, connection:
+            connection.executemany('INSERT INTO asset(location,path,name,medium) VALUES(?,?,?,?)',
+                                   [('local', path, name, 'video') for path, name in zip(paths, names)])
+        before = db.read_bytes()
+        with patch('peach.library_processing.translate_ledger_path', side_effect=translated.__getitem__), \
+                patch('peach.library_processing.root_online', return_value=True):
+            for roots in ([remote, local], [local, remote]):
+                rows, _ = _collection_rows(db, locations={'local': ('R:/Films', str(local))},
+                                            online_roots=roots, asset_ids=None)
+                self.assertEqual([row['name'] for row in rows], names[:2])
+            rows, _ = _collection_rows(db, locations={'local': ('R:/Films',)},
+                                        online_roots=[remote], asset_ids=[1, 3])
+            self.assertEqual([row['name'] for row in rows], names[:1])
+            self.assertIsNone(_online_source_root('local', 'R:/Films', {'local': [local / names[1]]},
+                                                 retrying=True, issue=Mock()))
+            self.assertEqual(_online_source_root('local', 'R:/Films', {'local': [remote / names[0]]},
+                                                retrying=True, issue=Mock()), remote)
+        self.assertEqual(db.read_bytes(), before)
+
     def test_collection_selects_main_video_and_preserves_registered_trailer(self):
         from peach.library_processing import _collection_rows
         db = fresh_ledger(self.root)
