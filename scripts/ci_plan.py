@@ -149,7 +149,9 @@ def main() -> None:
     if output := os.environ.get("GITHUB_OUTPUT"):
         with Path(output).open("a", encoding="utf-8") as stream:
             for key in result:
-                stream.write(f"{key}={json.dumps(result[key])}\n")
+                value = result[key]
+                encoded = value if isinstance(value, str) else json.dumps(value)
+                stream.write(f"{key}={encoded}\n")
 
 
 if __name__ == "__main__":
