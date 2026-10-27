@@ -91,6 +91,35 @@ class _WorktreeCase(unittest.TestCase):
         self.tmp.cleanup()
 
 class AgentWorktreeTests(_WorktreeCase):
+    def test_document_integration_keeps_its_checks_without_waiting_for_full_suite(self):
+        result = create(self.repo, "Codex", "readme", self.root / "worktrees")
+        worker = Path(result["path"])
+        (worker / "README.md").write_text("# Example\n", encoding="utf-8")
+        _git(worker, "add", "README.md")
+        _git(worker, "commit", "-m", "docs: example")
+        folder = agent_worktree.test_evidence.evidence_dir(self.repo)
+        with agent_worktree.test_evidence.held(folder / "full-suite.lock", scope="full"):
+            report = integrate(self.repo, str(result["branch"]), lock_timeout=0)
+        self.assertEqual(report["files"], ["README.md"])
+        agent_worktree.require_verified.assert_called_once_with(worker, "master", {"README.md"})
+        self.assertEqual((self.repo / "README.md").read_text(encoding="utf-8"), "# Example\n")
+
+    def test_code_integration_waits_for_full_suite_without_changing_master(self):
+        result = create(self.repo, "Codex", "code", self.root / "worktrees")
+        worker = Path(result["path"])
+        (worker / "worker.txt").write_text("worker\n", encoding="utf-8")
+        (worker / "README.md").write_text("# Example\n", encoding="utf-8")
+        _git(worker, "add", "README.md")
+        commit(worker, "worker change")
+        before = _git(self.repo, "rev-parse", "HEAD").stdout.strip()
+        folder = agent_worktree.test_evidence.evidence_dir(self.repo)
+        with agent_worktree.test_evidence.held(folder / "full-suite.lock", scope="full"), \
+                self.assertRaisesRegex(WorkspaceError, "全量验证"):
+            integrate(self.repo, str(result["branch"]), lock_timeout=0)
+        self.assertEqual(_git(self.repo, "rev-parse", "HEAD").stdout.strip(), before)
+        self.assertEqual((self.repo / "worker.txt").read_text(encoding="utf-8"), "base\n")
+        self.assertFalse((self.repo / "README.md").exists())
+
     def test_create_ready_and_integrate_non_overlapping_branch(self):
         result = create(self.repo, "Claude", "metadata batch", self.root / "worktrees")
         worker = Path(result["path"])
