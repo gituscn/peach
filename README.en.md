@@ -51,7 +51,7 @@ Watch history, favorites and settings stay on your computer. Scanning leaves ori
 
 Scanning, cloud downloads and media processing share junk checks. Attachments with sufficient evidence go to the recoverable trash; uncertain items await review. You can restore an item and mark it as “not junk”. See [junk files](docs/OPERATIONS.md#垃圾文件) for processing order and protections.
 
-Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. When metadata or cover requests take too long, skip the current work, keep completed results, and retry unfinished items afterward. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
+Scanning, follow updates and new-release metadata collection save their progress and continue unfinished items after the app restarts. When metadata or cover requests take too long, skip the current work or stop the entire scan and collection task. Completed results are kept, and stopped tasks do not resume automatically. The management page can process only newly added videos, export the complete issue list, or archive notices from finished tasks while keeping their history. See [task recovery](docs/OPERATIONS.md#长时任务断点续跑) for recovery boundaries.
 
 Upgrades automatically process existing metadata and caches while preserving manual edits. Normal use requires no migration scripts. The app and independently installed userscript offer update notices; page refreshes remain your choice. See [automatic upgrade processing](docs/OPERATIONS.md#升级后的自动处理) for scope and recovery.
 
@@ -93,6 +93,8 @@ Try search, filters and profiles in the [live demo](https://demo.peach.video). I
     <td colspan="2" align="center">Player: film details and playback controls</td>
   </tr>
 </table>
+
+Daily sync discovers new files and completes pending videos; full-library maintenance has a separate menu. Browse series alongside studios and agencies, and filter the catalog by release year. Narrow cards retain release dates on a separate line.
 
 ## Download and use
 

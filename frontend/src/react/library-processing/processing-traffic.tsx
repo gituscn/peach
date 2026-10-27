@@ -31,10 +31,11 @@ export function TrafficProgress({ traffic, initial = false, detailsOpen, onDetai
   const count = (value: number) => value.toLocaleString('zh-CN');
   return <div data-processing-traffic="" className="flex min-w-0 flex-col gap-2 text-caption-1-regular text-text-secondary tabular-nums wrap-anywhere">
     {traffic.workload ? <p className="flex flex-wrap gap-x-3 gap-y-1">
-      <span>视频 {count(traffic.workload.video_files)} 个</span>
+      <span>{traffic.unknown_files ? '已发现视频' : '范围内视频'} {count(traffic.workload.video_files)} 个</span>
       <span>JAV 文件 {count(traffic.workload.jav_files)} 个 · 不同番号 {count(traffic.workload.jav_titles)} 个</span>
     </p> : null}
-    {traffic.inventory && !traffic.inventory.complete ? <p role="status">正在统计新目录…</p> : null}
+    {traffic.inventory && !traffic.inventory.complete ? <p role="status">正在发现新增文件，数量和预估仍会变化…</p> : null}
+    {traffic.unknown_files && traffic.inventory?.complete !== false ? <p role="status">尚有文件未确认，当前数量和预估不完整</p> : null}
     {traffic.inventory?.errors ? <p role="status">部分目录无法读取，数量和预估不完整</p> : null}
     <div className="inline-grid grid-cols-2 gap-6 py-2">
       <section aria-label="流量预估" className="flex min-w-0 flex-col gap-1">

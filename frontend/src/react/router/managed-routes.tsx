@@ -284,6 +284,7 @@ const indexRoute: ManagedRoute<IndexOpenProps> = {
 };
 export const INDEX_ROUTES: IndexRouteTable = {
   '/performers': indexRoute, '/creators': indexRoute, '/studios': indexRoute, '/agencies': indexRoute, '/tags': indexRoute,
+  '/series': indexRoute,
 };
 
 /* 资料页：资料卡、筛选浮层、新作那一行与正文是同一页的四块。框架由元素排好（`openManagedRoute` 的

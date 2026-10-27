@@ -25,10 +25,12 @@ export interface LibraryProcessingIssue {
 /** 一趟扫描与采集的快照。字段以 `q_library_processing`（`src/peach/web_library_processing.py`）为准。 */
 export interface LibraryProcessingData {
   metadata_only?: boolean;
-  /** `idle` | `running` | `pausing` | `paused` | `complete` | `failed`。 */
+  /** `idle` | `running` | `pausing` | `paused` | `stopping` | `cancelled` | `complete` | `failed`。 */
   status: string;
   /** 本轮各阶段已处理完但留有问题，或执行中断。 */
-  outcome?: 'complete' | 'partial' | 'interrupted';
+  outcome?: 'complete' | 'partial' | 'interrupted' | 'cancelled';
+  archived?: boolean;
+  new_asset_count?: number;
   speed_mode?: ProcessingSpeed;
   eta_seconds_min?: number | null;
   eta_seconds_max?: number | null;
@@ -107,6 +109,8 @@ export interface ProcessingTraffic {
 export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signal?: AbortSignal, inventory?: string) => {
   const params = new URLSearchParams({ estimate: '1', stage: command.stage || 'all' });
   if (command.asset_ids) params.set('asset_ids', JSON.stringify(command.asset_ids));
+  if (command.scope) params.set('scope', command.scope);
+  if (command.incremental) params.set('incremental', '1');
   if (inventory) params.set('inventory', inventory);
   return apiGet<{ traffic: ProcessingTraffic }>(`${LIBRARY_PROCESSING_URL}?${params}`, signal);
 };
@@ -114,6 +118,8 @@ export const fetchProcessingEstimate = (command: LibraryProcessingCommand, signa
 /** 一次写操作的请求体：指定处理阶段与影片，或者按任务号重试失败项。 */
 export type ProcessingSpeed = 'low' | 'standard' | 'high';
 export interface LibraryProcessingCommand {
+  incremental?: boolean;
+  scope?: 'new';
   stage?: 'scan' | 'collect' | 'previews' | 'metadata';
   asset_ids?: number[];
   job_id?: string;
@@ -121,7 +127,7 @@ export interface LibraryProcessingCommand {
   speed_mode?: ProcessingSpeed;
 }
 export type ProcessingControlCommand =
-  | { action: 'pause' | 'resume'; job_id: string }
+  | { action: 'pause' | 'resume' | 'cancel' | 'archive'; job_id: string }
   | { action: 'set_speed'; speed_mode: ProcessingSpeed; job_id?: string }
   | { action: 'skip_current'; job_id: string; asset_id: number };
 
@@ -146,7 +152,7 @@ export function slowItemText({ what, source }: SlowItem): string {
 
 /** 暂停中的任务仍占用同一份处理范围，可继续并持续读取状态。 */
 export const processingActive = (state?: LibraryProcessingData) =>
-  !!state && ['running', 'pausing', 'paused'].includes(state.status);
+  !!state && ['running', 'pausing', 'paused', 'stopping'].includes(state.status);
 
 export const processingHasPartialResult = (state?: LibraryProcessingData) =>
   state?.status === 'failed' && state.outcome === 'partial';
@@ -157,6 +163,7 @@ export const ALL_CONTENT_URL = '/?loc=&thumb=0';
 /** 时间向分钟取整；区间两端始终使用同一单位。 */
 export function remainingTime(state: LibraryProcessingData): string {
   if (!processingActive(state)) return '';
+  if (state.status === 'stopping') return '正在停止，等待当前步骤退出；已取得的结果会保留';
   if (state.status === 'paused') return '已暂停，继续后更新预估';
   if (state.status === 'pausing') return '正在暂停，当前步骤结束后暂停';
   if (state.stalled) return '等待当前文件响应，剩余时间待更新';

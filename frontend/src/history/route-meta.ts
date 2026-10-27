@@ -45,6 +45,7 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
   '/creators': { title: '卖家', reload: 'reopen' },
   '/studios': { nav: 'studios', title: '厂牌', reload: 'reopen' },
   '/agencies': { title: '事务所', reload: 'reopen' },
+  '/series': { nav: 'studios', title: '系列', reload: 'reopen' },
   '/tags': { nav: 'tags', title: '标签', reload: 'reopen' },
   '/performers/*': { reload: 'reopen' },
   '/studios/*': { reload: 'reopen' },

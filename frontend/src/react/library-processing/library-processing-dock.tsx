@@ -25,7 +25,7 @@ export function LibraryProcessingDock({ toast: receipt }: Pick<LibraryProcessing
     const active = processingActive(state);
     const currentFailure = state?.status === 'failed'
       && (settled?.job_id === state.job_id || freshProcessingResult(state));
-    if (hidden || (!active && !problem && !currentFailure && !(requested && state?.status === 'failed'))) {
+    if (hidden || (state?.archived && !problem) || (!active && !problem && !currentFailure && !(requested && state?.status === 'failed'))) {
       if (shown.current) toast.dismiss(TASK_TOAST);
       shown.current = false;
       return;

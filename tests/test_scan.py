@@ -123,6 +123,52 @@ class WindowsShapeTests(_ScanCase):
 class PosixShapeTests(_ScanCase):
     """macOS：账本里写 `R:\\media\\...`，遍历的是挂载点，读取侧按挂载表翻回去。"""
 
+    def test_file_identity_preserves_id_and_personal_fields_after_external_rename(self):
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        first, _ = self._scan('R:\\media', **options)
+        old = self.media / '创作者/sub/a.mp4'
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            asset_id = connection.execute("SELECT id FROM asset WHERE medium='video'").fetchone()[0]
+            connection.execute("UPDATE asset SET rating=5,catalog_title='人工标题' WHERE id=?", (asset_id,))
+        old.rename(self.media / 'changed.mp4')
+        second, _ = self._scan('R:\\media', **options, new_only=True)
+        self.assertEqual(second.new_ids, ())
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute('SELECT id,name,rating,catalog_title FROM asset WHERE medium=\'video\'').fetchall(),
+                             [(asset_id,'changed.mp4',5,'人工标题')])
+
+    def test_same_size_copy_and_hardlink_are_separate_files(self):
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        self._scan('R:\\media', **options)
+        old = self.media / '创作者/sub/a.mp4'
+        (self.media / 'copy.mp4').write_bytes(old.read_bytes())
+        os.link(old, self.media / 'hardlink.mp4')
+        result, _ = self._scan('R:\\media', **options, new_only=True)
+        self.assertEqual(len(result.new_ids), 2)
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM asset WHERE medium='video'").fetchone()[0], 3)
+
+    def test_same_second_scan_returns_only_exact_insertions(self):
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        with patch('peach.scan.time.strftime', return_value='2026-10-27 12:00:00'):
+            self._scan('R:\\media', **options)
+            (self.media / 'new.mp4').write_bytes(b'new-video')
+            result, _ = self._scan('R:\\media', **options, new_only=True)
+        self.assertEqual(len(result.new_ids), 1)
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute('SELECT name FROM asset WHERE id=?', result.new_ids).fetchone()[0], 'new.mp4')
+
+    def test_repeated_scan_in_one_second_keeps_completed_videos_out_of_the_new_queue(self):
+        from peach.library_new_assets import pending, remember
+        options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=False)
+        with patch('peach.scan.time.strftime', return_value='2026-10-27 12:00:00'):
+            self._scan('R:\\media', **options)
+            queued = pending(self.db)
+            self.assertEqual(len(queued), 1)
+            remember(self.db, completed=queued)
+            self._scan('R:\\media', **options)
+            self.assertEqual(pending(self.db), [])
+
     def test_windows_mount_mapping_has_the_same_ledger_path_contract(self):
         options = dict(declared_roots={'local': ('R:\\media',)}, mounts={'local': (self.media,)}, windows=True)
         self.assertEqual(scan.walk_root_for('local', 'R:\\media\\创作者', **options), self.media / '创作者')

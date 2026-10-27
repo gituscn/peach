@@ -106,6 +106,7 @@ describe('扫描与采集控制', () => {
         await page.route('**/api/library-processing{,?*}', async route => {
           const url = new URL(route.request().url());
           if (url.searchParams.has('estimate')) {
+            assert.equal(url.searchParams.get('incremental'), '1');
             inventoryReads += 1;
             await route.fulfill({ json: { traffic: { ...state.traffic,
               workload: inventoryComplete ? state.traffic.workload : { video_files: 10, jav_files: 3, jav_titles: 2 },
@@ -133,19 +134,21 @@ describe('扫描与采集控制', () => {
         await card.waitFor();
         await settle(page);
         assert.equal(await card.locator('[data-processing-controls]').count(), 0);
-        assert.equal(await card.getByRole('button', { name: '同步媒体库', exact: true }).locator('svg').count(), 0);
+        assert.equal(await card.getByRole('button', { name: '同步新增文件', exact: true }).locator('svg').count(), 0);
         await card.getByRole('button', { name: '更多同步方式', exact: true }).click();
         const menu = page.getByRole('dialog', { name: '同步方式', exact: true });
         assert.equal(await menu.locator('svg').count(), 0);
-        assert.equal(await menu.getByRole('button').count(), 4);
-        for (const label of ['仅扫描文件', '仅补全已入库影片', '仅补全影片资料', '仅补全预览图']) {
+        assert.equal(await menu.getByRole('button').count(), 7);
+        assert.equal(await menu.getByRole('group', { name: '日常同步', exact: true }).getByRole('button').count(), 2);
+        assert.equal(await menu.getByRole('group', { name: '全库维护', exact: true }).getByRole('button').count(), 5);
+        for (const label of ['仅发现新增文件', '补全待处理影片', '同步整个媒体库', '仅扫描文件', '补全资料与预览', '仅补全影片资料', '仅补全预览图']) {
           await menu.getByText(label, { exact: true }).waitFor();
         }
         await menu.getByText('为已入库的本地视频生成九宫格', { exact: true }).waitFor();
         await menu.screenshot({ path: path.join(artifacts, `${viewport.name}-processing-menu.png`) });
         await menu.press('Escape');
-        await card.getByRole('button', { name: '同步媒体库', exact: true }).click();
-        const dialog = page.getByRole('dialog', { name: '同步媒体库', exact: true });
+        await card.getByRole('button', { name: '同步新增文件', exact: true }).click();
+        const dialog = page.getByRole('dialog', { name: '同步新增文件', exact: true });
         await dialog.waitFor();
         await dialog.getByRole('region', { name: '磁盘预估' }).waitFor();
         const columns = await dialog.locator('[aria-label="流量预估"], [aria-label="磁盘预估"]').evaluateAll(elements =>
@@ -160,9 +163,9 @@ describe('扫描与采集控制', () => {
         const modalLayout = await layout(page);
         assert.ok(modalLayout.scrollWidth <= modalLayout.viewportWidth, JSON.stringify(modalLayout));
         assert.deepEqual(modalLayout.offenders, []);
-        await dialog.getByText('正在统计新目录…', { exact: true }).waitFor();
-        assert.equal(await dialog.getByRole('button', { name: '同步媒体库', exact: true }).isEnabled(), true);
-        await dialog.getByText('视频 10 个', { exact: true }).waitFor();
+        await dialog.getByText('正在发现新增文件，数量和预估仍会变化…', { exact: true }).waitFor();
+        assert.equal(await dialog.getByRole('button', { name: '同步新增文件', exact: true }).isEnabled(), true);
+        await dialog.getByText('已发现视频 10 个', { exact: true }).waitFor();
         const libraryLink = dialog.getByRole('link', { name: '管理媒体库', exact: true });
         assert.equal(await libraryLink.getAttribute('href'), '/settings/library');
         const footerOrder = await dialog.locator('.geist-modal-footer').evaluate(el => {
@@ -173,15 +176,15 @@ describe('扫描与采集控制', () => {
         assert.equal(footerOrder, true, '管理媒体库与主按钮在右下同排居中');
         await libraryLink.click();
         await page.waitForURL('**/settings/library');
-        assert.equal(await page.getByRole('dialog', { name: '同步媒体库', exact: true }).count(), 0);
+        assert.equal(await page.getByRole('dialog', { name: '同步新增文件', exact: true }).count(), 0);
         const inventoryAtClose = inventoryReads;
         await page.waitForTimeout(600);
         assert.equal(inventoryReads, inventoryAtClose);
         assert.equal(writes.length, 0);
         await page.goto(new URL('/data-cleanup', page.url()).href);
         await card.waitFor();
-        await card.getByRole('button', { name: '同步媒体库', exact: true }).click();
-        await dialog.getByText('正在统计新目录…', { exact: true }).waitFor();
+        await card.getByRole('button', { name: '同步新增文件', exact: true }).click();
+        await dialog.getByText('正在发现新增文件，数量和预估仍会变化…', { exact: true }).waitFor();
         inventoryComplete = true;
         await dialog.getByText('预计流量', { exact: true }).waitFor();
         await dialog.getByText('JAV 文件 60 个 · 不同番号 40 个', { exact: true }).waitFor();
@@ -228,9 +231,9 @@ describe('扫描与采集控制', () => {
         await dialog.screenshot({ path: path.join(artifacts, `${viewport.name}-high-startup.png`) });
         await startupSlider.press('Home');
         await dialog.screenshot({ path: path.join(artifacts, `${viewport.name}-startup.png`) });
-        await dialog.getByRole('button', { name: '同步媒体库', exact: true }).click();
+        await dialog.getByRole('button', { name: '同步新增文件', exact: true }).click();
         await card.getByText('预计剩余约 20–40 分钟（粗估）', { exact: true }).waitFor();
-        assert.equal(writes[0]?.speed_mode, 'low');
+        assert.deepEqual(writes[0], { incremental: true, speed_mode: 'low' });
         const dock = page.locator('#toasts [data-processing-dock]');
         await dock.locator('[data-processing-traffic]').waitFor();
         state.traffic = { ...state.traffic, used_bytes: 2097152, metered_used_bytes: 1048576,
@@ -247,7 +250,7 @@ describe('扫描与采集控制', () => {
         await resume.waitFor();
         assert.equal(await resume.innerText(), '');
         assert.equal(await resume.locator('svg').count(), 1);
-        assert.equal(await card.getByRole('button', { name: '同步媒体库', exact: true }).getAttribute('aria-disabled'), 'true');
+        assert.equal(await card.getByRole('button', { name: '同步新增文件', exact: true }).getAttribute('aria-disabled'), 'true');
         await page.reload();
         await resume.waitFor();
         const lowSpeed = dock.getByRole('button', { name: '处理速度：低占用' });

@@ -59,13 +59,12 @@ function Completion({ assetIds, onComplete, className }: { assetIds: number[]; o
     void queryClient.invalidateQueries({ queryKey: ['catalog-grid'] });
     onComplete?.();
   }, [state, started, onComplete]);
-  // 运行中的进度与控制由常驻任务卡承接，缺图提示只在可发起补全时呈现。
-  if (processingActive(state)) return null;
+  // 运行时保留缺图数量；新范围等待当前任务结束，不隐式追加或替换。
   const busy = start.isPending || processingActive(state);
   const problem = start.error ? errorMessage(start.error) : job.error ? DISCONNECTED_TEXT
     : started && state?.job_id === started && state.status === 'failed' ? state.error || '补全未完成' : '';
   const message = problem || (start.isPending ? '正在启动补全…'
-    : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，可补全资料与图片。`);
+    : outcome || `这批影片中有 ${assetIds.length.toLocaleString()} 部暂无预览，${processingActive(state) ? '当前任务结束后可单独补全。' : '可补全资料与图片。'}`);
   return <section aria-label="补全预览" aria-live="polite" data-library-completion="" className={cx('@container', className)}>
     <Note tone={problem ? 'warning' : 'neutral'} action={<div className="flex flex-wrap items-center gap-2"><ProcessingActions busy={busy} metadataOnly={state?.metadata_only} onRun={command => {
       if (busy) return;

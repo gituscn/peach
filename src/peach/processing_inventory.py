@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import threading
 import time
+import sqlite3
+from contextlib import closing
 from pathlib import PureWindowsPath
 from uuid import uuid4
 
@@ -13,8 +15,8 @@ _LATEST = {}
 _LOCK = threading.Lock()
 
 
-def _identity(config, db_path, stage, asset_ids):
-    return (str(db_path), repr(config), stage, tuple(asset_ids) if asset_ids is not None else None)
+def _identity(config, db_path, stage, asset_ids, incremental=False):
+    return (str(db_path), repr(config), stage, tuple(asset_ids) if asset_ids is not None else None, incremental)
 
 
 def recent_rows(config, db_path, stage, asset_ids):
@@ -24,24 +26,30 @@ def recent_rows(config, db_path, stage, asset_ids):
 
 
 class InventoryPreview:
-    def __init__(self, config, db_path, stage, asset_ids):
-        self.identity = _identity(config, db_path, stage, asset_ids)
+    def __init__(self, config, db_path, stage, asset_ids, incremental=False):
+        self.identity = _identity(config, db_path, stage, asset_ids, incremental)
+        if incremental:
+            from .library_new_assets import pending
+            asset_ids = pending(db_path)
         self.meter = ProcessingTraffic(config, db_path, stage, asset_ids)
+        with closing(sqlite3.connect(db_path)) as connection:
+            self.known = {(location, str(PureWindowsPath(path)).casefold()) for location, path
+                          in connection.execute('SELECT location,path FROM asset WHERE path IS NOT NULL')}
         self.rows = list(self.meter.plan.assets)
         self.discovered = []
         self.errors = 0
-        self.complete = stage not in ('all', 'scan') or asset_ids is not None
+        self.complete = stage not in ('all', 'scan') or (asset_ids is not None and not incremental)
+        self.meter.unknown_files = not self.complete
         self.iterator = self._files(config)
         self.at = time.monotonic()
         self.lock = threading.Lock()
 
     def _files(self, config):
         from .scan import _walk, is_sidecar, medium_of, walk_root_for, _relative_directory
-        known = {self.meter._media_key(row['path'], row['location']) for row in self.rows}
         library_roots = tuple(root for roots in config.locations.values() for root in roots)
         seen = set()
         for key, source in self.meter.rows.items():
-            if not source['root'] or key in known:
+            if not source['root']:
                 continue
             location, root = source['location'], source['root']
             try:
@@ -60,7 +68,7 @@ class InventoryPreview:
                             entry.name, frozenset(), path=path, library_roots=library_roots):
                         owner = self.meter._media_key(path, location)
                         identity = location, path.casefold()
-                        if owner not in known and identity not in seen:
+                        if owner is not None and identity not in self.known and identity not in seen:
                             seen.add(identity)
                             row = dict(location=location, path=path, name=entry.name,
                                        size=None, duration=None, snapshot_path=None)
@@ -88,12 +96,13 @@ class InventoryPreview:
                         break
                 self.meter.plan.extend(batch)
             self.at = time.monotonic()
+            self.meter.unknown_files = not self.complete or bool(self.errors)
             result = self.meter.snapshot()
             result['inventory'] = dict(complete=self.complete, errors=self.errors)
             return result
 
 
-def preview(config, db_path, stage, asset_ids, token=None):
+def preview(config, db_path, stage, asset_ids, token=None, *, incremental=False):
     with _LOCK:
         expired = [key for key, value in _SESSIONS.items() if time.monotonic() - value.at > 300]
         for key in expired:
@@ -103,10 +112,10 @@ def preview(config, db_path, stage, asset_ids, token=None):
             del _LATEST[key]
         if token:
             session = _SESSIONS.get(token)
-            if session is None or session.identity != _identity(config, db_path, stage, asset_ids):
+            if session is None or session.identity != _identity(config, db_path, stage, asset_ids, incremental):
                 raise ValueError('目录预检已结束，请重新打开同步弹窗')
         else:
-            session = InventoryPreview(config, db_path, stage, asset_ids)
+            session = InventoryPreview(config, db_path, stage, asset_ids, incremental)
             token = uuid4().hex
             _SESSIONS[token] = session
     result = session.advance()

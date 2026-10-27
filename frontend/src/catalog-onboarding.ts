@@ -2,7 +2,7 @@ import { emptyStateHtml } from '@peach/legacy/ui';
 import { esc } from '@peach/legacy/core';
 
 type Request = (url: string) => Promise<any>;
-const FILTERS = ['loc', 'creator', 'performer', 'studio', 'series', 'agency', 'tag', 'tag_match', 'len', 'dur_min', 'dur_max', 'orient', 'region', 'state', 'jav', 'thumb'];
+const FILTERS = ['loc', 'creator', 'performer', 'studio', 'series', 'agency', 'tag', 'tag_match', 'len', 'dur_min', 'dur_max', 'orient', 'region', 'year', 'state', 'jav', 'thumb'];
 
 /** 清除馆藏条件，保留当前页面、视图与本地或在线范围。 */
 export function clearCatalogAddress(address = typeof location === 'undefined' ? '/' : location.href): string {

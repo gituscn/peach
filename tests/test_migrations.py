@@ -3,6 +3,7 @@ import sqlite3
 import shutil
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from peach.migrations import plan, upgrade
@@ -12,6 +13,42 @@ MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
 
 
 class MigrationTests(unittest.TestCase):
+    def test_task_reference_migration_preserves_rows_and_existing_links(self):
+        prior = self.root.resolve() / 'prior'
+        prior.mkdir()
+        for path in MIGRATIONS.glob('*.sql'):
+            if path.name < '0049_':
+                shutil.copyfile(path, prior / path.name)
+        upgrade(self.db, prior)
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.executescript("""
+              INSERT INTO task_run(id,task_key,trigger,status,finished_at,parent_run_id,root_run_id,result_summary,error)
+              VALUES(10,'parent','manual','succeeded','t',NULL,10,'{}',NULL),
+                    (11,'child','manual','succeeded','t',10,10,'{"changed":1}',NULL),
+                    (12,'child','manual','failed','t',100,100,'{}','保留错误'),
+                    (13,'child','manual','pending',NULL,100,10,'{}',NULL),
+                    (14,'child','manual','running',NULL,11,100,'{}',NULL),
+                    (15,'standalone','manual','succeeded','t',NULL,NULL,'{}',NULL);
+              INSERT INTO asset(id,location,path,medium) VALUES(1,'local','sample.mp4','video');
+              INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'示例','user');
+            """)
+            columns = [row[1] for row in connection.execute('PRAGMA table_info(task_run)')
+                       if row[1] not in ('parent_run_id', 'root_run_id')]
+            query = f"SELECT {','.join(columns)} FROM task_run ORDER BY id"
+            tasks = connection.execute(query).fetchall()
+            assets = connection.execute('SELECT * FROM asset').fetchall()
+            tags = connection.execute('SELECT * FROM asset_tag').fetchall()
+            self.assertEqual(len(connection.execute('PRAGMA foreign_key_check').fetchall()), 4)
+            self.assertEqual([m.version for m in upgrade(self.db, MIGRATIONS)], ['0049'])
+            self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
+            self.assertEqual(connection.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
+            self.assertEqual(connection.execute('SELECT id,parent_run_id,root_run_id FROM task_run ORDER BY id').fetchall(),
+                [(10,None,10),(11,10,10),(12,None,None),(13,None,10),(14,11,None),(15,None,None)])
+            self.assertEqual(connection.execute(query).fetchall(), tasks)
+            self.assertEqual(connection.execute('SELECT * FROM asset').fetchall(), assets)
+            self.assertEqual(connection.execute('SELECT * FROM asset_tag').fetchall(), tags)
+            self.assertEqual(upgrade(self.db, MIGRATIONS), [])
+
     def test_missing_database_status_does_not_create_a_file(self):
         self.assertTrue(plan(self.db, MIGRATIONS)[1])
         self.assertFalse(self.db.exists())
@@ -28,7 +65,7 @@ class MigrationTests(unittest.TestCase):
             connection.execute("INSERT INTO asset(id,location,path,medium,disposal) VALUES(1,'local','sample.mp4','video','trash')")
             connection.execute("INSERT INTO asset_tag(asset_id,tag,source) VALUES(1,'示例','user')")
             connection.commit()
-            self.assertEqual([migration.version for migration in upgrade(self.db, MIGRATIONS)], ['0046', '0047', '0048'])
+            self.assertEqual([migration.version for migration in upgrade(self.db, MIGRATIONS)], ['0046', '0047', '0048', '0049'])
             self.assertEqual(connection.execute("SELECT disposal,disposal_reason FROM asset WHERE id=1").fetchone(), ('trash', None))
             self.assertEqual(connection.execute("SELECT tag,source FROM asset_tag WHERE asset_id=1").fetchall(), [('示例', 'user')])
             self.assertEqual(connection.execute("SELECT count(*) FROM asset").fetchone()[0], 1)
@@ -47,7 +84,7 @@ class MigrationTests(unittest.TestCase):
         sqlite3.connect(self.db).close()
         backup = self.root / "before.db"
         done = upgrade(self.db, MIGRATIONS, backup)
-        self.assertEqual([m.version for m in done], [f'{number:04d}' for number in range(49)])
+        self.assertEqual([m.version for m in done], [f'{number:04d}' for number in range(50)])
         self.assertTrue(backup.exists())
         con = sqlite3.connect(self.db)
         tables = {row[0] for row in con.execute(
@@ -65,7 +102,7 @@ class MigrationTests(unittest.TestCase):
                          "asset_tag_preference", "asset_search", "follow_playback",
                          "genre_decision", "asset_subtitle", "task_run", "performer_profile", "code_sample_image",
                          "entity_classification", "entity_identity_link", "seed_pack_history", "schema_migration"} <= tables)
-        self.assertEqual(versions, [f'{number:04d}' for number in range(49)])
+        self.assertEqual(versions, [f'{number:04d}' for number in range(50)])
         self.assertEqual(upgrade(self.db, MIGRATIONS), [])
         self.assertEqual(plan(self.db, MIGRATIONS)[1], [])
 

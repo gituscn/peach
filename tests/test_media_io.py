@@ -29,6 +29,15 @@ class MediaIoTests(unittest.TestCase):
         self.assertEqual([(entry.name, entry.stat().st_size) for entry in entries], [(source.name, len(raw))])
         self.assertEqual(media_io.directory_files(self.root), {source.name: source})
 
+    def test_native_file_identity_survives_the_reader_process_boundary(self):
+        source = self.root/'影片.mp4'
+        source.write_bytes(b'video')
+        before = source.stat()
+        info = media_io.directory_entries(self.root,file_identity=True)[0].stat()
+        self.assertEqual((info.st_ino,info.st_dev,info.st_size),
+                         (before.st_ino,before.st_dev,before.st_size))
+        self.assertNotEqual(info.st_ino,0)
+
     def test_timeout_reaps_reader_before_returning(self):
         children = []
         original_run, original_popen = subprocess.run, subprocess.Popen

@@ -41,7 +41,7 @@ describe('混排作品的画面框',()=>{
  before(async()=>{browser=await launch()});
  after(async()=>{await browser?.close()});
  for(const viewport of [...VIEWPORTS,{name:'compact',width:320,height:844,mobile:true}]){
-  it(`${viewport.name} 多列等高、单列自然高度，元信息保留一行`,async()=>{
+  it(`${viewport.name} 多列等高、单列自然高度，署名与日期不越出行框`,async()=>{
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},reducedMotion:'reduce'});
    try{
     const page=await context.newPage();

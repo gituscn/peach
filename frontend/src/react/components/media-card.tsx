@@ -336,8 +336,10 @@ function VideoCard({ item, variant, layout, selected, selectMode, seekSeconds, h
           <div data-media-byline="">
             {who}
             {item.why && variant !== 'next' ? <span data-media-why="" title={item.why}>{item.why}</span> : null}
-            {item.is_jav && item.release_date ? <time data-media-release="" dateTime={item.release_date} title={item.release_date}><Icon name="calendar" />{item.release_date}</time> : null}
-            <span data-media-size=""><Icon name="hard-drive" />{Number(shownSize) > 0 ? fmtSize(Number(shownSize)) : '大小未知'}</span>
+            <span data-media-facts="">
+              {item.is_jav && item.release_date ? <time data-media-release="" dateTime={item.release_date} title={item.release_date}><Icon name="calendar" />{item.release_date}</time> : null}
+              <span data-media-size=""><Icon name="hard-drive" />{Number(shownSize) > 0 ? fmtSize(Number(shownSize)) : '大小未知'}</span>
+            </span>
           </div>
           {variant === 'next' ? (item.why ? <RecommendationReason reason={item.why} /> : null) : tags.length || item.disposal === 'trash'
             ? (

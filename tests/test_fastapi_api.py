@@ -1228,6 +1228,23 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
         for name in ('unknown.png', 'github.svg', '..%2Fgithub.png'):
             self.assertEqual((await self.client.get(f'/site-icon/{name}?t=secret')).status_code, 404)
 
+    async def test_browser_icons_are_local_authenticated_cacheable_resources(self):
+        from peach.browser_icons import catalog, resolve
+        self.assertEqual((await self.client.get('/browser-icon/chrome')).status_code, 401)
+        for key in catalog():
+            path, content_type = resolve(key)
+            response = await self.client.get(f'/browser-icon/{key}?t=secret')
+            self.assertEqual(response.status_code, 200, key)
+            self.assertTrue(response.headers['content-type'].startswith(content_type), key)
+            self.assertEqual(response.content, path.read_bytes(), key)
+        head = await self.client.head('/browser-icon/firefox?t=secret')
+        self.assertEqual(head.status_code, 200)
+        self.assertEqual(head.content, b'')
+        cached = await self.client.get('/browser-icon/firefox?t=secret', headers={'If-None-Match':head.headers['etag']})
+        self.assertEqual(cached.status_code, 304)
+        for key in ('unknown','manifest.json','..%2Fpeach.ico'):
+            self.assertEqual((await self.client.get(f'/browser-icon/{key}?t=secret')).status_code, 404)
+
     def _archive_links(self, colour_of):
         """两条存档链接；上游按 `colour_of(url)` 给一枚圆形图标，给 None 就 404。返回请求过的地址。"""
         from PIL import Image, ImageDraw

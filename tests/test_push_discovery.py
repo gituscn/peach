@@ -349,7 +349,39 @@ class _ServiceCase(unittest.TestCase):
 
 
 class IngestPathTests(_ServiceCase):
+    def test_move_event_keeps_upgrade_existing_asset_without_an_identity_cache(self):
+        from contextlib import closing
+        old = self.media / 'old.mp4'
+        old.write_bytes(b'video')
+        path = self.ledger('local','old.mp4')
+        with closing(sqlite3.connect(self.db)) as connection, connection:
+            asset_id = connection.execute("INSERT INTO asset(location,path,name,medium,rating) VALUES(?,?,?,?,?)",
+                ('local',path,'old.mp4','video',5)).lastrowid
+        old.rename(self.media/'renamed.mp4')
+        service = self.service()
+        self.assertTrue(service._ingest('local',self.ledger('local','renamed.mp4'),path))
+        with closing(sqlite3.connect(self.db)) as connection:
+            self.assertEqual(connection.execute("SELECT id,name,rating FROM asset WHERE medium='video'").fetchall(),
+                             [(asset_id,'renamed.mp4',5)])
+
     """单条路径走的是扫描那段登记，不是第二套写法。"""
+
+    def test_new_video_queue_accepts_push_arrivals_without_readding_completed_paths(self):
+        from peach.library_new_assets import pending, remember
+        (self.media / 'new.mp4').write_bytes(b'video')
+        (self.media / 'photo.jpg').write_bytes(b'image')
+        options = dict(declared_roots=self.declared, mounts=self.mounts)
+        with mock.patch('peach.scan.time.strftime', return_value='2026-10-27 12:00:00'):
+            first = scan.ingest_path(self.db, 'local', self.ledger('local', 'new.mp4'), **options)
+            scan.ingest_path(self.db, 'local', self.ledger('local', 'photo.jpg'), **options)
+            self.assertEqual(pending(self.db), [first.asset_id])
+            remember(self.db, completed=[first.asset_id])
+            again = scan.ingest_path(self.db, 'local', self.ledger('local', 'new.mp4'), **options)
+            self.assertFalse(again.new)
+            self.assertEqual(pending(self.db), [])
+        (self.cloud / 'cloud.mp4').write_bytes(b'cloud video')
+        arrival = scan.ingest_path(self.db, '115', self.ledger('115', 'cloud.mp4'), **options)
+        self.assertEqual(pending(self.db), [arrival.asset_id])
 
     def test_one_file_lands_as_one_row_with_the_ledger_shape(self):
         (self.media / "创作者").mkdir()
@@ -508,11 +540,19 @@ class IngestNotifiesTests(_ServiceCase):
 
 
 class SettingsTests(_ServiceCase):
+    def test_unsaved_settings_enable_only_local_discovery_and_preserve_saved_off(self):
+        service = self.service()
+        self.assertTrue(service.config.enabled)
+        self.assertTrue(service.config.watch_local)
+        self.assertFalse(service.config.cloud)
+        service.settings.save({'enabled':False,'cloud':False}, self.declared)
+        self.assertFalse(self.service().config.enabled)
+
     def test_a_prefix_pointing_at_an_unknown_root_is_refused_on_save(self):
         service = self.service()
         with self.assertRaisesRegex(ValueError, "不是已声明的媒体根"):
             service.save({"enabled": True, "prefixes": [{"prefix": "/115", "root": "Z:\\"}]})
-        self.assertFalse(service.config.enabled)
+        self.assertTrue(service.config.enabled)
 
     def test_the_same_prefix_cannot_be_registered_twice(self):
         service = self.service()
@@ -576,6 +616,52 @@ class CloudChannelTests(_ServiceCase):
 
 
 class LocalChannelTests(_ServiceCase):
+    def test_historic_macos_events_do_not_enter_the_queue(self):
+        service = mock.Mock()
+        with mock.patch.object(push.time, 'time_ns', return_value=100):
+            handler = push._LocalEventHandler(service)
+        handler.register('local', self.declared['local'][0], self.media)
+        event = SimpleNamespace(event_type='created', src_path=str(self.media/'old.mp4'), is_directory=False)
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=99)):
+            handler.dispatch(event)
+        service.submit.assert_not_called()
+        event.src_path = str(self.media/'new.mp4')
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=100)):
+            handler.dispatch(event)
+        service.submit.assert_called_once_with('local', self.ledger('local', 'new.mp4'))
+        service.submit.reset_mock()
+        event.event_type, event.dest_path = 'moved', str(self.media/'renamed.mp4')
+        with mock.patch.object(push, 'sys', SimpleNamespace(platform='darwin')), \
+                mock.patch.object(Path, 'stat', return_value=SimpleNamespace(st_ctime_ns=101)):
+            handler.dispatch(event)
+        service.submit_move.assert_called_once_with('local', self.ledger('local', 'new.mp4'),
+                                                   self.ledger('local', 'renamed.mp4'), directory=False)
+
+    def test_default_native_watcher_is_idle_until_new_files_arrive(self):
+        (self.media/'existing.mp4').write_bytes(b'old')
+        service = self.service()
+        probe = mock.Mock(wraps=service.queue.probe)
+        service.queue.probe = probe
+        service.start()
+        if not service.local_channel.running:
+            self.skipTest(f'本机起不了文件监视：{service.local_channel.message}')
+        started, cpu = time.monotonic(), time.process_time()
+        time.sleep(0.3)
+        elapsed, used = time.monotonic()-started, time.process_time()-cpu
+        self.assertEqual(self.rows(),{})
+        probe.assert_not_called()
+        started = time.monotonic()
+        for index in range(20):
+            (self.media/f'new-{index}.mp4').write_bytes(b'new')
+        _wait_for(lambda: len(self.rows())==20)
+        self.assertEqual(len(self.rows()),20)
+        self.assertNotIn(self.ledger('local','existing.mp4'),self.rows())
+        self.assertEqual(service.snapshot()['queue']['failed'],0)
+        print(f'原生发现：空闲 {elapsed:.3f}s / CPU {used:.3f}s / 媒体探测0次；'
+              f'20个新增文件登记 {time.monotonic()-started:.3f}s')
+
     def test_a_file_landing_in_a_watched_root_reaches_the_ledger(self):
         service = self.service()
         service.save({"enabled": True, "watch_local": True, "cloud": False, "prefixes": []})

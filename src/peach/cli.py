@@ -508,10 +508,16 @@ def _process_library(args: argparse.Namespace) -> int:
     _require_readable_settings()
     config = settings_file.active()
     with cli_run('library-processing', args.db, label='资料处理') as handle:
-        result = process_library(config, args.db, config.directory('generated'),
-                                 config.directory('generated') / 'covers', location=args.location,
-                                 database=LedgerDatabase(args.db),
-                                 report=lambda state: print(f"{state['stage']}：{state['checked']}/{state['total']}", flush=True))
+        from .jobs import JobCancelled
+        try:
+            result = process_library(config, args.db, config.directory('generated'),
+                                     config.directory('generated') / 'covers', location=args.location,
+                                     database=LedgerDatabase(args.db),
+                                     report=lambda state: print(f"{state['stage']}：{state['checked']}/{state['total']}", flush=True))
+        except JobCancelled:
+            handle.finish('cancelled', error='用户停止任务')
+            print('任务已停止，已保存结果保留。')
+            return 130
         rows = declared_rows(result.get('followups'))
         queued = handle.store.enqueue_followups(handle.run_id, rows)
         if rows:

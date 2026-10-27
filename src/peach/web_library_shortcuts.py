@@ -12,7 +12,7 @@ from .profiles import DEFAULT_PROFILE_ID, read_settings
 from .web_catalog import VISIBLE_CATALOG_ASSET, entity_ref
 
 QUERY_KEYS = frozenset({"loc", "creator", "studio", "owner", "tag", "tag_match", "len",
-                        "dur_min", "dur_max", "orient", "region", "sort", "dir", "q", "jav", "thumb", "state",
+                        "dur_min", "dur_max", "orient", "region", "year", "sort", "dir", "q", "jav", "thumb", "state",
                         "browse", "folder", "folder_recursive"})
 PATHS = frozenset({"/", "/unseen", "/watch-later", "/flagged"})
 

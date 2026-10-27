@@ -64,8 +64,8 @@ class DirectoryEntry:
         return SimpleNamespace(**self.attributes)
 
 
-def directory_entries(path):
-    return [DirectoryEntry(value) for value in _request('directory', path)]
+def directory_entries(path, *, file_identity=False):
+    return [DirectoryEntry(value) for value in _request('directory', path, value='identity' if file_identity else '')]
 
 
 def directory_files(path):
@@ -109,7 +109,8 @@ def file_stat(path, *, timeout=None):
 
 
 def _attributes(stat):
-    return {key: getattr(stat, key) for key in ('st_size', 'st_mtime', 'st_mtime_ns', 'st_mode')}
+    return {key: getattr(stat, key) for key in ('st_size', 'st_mtime', 'st_mtime_ns', 'st_mode',
+            'st_ino', 'st_dev', 'st_birthtime_ns') if hasattr(stat, key)}
 
 
 def _read(operation, path, value):
@@ -128,7 +129,11 @@ def _read(operation, path, value):
                 try:
                     item.update(directory=entry.is_dir(), symlink=entry.is_symlink())
                     if not item['directory']:
-                        item['attributes'] = _attributes(entry.stat())
+                        info = entry.stat()
+                        # Windows 的目录快照没有文件 ID；仅本地身份请求在子进程内补读。
+                        if value == 'identity' and not info.st_ino:
+                            info = os.stat(entry.path)
+                        item['attributes'] = _attributes(info)
                 except OSError as error:
                     item['error'] = str(error)
                 result.append(item)

@@ -63,6 +63,7 @@ export function ProcessingNoticePanel({ state, problem = '', measure = false, on
     observer.observe(node);
     return () => { disposed = true; observer.disconnect(); document.documentElement.style.removeProperty('--processing-toast-space') };
   }, [measure]);
+  if (state?.archived && !problem) return null;
   if (!problem && !active && !failed && !partial) return null;
   const slow = problem ? null : slowItem(state);
   const warning = !!problem || !!state?.stalled || partial || !!slow;

@@ -98,7 +98,7 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
     });
   }
 
-  it('数据管理骨架里等数据的操作键是禁用态，数据到了才换回蓝色主按钮', { timeout: 60_000 }, async () => {
+  it('数据管理骨架里等数据的操作键是禁用态，数据到了才换回主操作样式', { timeout: 60_000 }, async () => {
     const opened = await visit(browser, '/data-cleanup', DESKTOP);
     try {
       const page = opened.page;
@@ -112,13 +112,13 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
       const expected = await disabledTokens(page);
       const waiting = await waitingActionFaces(page, '[data-skeleton="cleanup"] [data-skeleton-action]');
       assert.deepEqual(waiting.filter((face) => !face.name.includes('skeleton')).map((face) => face.name).filter(Boolean),
-        ['同步媒体库', '更多同步方式', '开始修复', '预览', '检查死链']);
+        ['同步新增文件', '更多同步方式', '开始修复', '预览', '检查死链']);
       for (const face of waiting) assertDisabledFace(face, expected);
       const ring = await page.locator('[data-skeleton="cleanup"] [data-split-button]')
         .evaluate((element) => getComputedStyle(element).boxShadow);
       assert.ok(ring.includes(expected.ring), `骨架里的分体键外圈不是禁用那一档描边：${ring}`);
       const sizes = await controlFaces(page, {
-        同步媒体库: '#libraryProcessing [data-split-button] > button:first-child',
+        同步新增文件: '#libraryProcessing [data-split-button] > button:first-child',
         更多方式: '#libraryProcessing [data-split-button] > button:last-child',
         开始修复: '#mediaRepair footer > button',
       });
@@ -131,13 +131,13 @@ describe('设计决定：数据管理、索引页与资料页头', () => {
         .waitFor({ timeout: 15_000 });
       await settle(page);
       const final = await controlFaces(page, {
-        同步媒体库: 'section[aria-label="扫描与采集"] [data-split-button] > button:first-child',
+        同步新增文件: 'section[aria-label="扫描与采集"] [data-split-button] > button:first-child',
         更多方式: 'section[aria-label="扫描与采集"] [data-split-button] > button:last-child',
         开始修复: 'section[aria-label="媒体修复"] footer > button',
       });
       for (const name of Object.keys(sizes)) {
         assert.equal(sizes[name]!.size, final[name]!.size, `${name} 接管时尺寸跳了`);
-        assert.match(final[name]!.face, /gradient/, `${name} 接管后没换回蓝色主按钮`);
+        assert.match(final[name]!.face, /gradient/, `${name} 接管后没换回主操作样式`);
       }
       const enabled = await page.locator('section[aria-label="扫描与采集"] [data-split-button] > button')
         .evaluateAll((buttons) => buttons.map((button) => (button as HTMLButtonElement).disabled));

@@ -1,4 +1,4 @@
-/* 五张索引页的数据契约：艺人、创作者、厂牌、事务所四份名册与标签词表。
+/* 索引页的数据契约：艺人、创作者、厂牌、事务所、系列名册与标签词表。
  *
  * 本地那一档读 `/api/index?kind=`（`src/peach/web_entity.py` 的 `q_index`），在线那一档读
  * 关注来源上的两份词表（`../follow/online-vocab.ts`）。四种形状一样：`items` 加 `has_more`，
@@ -19,7 +19,7 @@ import {
 } from '../follow/online-vocab';
 import { queryClient } from '../query';
 
-export type IndexKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'tags';
+export type IndexKind = 'performers' | 'creators' | 'studios' | 'agencies' | 'series' | 'tags';
 export type IndexScope = 'local' | 'online';
 export type TagView = 'alphabet' | 'cloud';
 export type PeopleLayout = 'big' | 'compact';
@@ -28,12 +28,12 @@ export const INDEX_URL = '/api/index';
 
 /** 页头标题与名册口径。 */
 export const INDEX_TITLES: Record<IndexKind, string> = {
-  performers: '艺人', creators: '卖家', studios: '厂牌', agencies: '事务所', tags: '标签',
+  performers: '艺人', creators: '卖家', studios: '厂牌', agencies: '事务所', series: '系列', tags: '标签',
 };
 
 /** 索引格对应的实体类型，资料页与取图链都按它分。 */
 export const ENTITY_KINDS: Record<Exclude<IndexKind, 'tags'>, string> = {
-  performers: 'performer', creators: 'creator', studios: 'studio', agencies: 'agency',
+  performers: 'performer', creators: 'creator', studios: 'studio', agencies: 'agency', series: 'series',
 };
 
 /** 本地标签的九类。次序就是浮层上排药丸的次序。 */

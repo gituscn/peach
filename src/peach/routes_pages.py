@@ -773,6 +773,17 @@ def bundled_site_icon(request: Request, name: str,
     return asset_response(request, path, "image/png")
 
 
+@router.api_route('/browser-icon/{key}', methods=['GET','HEAD'])
+def bundled_browser_icon(request: Request, key: str,
+                         args: dict[str,str] = Depends(require_asset_auth)):
+    from .browser_icons import resolve
+    target = resolve(key)
+    if target is None:
+        return PlainTextResponse('missing',status_code=404)
+    path, content_type = target
+    return asset_response(request,path,content_type)
+
+
 @router.api_route("/robots.txt", methods=["GET", "HEAD"])
 def robots_txt():
     """不要求登录：爬虫拿不到会话，被 401 挡住就等于没读到这份声明。
@@ -824,6 +835,7 @@ def peach_logo_small(request: Request):
 @router.api_route("/creators/", methods=["GET", "HEAD"])
 @router.api_route("/studios/", methods=["GET", "HEAD"])
 @router.api_route("/agencies/", methods=["GET", "HEAD"])
+@router.api_route("/series/", methods=["GET", "HEAD"])
 @router.api_route("/tags/", methods=["GET", "HEAD"])
 def index_directory_redirect(request: Request, args: dict[str, str] = Depends(require_page_auth)):
     """索引页使用规范路径，查询参数保持原样。"""
@@ -945,6 +957,7 @@ def entity_route(request: Request, name: str,
 @router.api_route("/creators", methods=["GET", "HEAD"])
 @router.api_route("/studios", methods=["GET", "HEAD"])
 @router.api_route("/agencies", methods=["GET", "HEAD"])
+@router.api_route("/series", methods=["GET", "HEAD"])
 @router.api_route("/tags", methods=["GET", "HEAD"])
 @router.api_route("/jav", methods=["GET", "HEAD"])
 @router.api_route("/unseen", methods=["GET", "HEAD"])

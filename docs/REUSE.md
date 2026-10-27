@@ -1,5 +1,17 @@
 # 复用清单
 
+## 任务历史关联清理
+
+采用 RAAMENN 的 [PR #151](https://github.com/peach-mitao/peach/pull/151)，固定来源提交 `eb5f6b49210ed330c767166ea204103a8193250a`，许可证沿用本项目 AGPL-3.0-or-later。复用 SQLite 的 `SET NULL` 语义和删除触发器，在外键开关两种连接下维护父任务与根任务关联。当前迁移编号为 `0049`，只清空不存在的任务引用；任务内容、有效关联、活跃后继和媒体记录保留。隔离回归覆盖旧库升级、重放、批量删除回滚及跨任务类型后继，无新增依赖。
+
+## 馆藏任务取消、范围与问题导出
+
+取消复用 `ProcessingControl` 的本机原子记录、安全停点与 `BackgroundJob` 结算；`stopping` 等待在途工作退出，`cancelled` 保留结果并阻止自动恢复。安装暂停与用户暂停沿用原语义。新影片范围复用 `ScanResult.new_ids`、`filelock` 和原子 JSON，接回旧扫描检查点；启动时固定为已有的 `asset_ids` 请求，恢复不重新计算范围。退场资产仅退出当前重试集合，来源离线不按文件消失处理；归档只保存提示选择，不删除问题原文或任务历史。
+
+问题导出采用 kevin552216 的 [PR #172](https://github.com/peach-mitao/peach/pull/172) 中 `issue-export.ts` 的分页 JSON 下载思路，固定来源 head `d1803c28e0b1a2a086d9756a67b0ec313387db29`，AGPL-3.0-or-later。Peach 增加日志内容摘要、总数和页偏移校验，拒绝同任务恢复时混合两份记录；旧完整 `issues` 数组可分页读取，缺失或损坏日志不伪装成空清单。复用既有 `useAction`、AbortSignal 和 Blob 下载，不采用该 PR 的单片重抓、字段保护和来源策略改动，无新增依赖。
+
+状态文件写入沿用 `fsutil.atomic_write_text`。补入 FriendlyPasser 的 [PR #120](https://github.com/peach-mitao/peach/pull/120) 固定提交 `b586ff907aa01b48432e51b6101b7ce4bc7f8126` 的 Windows 读句柄验证，检查实际 WinError、读者关闭、完整 JSON 发布和临时文件清理；不增加另一套保存策略。
+
 ## 发布依赖接管来源
 
 依赖清单复用 Dependabot 的独立 PR 差集，版本与完整依赖图由当前清单和锁文件确定。相邻修改保留主线消费者并重算锁；npm vendor 与前端包使用项目入口重建，许可证和来源记录随资源分发。接管器分别识别应用与 amane 桥的清单，并以实际接管提交确认完成；普通 PR 引用不构成采用。
@@ -1068,3 +1080,10 @@ Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_pro
 身份生成复用 Python 3.14 标准库 [`uuid`](https://docs.python.org/3.14/library/uuid.html) 的 UUIDv4、UUIDv5（PSF 许可，随运行时维护，Windows/macOS/Linux，无新增安装体积）；路径归属复用 `platform.resolve_root`、`PureWindowsPath`，配置写入复用 `fsutil.atomic_write_text`，扫描沿用 SQLite upsert 与现有断点。当前树与 Git 中的媒体库分组、目录索引、来源探测和下载渠道共同消费这些身份。
 
 媒体库与根目录的归属是 Peach 的领域模型，不引入 Jellyfin/Emby 等独立媒体服务器或数据库 ORM：这些方案不能直接维护现有账本、个人记录和 Windows 账本路径契约。只读旧配置使用确定性升级，显式保存持久化身份；新增实体的随机 UUID 与显示名称无关。隔离用例覆盖配置往返、同名库、重排、重定位、根目录离线及扫描个人记录保护；实现与验收边界见 [ADR-0115](adr/0115-library-and-storage-root-identity.md)。未新增依赖，不自动写真实 ledger。
+
+
+## 浏览器品牌图标与本地文件身份
+
+口味页浏览器标识使用本地静态资源，不在展示时请求品牌网站。通用图标来自 [browser-logos](https://github.com/alrra/browser-logos/tree/58881b84c4d73adc03c06fa2c275a7abee02d935)，固定 revision 为 `58881b84c4d73adc03c06fa2c275a7abee02d935`；品牌商标归原持有人。其余品牌的来源、摘要、类型和别名记录在 `resources/browser-icons/manifest.json`。115 使用已安装浏览器 PE 的 `IDR_MAINFRAME` 主图标，未加载或执行程序；不能用网站标记替代应用图标。未知品牌继续使用通用图标，不按 Chromium 内核冒充 Chrome。
+
+本地发现继续复用 `watchdog` 原生文件事件。缺少配置时开启本地目录监控，保留显式关闭；网盘挂载不递归订阅。空队列等待事件，不增加定期目录遍历。本地移动事件传递旧路径，已积累的系统文件身份用于同卷改名和移动后的 ID 保留；标准库文件属性与 `FileLock`、原子写入承接私有缓存，不新增哈希遍历或媒体读取。跨卷副本、旧路径仍存在的文件不自动合并。升级前没有身份记录且停机期间已经移动的文件仍需全库维护或人工确认，不能仅凭大小和文件名接回。

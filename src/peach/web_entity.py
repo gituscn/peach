@@ -146,7 +146,7 @@ def _tag_scope_visibility(kind: str, entity_column: str, asset_column: str) -> s
 #: 索引页地址 → `entity.kind`。有资料页就该有索引页：只靠女优页上那个名字进事务所页的话，
 #: 名下没有关系的几十家等于只能靠猜地址。标签不在这里，它走另一条分支。
 INDEX_ENTITY_KINDS = {"performers": "performer", "creators": "creator",
-                      "studios": "studio", "agencies": "agency"}
+                      "studios": "studio", "agencies": "agency", "series": "series"}
 
 
 def _performer_entries(contract: WebContract, c, d: dict, alias_rows) -> dict:
@@ -738,7 +738,7 @@ def _index_rows(contract: WebContract, kind, q, limit, offset, category):
             clause, values = entity_classification.filter_sql(category,connection=c)
             sql += clause
             par.extend(values)
-            sql += "GROUP BY e.id,e.canonical_name ORDER BY n DESC LIMIT ? OFFSET ?"
+            sql += "GROUP BY e.id,e.canonical_name ORDER BY n DESC,e.id ASC LIMIT ? OFFSET ?"
             par.extend((limit + 1, offset))
             rows = [dict(r) for r in c.execute(sql, par)]
             has_more = len(rows) > limit

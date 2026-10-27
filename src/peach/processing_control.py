@@ -89,6 +89,8 @@ def checkpoint_values(values):
 
 
 def interrupted_state(control):
+    if control is not None and control.cancelled:
+        return dict(status='cancelled', outcome='cancelled', stage='已停止', error='')
     return dict(status='paused', error='', completed_at=None) if control is not None and control.paused else {}
 
 
@@ -173,6 +175,7 @@ class ProcessingControl:
         self.mode = data.get('speed_mode') if data.get('speed_mode') in MODES else 'standard'
         self.job_id = data.get('job_id')
         self.paused = data.get('paused') is True
+        self.cancelled = data.get('cancelled') is True
         self.event = threading.Event()
         self.event.set()
         self.publish = None
@@ -194,6 +197,7 @@ class ProcessingControl:
             if data.get('job_id') == self.job_id or self.publish is None:
                 self.job_id = data.get('job_id', self.job_id)
                 self.paused = data.get('paused', self.paused)
+                self.cancelled = data.get('cancelled', self.cancelled)
                 self.skip_asset_id = data.get('skip_asset_id')
                 mode = data.get('speed_mode', self.mode)
                 if mode in MODES and self.mode != mode:
@@ -202,7 +206,7 @@ class ProcessingControl:
 
     def _save(self):
         atomic_write_text(self.path, json.dumps(dict(
-            speed_mode=self.mode, job_id=self.job_id, paused=self.paused,
+            speed_mode=self.mode, job_id=self.job_id, paused=self.paused, cancelled=self.cancelled,
             skip_asset_id=self.skip_asset_id)) + '\n')
 
     def skip_current(self, job_id, asset_id):
@@ -216,6 +220,9 @@ class ProcessingControl:
 
     def check_item(self):
         self.refresh()
+        if self.cancelled:
+            from .jobs import JobCancelled
+            raise JobCancelled('用户停止任务')
         if self.current_asset_id is not None and self.skip_asset_id == self.current_asset_id:
             raise ItemSkipped('已跳过当前影片')
 
@@ -226,6 +233,9 @@ class ProcessingControl:
             if action == 'set_speed':
                 self.mode = valid_mode(mode)
                 self.next_work.clear()
+            elif action == 'cancel':
+                self.cancelled = True
+                self.paused = False
             else:
                 self.paused = action == 'pause'
             self._save()
@@ -236,6 +246,7 @@ class ProcessingControl:
         with self.lock:
             if self.job_id != job_id:
                 self.job_id, self.paused, self.paused_seconds = job_id, False, 0.0
+                self.cancelled = False
                 self.skip_asset_id = None
 
     @contextmanager
@@ -291,6 +302,12 @@ def user_paused(db_path, job_id):
     from .update_tasks import state_for
     data = _read(state_for(db_path).parent / 'library-processing-control.json')
     return data.get('job_id') == job_id and data.get('paused') is True
+
+
+def user_cancelled(db_path, job_id):
+    from .update_tasks import state_for
+    data = _read(state_for(db_path).parent / 'library-processing-control.json')
+    return bool(job_id) and data.get('job_id') == job_id and data.get('cancelled') is True
 
 
 def initial_estimate(config, db_path, stage, asset_ids=None, mode=None):
