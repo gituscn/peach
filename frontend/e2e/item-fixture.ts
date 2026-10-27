@@ -93,13 +93,15 @@ export interface ItemStub {
   writes: { url: string; body: Record<string, unknown> }[];
   /** 各读接口被请求了几次，按路径计。 */
   reads: Map<string, number>;
+  /** 空片源的预期解码错误，独立于真实诊断服务的限流预算。 */
+  mediaErrors: Record<string, unknown>[];
 }
 
 const body = (request: Request) => JSON.parse(request.postData() || '{}') as Record<string, unknown>;
 
 async function stub(page: Page, catalogIds: readonly number[] = CATALOG): Promise<ItemStub> {
   await mockSubtitleMemory(page);
-  const state: ItemStub = { writes: [], reads: new Map() };
+  const state: ItemStub = { writes: [], reads: new Map(), mediaErrors: [] };
   const read = (path: string) => state.reads.set(path, (state.reads.get(path) || 0) + 1);
   const playlists = new Map<number, { id: number; name: string; ids: number[]; current: number | null }>([
     [PLAYLIST.id, { id: PLAYLIST.id, name: PLAYLIST.name, ids: [...PLAYLIST.items], current: 11 }],
@@ -171,6 +173,13 @@ async function stub(page: Page, catalogIds: readonly number[] = CATALOG): Promis
     (route) => route.request().method() === 'GET' ? route.fallback() : route.fulfill({ json: { ok: true } }));
   await page.route((url) => url.pathname === '/api/stream-plan',(route) => route.fulfill({ json: { protocol: 'direct' } }));
   await page.route((url) => url.pathname === '/stream', (route) => route.fulfill({ status: 204, body: '' }));
+  await page.route((url) => url.pathname === '/api/diagnostics/client-error', (route) => {
+    const sent = body(route.request());
+    const playback = sent.playback as { source_route?: string } | undefined;
+    if (sent.kind !== 'media' || playback?.source_route !== '/stream') return route.fallback();
+    state.mediaErrors.push(sent);
+    return route.fulfill({ json: { recorded: true } });
+  });
   await page.route((url) => ['/poster', '/cover', '/logo', '/entity-image', '/avatar'].includes(url.pathname), (route) => {
     const url = new URL(route.request().url());
     const cover = url.pathname === '/cover';
