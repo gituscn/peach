@@ -289,6 +289,13 @@ class MediaResponseLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def shared_client_leaves(self, *, explicit):
         joined = asyncio.Event()
         generate = self.service.generate
+        release = self.root / "release-segment"
+        attempts = [("controlled output", lambda out: [
+            getattr(sys, '_base_executable', sys.executable), "-c",
+            "import sys,time\nfrom pathlib import Path\n"
+            "while not Path(sys.argv[1]).exists(): time.sleep(0.01)\n"
+            "Path(sys.argv[2]).write_bytes(b'segment')",
+            str(release), str(out)])]
 
         async def observed(*args, **kwargs):
             if kwargs["session"] == "two":
@@ -297,7 +304,7 @@ class MediaResponseLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
         with mock.patch.object(routes_media, "_hls_plan", return_value=(
                 None, self.source, [(0, 6)], False)), \
-                mock.patch.object(self.service, "_attempts", return_value=self.attempts(0.6)), \
+                mock.patch.object(self.service, "_attempts", return_value=attempts), \
                 mock.patch.object(self.service, "generate", observed), \
                 mock.patch("peach.segments.asyncio.create_subprocess_exec", self.owned_spawn):
             first, messages, _ = self.request("/stream/hls/1/0.ts", b"session=one&t=secret")
@@ -310,6 +317,7 @@ class MediaResponseLifecycleTests(unittest.IsolatedAsyncioTestCase):
                 messages.put_nowait({"type": "http.disconnect"})
             self.assertTrue(await self.finished(first), "离开的请求仍在等待共享生成")
             self.assertIsNone(self.children[0].returncode, "另一个客户端仍在使用该生成者")
+            release.touch()
             await asyncio.wait_for(second, 2)
         self.assertEqual(len(self.children), 1)
         self.assertEqual([one["status"] for one in sent if one["type"] == "http.response.start"], [200])
