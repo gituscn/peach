@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-READMES = {"README.md", "README.en.md"}
+READMES = {"README.md", "README.zh-CN.md"}
 PREFIXES = ("src/peach/", "web/", "frontend/", "migrations/", "resources/")
 FILES = {
     "pyproject.toml", "package.json", "package-lock.json",
