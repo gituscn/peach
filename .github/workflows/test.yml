@@ -150,29 +150,28 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
-      # `web` 与 `packaging` 域里的 tsc、lint、vitest 和浏览器冒烟在 CI 缺前置条件时判失败
-      # （`tests/support/conditions.py`）。`core` 不含这些用例，其余域都要装齐。
+      # checks 只验收文档与仓库契约；运行时域保留完整工具，未知输入使用全量。
       - uses: actions/setup-node@v7
-        if: matrix.scope != 'core'
+        if: matrix.runtime_tools
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: 安装前端依赖
-        if: matrix.scope != 'core'
+        if: matrix.runtime_tools
         run: npm --prefix frontend ci
       # 抽帧与 AV1 软件解码回归在两端执行；浏览器冒烟的 Chrome 仅在 Windows 装配。
       - name: 安装固定版本 FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v3
-        if: runner.os == 'Windows' && matrix.scope != 'core'
+        if: runner.os == 'Windows' && matrix.runtime_tools
         with:
           ffmpeg-version: "9.0.1"
           github-token: ${{ github.token }}
       - name: 安装 macOS FFmpeg
-        if: runner.os == 'macOS' && matrix.scope != 'core'
+        if: runner.os == 'macOS' && matrix.runtime_tools
         run: brew install ffmpeg
       - name: 指定 e2e 用的 Chrome
-        if: runner.os == 'Windows' && matrix.scope != 'core'
+        if: runner.os == 'Windows' && matrix.runtime_tools
         shell: pwsh
         run: |
           $peachChrome = Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'
