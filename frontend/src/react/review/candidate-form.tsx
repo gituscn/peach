@@ -114,7 +114,8 @@ export function CandidateChoices(
   }
   return (
     <RadioGroup aria-label={`${fieldName || '资料'}的来源`} value={value} isDisabled={locked}
-      onChange={onChange} className="gap-3">
+      onChange={onChange}>
+      <div className="flex min-w-0 flex-col gap-3">
       {candidates.map((candidate) => (
         <div key={candidate.candidate_key} className="flex min-w-0 flex-col gap-1">
           <RadioCard value={candidate.candidate_key} className="relative items-start"
@@ -123,6 +124,7 @@ export function CandidateChoices(
           <CandidateEvidence candidate={candidate} />
         </div>
       ))}
+      </div>
     </RadioGroup>
   );
 }

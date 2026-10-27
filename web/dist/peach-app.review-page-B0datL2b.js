@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "cfd0efb4-4aee-4c3e-8715-336a53b92e4e", e._sentryDebugIdIdentifier = "sentry-dbid-cfd0efb4-4aee-4c3e-8715-336a53b92e4e");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "fad36fa2-5f4f-4817-a33b-a6a4487390ae", e._sentryDebugIdIdentifier = "sentry-dbid-fad36fa2-5f4f-4817-a33b-a6a4487390ae");
 	} catch {}
 })();
 import { $b4f18e3395fe64d7$export$3d96ec278d3efce4 as e, $b4f18e3395fe64d7$export$3e41faf802a29e71 as t, $b4f18e3395fe64d7$export$b2539bed5023c21c as n, $ea3928288112382f$export$439d29a4e110a164 as r, $fe21c36db05242bb$export$a98f0dcb43a68a25 as i, $fe21c36db05242bb$export$d7b12c4107be0d61 as a, Button as o, ButtonLink as s, Checkbox as c, CheckboxGlyph as l, Chip as u, CollapseChevron as d, CollapseRegion as f, DEFAULT_CATEGORY as ee, ENTITY_REVIEW_KINDS as p, Ea as m, EmptyState as te, ExternalLink as h, FIELDSET_FOOT as g, FilterGlassRows as _, Gg as v, InputBase as y, LinkButton as b, Note as x, REVIEW_CATEGORIES as S, REVIEW_DECISION_LABELS as C, REVIEW_KEY as w, REVIEW_LABELS as T, REVIEW_QUEUES as E, REVIEW_QUEUE_LABELS as D, Select as O, SelectItem as k, SelectionActions as A, SelectionDock as j, TextField as M, Wt as N, __toESM as P, avatarInner as F, busyProps as I, canApprove as ne, cardClass as L, commonReviewSources as R, currentReviewRow as re, cx as z, decisionPayload as ie, decisionReceipt as ae, defaultChoice as oe, errorMessage as B, fetchReview as se, filterReviewRows as ce, groupReviewRows as le, isReviewCategory as ue, l7 as de, m7 as fe, mirrorText as pe, paginationRange as me, pendingGenres as he, recordGenre as ge, reloadReview as _e, require_jsx_runtime as ve, require_react as V, reviewGroupingOptions as ye, reviewQueueData as be, reviewQueueOf as xe, reviewWindow as Se, rowEvidence as Ce, rowFieldName as we, rowSubject as Te, rowTags as H, rowTitle as U, selectReviewRange as Ee, settleReviewRows as De, spinnerHtml as W, submitDecision as Oe, useMutation as ke, useOverlayScrollbar as Ae, useQuery as je, useViewGlide as G } from "./peach-app.js";
@@ -330,19 +330,21 @@ function He({ row: e, fieldName: t, value: n, onChange: r, locked: i }) {
 		value: n,
 		isDisabled: i,
 		onChange: r,
-		className: "gap-3",
-		children: a.map((e) => /* @__PURE__ */ (0, q.jsxs)("div", {
-			className: "flex min-w-0 flex-col gap-1",
-			children: [/* @__PURE__ */ (0, q.jsx)(Re, {
-				value: e.candidate_key,
-				className: "relative items-start",
-				title: /* @__PURE__ */ (0, q.jsx)("span", {
-					title: Z(e),
-					children: Z(e)
-				}),
-				description: /* @__PURE__ */ (0, q.jsx)(Ve, { candidate: e })
-			}), /* @__PURE__ */ (0, q.jsx)(X, { candidate: e })]
-		}, e.candidate_key))
+		children: /* @__PURE__ */ (0, q.jsx)("div", {
+			className: "flex min-w-0 flex-col gap-3",
+			children: a.map((e) => /* @__PURE__ */ (0, q.jsxs)("div", {
+				className: "flex min-w-0 flex-col gap-1",
+				children: [/* @__PURE__ */ (0, q.jsx)(Re, {
+					value: e.candidate_key,
+					className: "relative items-start",
+					title: /* @__PURE__ */ (0, q.jsx)("span", {
+						title: Z(e),
+						children: Z(e)
+					}),
+					description: /* @__PURE__ */ (0, q.jsx)(Ve, { candidate: e })
+				}), /* @__PURE__ */ (0, q.jsx)(X, { candidate: e })]
+			}, e.candidate_key))
+		})
 	}) : null;
 }
 function Ue({ genre: e, tags: t, locked: n, toast: r }) {
@@ -1241,4 +1243,4 @@ function it(r) {
 }
 export { it as ReviewPage };
 
-//# debugId=cfd0efb4-4aee-4c3e-8715-336a53b92e4e
+//# debugId=fad36fa2-5f4f-4817-a33b-a6a4487390ae

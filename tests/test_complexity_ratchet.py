@@ -39,7 +39,7 @@ BASELINE: dict[str, int] = {
     "src/peach/junk.py:scored_candidates": 57,
     "scripts/localize_performer_names.py:collect": 63,
     "src/peach/web_resource_sync.py:_resource_orphan_plan": 50,
-    "src/peach/web_review.py:_review_rows": 43,
+    "src/peach/web_review.py:_review_rows": 40,
     "src/peach/fanbox.py:normalize_fanbox_post": 59,
     "scripts/merge_duplicate_identities.py:collect": 50,
     "src/peach/web_review.py:_attach_review_asset_context": 46,

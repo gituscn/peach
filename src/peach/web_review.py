@@ -345,6 +345,21 @@ def _metadata_queue_rows(connection, rows: list[dict],
     return [row for row in rows if row['item_key'] in kept], genre_decisions
 
 
+def _attach_review_decisions(rows: list[dict], category: str, decisions: dict,
+                             genre_decisions: dict) -> None:
+    """保留候选顺序，并按当前证据投影仍有效的复核决定。"""
+    for position, row in enumerate(rows):
+        row['queue_order'] = position
+        decision = decisions.get(row["item_key"], {})
+        if category == "studio_logos" and row.get("content_state") == "changed":
+            # 同一厂牌的新图片仍需确认，不沿用旧图片的批准。
+            decision = {}
+        if category == "metadata_fields":
+            decision = _metadata_decision_in_force(decision, row, genre_decisions)
+        row["decision"] = decision.get("status", "pending")
+        row["decision_note"] = decision.get("note", "")
+
+
 def _review_rows(contract: ReviewContract, category: str, *, queue: str | None = 'pending') -> tuple[list[dict], str | None, int]:
     # 复核卡片只需知道 /cover 能否取图，不加载全库的裁剪和人脸 sidecar。
     has_cover = cache(lambda code: contract.cover_path(code) is not None)
@@ -361,16 +376,7 @@ def _review_rows(contract: ReviewContract, category: str, *, queue: str | None =
         }
         if category == "metadata_fields":
             rows, genre_decisions = _metadata_queue_rows(connection, rows, decisions)
-        for position, row in enumerate(rows):
-            row['queue_order'] = position
-            decision = decisions.get(row["item_key"], {})
-            if category == "studio_logos" and row.get("content_state") == "changed":
-                # 同一厂牌的新图片仍需确认，不沿用旧图片的批准。
-                decision = {}
-            if category == "metadata_fields":
-                decision = _metadata_decision_in_force(decision, row, genre_decisions)
-            row["decision"] = decision.get("status", "pending")
-            row["decision_note"] = decision.get("note", "")
+        _attach_review_decisions(rows, category, decisions, genre_decisions)
         rows = _select_review_queue(rows, queue)
         if category in {"creator_tags", "western_identity"}:
             names = [str(row.get("creator") or "").strip() for row in rows]
