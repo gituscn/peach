@@ -27,7 +27,7 @@ import {
 
 import { managementSkeletonHtml, paintManagementPlaceholder } from '../../../management-placeholder';
 import { routeScrollBehavior, scrollToAnchor } from '../../../ui-kit/anchor-scroll';
-import { isReviewCategory } from '../../review/review';
+import { isReviewCategory, reviewQueueOf } from '../../review/review';
 import { javLibraryPath, javTab } from '../../jav/jav';
 import { ShellActionsContext, useOpenEpoch } from '../router';
 import type { ManagedOpenProps, ManagedPath, ShellActions } from '../shell-actions';
@@ -99,7 +99,8 @@ async function openProps(path: ManagedPath, run: Run): Promise<object | null> {
     const category = search().get('category') || '';
     const runtime = await readRuntime(run);
     if (!run.live) return null;
-    return { category: isReviewCategory(category) ? category : '', ...writerProps(runtime, '/review') } satisfies ManagedOpenProps['/review'];
+    return { category: isReviewCategory(category) ? category : '', queue: reviewQueueOf(search().get('queue')),
+      ...writerProps(runtime, '/review') } satisfies ManagedOpenProps['/review'];
   }
   if (path === '/subscriptions') {
     const route = followManageParams('?' + search().toString());

@@ -1,7 +1,6 @@
 /* 队列里的一张卡：问的是什么、凭什么判、以及三个结论。
  *
- * 主体动作在最右——一行里从左到右是「拒绝、跳过、通过」，读到最后一枚才是这张卡真正要人
- * 做的判断。Geist 的弹层与 Fieldset 操作条都是这个方向。 */
+ * 待处理卡依次提供忽略、稍后处理、通过，主操作靠右；已忽略卡只提供恢复。 */
 import { useRef } from 'react';
 
 import { avatarInner } from '@peach/card-art';
@@ -16,7 +15,8 @@ import { RiImageLine } from '@remixicon/react';
 import { busyProps } from '../settings/use-action';
 import { CandidateChoices, PendingGenres } from './candidate-form';
 import { AssetPicker, EntityHead, IdentityEvidence, OriginAsset, SourceImage } from './review-evidence';
-import type { DecisionStatus, ReviewCategory, ReviewRow, RowChoice } from './review';
+import type { DecisionStatus, ReviewCategory, ReviewQueue, ReviewRow, RowChoice } from './review';
+import { REVIEW_DECISION_LABELS } from './review';
 import {
   canApprove, ENTITY_REVIEW_KINDS, rowEvidence, rowFieldName, rowSubject, rowTags, rowTitle,
 } from './review';
@@ -51,6 +51,7 @@ export interface CardHandlers {
 
 export interface ReviewCardProps {
   category: ReviewCategory;
+  queueView?: ReviewQueue;
   row: ReviewRow;
   choice: RowChoice;
   onChoice(next: RowChoice): void;
@@ -67,7 +68,7 @@ export interface ReviewCardProps {
 export function ReviewCard(props: ReviewCardProps) {
   const {
     category, row, choice, onChoice, selected, onSelect, locked, busy, problem, genreTags,
-    onDecide, handlers,
+    onDecide, handlers, queueView = 'pending',
   } = props;
   /* Checkbox 的 `onChange` 只给新状态，Shift 要从触发它的那一下事件里取：按下先于变更，
      键盘的空格也一样。 */
@@ -87,7 +88,7 @@ export function ReviewCard(props: ReviewCardProps) {
   const approvable = canApprove(category, row);
   const comparison = row.comparison_assets || [];
   const assets = row.preview_assets || [];
-  const decided = String(row.decision || 'pending') !== 'pending';
+  const decisionLabel = REVIEW_DECISION_LABELS[row.decision || ''];
 
   /* 对照作品排在不缩的卡头里：服务端给两条，再多也只露前两条，其余报一个数，
      否则卡头会把动作条挤出卡外。 */
@@ -165,7 +166,7 @@ export function ReviewCard(props: ReviewCardProps) {
           </span>
         )}
         <div className="min-w-0 flex-1">{heading}</div>
-        {decided ? <Chip variant="caption" color="neutral">{row.decision}</Chip> : null}
+        {decisionLabel ? <Chip variant="caption" color="neutral">{decisionLabel}</Chip> : null}
       </header>
 
       {/* 中段只长不缩：内容短时它吃掉剩下的高度，内容长时卡不变形，由这一段自己滚。
@@ -214,16 +215,17 @@ export function ReviewCard(props: ReviewCardProps) {
       {/* 动作条占满卡底那一格：沉一档底色、上面一条线把「看证据」和「下判断」分开，
           下面两角跟着卡的圆角收口。 */}
       <footer className="-mx-5 flex min-h-14 shrink-0 flex-wrap items-center justify-end gap-2 rounded-b-surface border-t border-separator-border bg-background-secondary-default py-3 pr-3 pl-5">
-        <Button variant="danger" size="small" disabled={locked} {...busyProps(busy)}
-          onClick={() => onDecide('rejected')}>拒绝</Button>
-        <Button variant="secondary" size="small" disabled={locked} {...busyProps(busy)}
-          onClick={() => onDecide('skipped')}>跳过</Button>
-        {/* 没有可采纳的候选时这颗键灰着，字面说它为什么点不了，和旁边的「跳过」分得开。 */}
-        <Button variant="primary" size="small" disabled={locked || !approvable} {...busyProps(busy)}
-          title={approvable ? undefined : '没有可采用的资料，只能拒绝或跳过'}
+        {queueView !== 'ignored' ? <Button variant="ghost" size="small" disabled={locked} {...busyProps(busy)}
+          onClick={() => onDecide('rejected')}>忽略</Button> : null}
+        {queueView === 'pending' ? <Button variant="secondary" size="small" disabled={locked} {...busyProps(busy)}
+          onClick={() => onDecide('skipped')}>稍后处理</Button> : <Button
+          variant={queueView === 'ignored' ? 'primary' : 'secondary'} size="small" disabled={locked} {...busyProps(busy)}
+          onClick={() => onDecide('restore')}>恢复待处理</Button>}
+        {queueView !== 'ignored' ? <Button variant="primary" size="small" disabled={locked || !approvable} {...busyProps(busy)}
+          title={approvable ? undefined : '没有可采用的资料，可先保留或忽略'}
           onClick={() => onDecide('approved')}>
           {approvable ? '通过' : '不可通过'}
-        </Button>
+        </Button> : null}
         {problem
           ? <p role="status" className="w-full text-body-2-regular text-text-error-primary">{problem}</p>
           : null}

@@ -2446,14 +2446,8 @@ class ReviewQueueTests(unittest.TestCase):
         # 来源写法不能丢，降为副标题。
         self.assertEqual(rows[0]["source_name"], "Alice Shaku")
 
-    def test_decided_rows_leave_the_queue_and_skipped_ones_sink(self):
-        """判过的不能一刷新又回来。
-
-        `_review_rows` 原样返回全部候选、只挂一个 `decision`、靠前端在本地 splice
-        的话，点「通过」当场消失、刷新全回来（厂牌 logo 上最明显）。
-        `跳过` 是「稍后再看」，仍留在队列但排到最后——否则一次跳过等于永久隐藏，
-        而界面上没有任何入口能把它找回来。
-        """
+    def test_review_states_survive_reload_and_restore_preserves_the_prior_decision(self):
+        """待处理、稍后处理、忽略独立计数，恢复保留原判定与时间。"""
         self.write_candidates("creator-tags-candidate-20260818.csv", [
             {"board": "a", "creator": "ukiru", "tags": "x", "status": "candidate"},
             {"board": "b", "creator": "ukiru", "tags": "y", "status": "candidate"},
@@ -2463,7 +2457,36 @@ class ReviewQueueTests(unittest.TestCase):
         self.decide("creator_tags", "b", "rejected")
         self.assertEqual(self.queue_keys("creator_tags"), ["a", "c"])
         self.decide("creator_tags", "a", "skipped")
-        self.assertEqual(self.queue_keys("creator_tags"), ["c", "a"])
+        self.assertEqual(self.queue_keys("creator_tags"), ["c"])
+        snapshot = rm_review.q_review(self.contract)
+        self.assertEqual(snapshot['counts']['creator_tags'], 1)
+        for state, key in [('later', 'a'), ('ignored', 'b')]:
+            self.assertEqual([row['item_key'] for row in snapshot['queues'][state]['sections']['creator_tags']], [key])
+            self.assertEqual(snapshot['queues'][state]['counts']['creator_tags'], 1)
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("UPDATE review_decision SET reviewer='本人',note='留待确认' WHERE item_key='a'")
+            connection.commit()
+            prior = connection.execute("SELECT status,reviewer,note,updated_at FROM review_decision WHERE item_key='a'").fetchone()
+        self.assertEqual(self.decide('creator_tags', 'a', 'restore')['applied_assets'], 0)
+        self.assertEqual(self.queue_keys('creator_tags'), ['a', 'c'])
+        self.assertEqual(rm_review.q_review(self.contract)['queues']['later']['counts']['creator_tags'], 0)
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
+            self.assertEqual(connection.execute('SELECT status,reviewer,note,decided_at FROM review_decision_history').fetchone(), prior)
+            self.assertTrue(connection.execute('SELECT restored_at FROM review_decision_history').fetchone()[0])
+
+    def test_restore_rejects_approved_or_missing_candidates_without_changing_decisions(self):
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
+            connection.executemany('INSERT INTO review_decision(category,item_key,status,updated_at) VALUES(?,?,?,?)',
+                [('creator_tags', 'approved', 'approved', 'old'), ('creator_tags', 'gone', 'skipped', 'old')])
+            connection.commit()
+            connection.execute("INSERT INTO review_decision(category,item_key,status,note,updated_at) VALUES('creator_tags','automatic','rejected','{\"auto_rejected\":true}','old')")
+            connection.commit()
+        for key in ('approved', 'gone', 'automatic'):
+            with self.assertRaises(ValueError):
+                self.decide('creator_tags', key, 'restore')
+        with contextlib.closing(sqlite3.connect(self.db_path)) as connection:
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_decision').fetchone()[0], 3)
+            self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_decision_history').fetchone()[0], 0)
 
     def test_approving_a_studio_logo_actually_installs_it(self):
         """批准必须真的把图装进 `/logo` 读的目录。

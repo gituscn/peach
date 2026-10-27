@@ -413,6 +413,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 ## 发现推荐缓存
 
+复核状态复用 `review_decision`、候选 CSV、TanStack Query 和 BoardUI `Tabs`。`/api/review` 的根段提供待处理，`queues.later` 与 `queues.ignored` 提供独立分类和计数；页面地址保存状态与分类。旧 `skipped` 直接投影为稍后处理，人工 `rejected` 投影为已忽略，自动判定不混入人工忽略。迁移 `0050` 只新增 `review_decision_history`，不重写旧决定。显式恢复先在同一事务保存原决定，再删除当前拒绝或跳过决定；已批准和不在当前候选中的资料不可恢复。只读镜像校验三个状态完整性，旧缓存缺状态时报告未取得。无新增依赖。
+
 搜索推荐复用 `/api/items`、馆藏范围的 `/api/jav/discoveries`、`/api/follow`、`/api/follow/authors` 与 `/api/feeds/discoveries`，图片复用 `coverImage`、`feedNewCoverHtml`、`avatarInner` 和 `authorAvatarHtml`。JAV 保留 IDF/MMR 口味排序，关注取全部状态的随机作品，视频与图片复用 `groupMediaKinds`、`itemForMedia` 和附件缩略图；署名沿用 `followIdentity` 的发布者判据。搜索框不启动库外资料补齐；详情与订阅分别沿用现有作品、作者、关注管理路由。无新增依赖、迁移或 ledger 写入。
 
 发现推荐的浏览证据复用 `taste_history` 私有历史库、规范身份和原子 JSON 写入；按日取证与同地址身份解析独立缓存。缓存只保存实体计数，历史、别名、关注、标签决定和解析规则参与失效；观看反馈不重复解析历史，任务心跳不影响偏好版本。页面预取复用 TanStack Query 的 `ensureQueryData`，无新增依赖。

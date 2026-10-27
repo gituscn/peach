@@ -8,10 +8,11 @@ import { RiCheckDoubleLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '../components/select';
 import { SelectionDock } from '../components/selection-dock';
-import type { DecisionStatus, ReviewGroup, ReviewGrouping, ReviewRow } from './review';
+import type { DecisionStatus, ReviewGroup, ReviewGrouping, ReviewQueue, ReviewRow } from './review';
 import { commonReviewSources } from './review';
 
 export interface BulkToolbarProps {
+  queueView?: ReviewQueue;
   groupOptions: [ReviewGrouping, string][];
   groupBy: ReviewGrouping;
   onGroupBy(next: ReviewGrouping): void;
@@ -30,13 +31,13 @@ export interface BulkToolbarProps {
   busy: boolean;
   feedback: string;
   onUnifySource(source: string): void;
-  onRun(status: Extract<DecisionStatus, 'approved' | 'rejected'>): void;
+  onRun(status: DecisionStatus): void;
 }
 
 export function BulkToolbar(props: BulkToolbarProps) {
   const {
     groupOptions, groupBy, onGroupBy, groups, filter, onFilter, pageKeys, selected, onSelected,
-    selectedRows, metadata, approvable, busy, feedback, onUnifySource, onRun,
+    selectedRows, metadata, approvable, busy, feedback, onUnifySource, onRun, queueView = 'pending',
   } = props;
   const shown = pageKeys.filter((key) => selected.has(key));
   const allShown = shown.length > 0 && shown.length === pageKeys.length;
@@ -78,7 +79,7 @@ export function BulkToolbar(props: BulkToolbarProps) {
       </div>
 
         <SelectionDock label="复核所选项目" visible={selected.size > 0} count={`已选 ${selected.size} 项`}>
-          {needsSource ? (
+          {needsSource && queueView !== 'ignored' ? (
             <Select aria-label="统一选择来源" size="sm" selectedKey=""
               isDisabled={busy || !sources.length}
               onSelectionChange={(key) => { if (key !== null && key !== '') onUnifySource(String(key)) }}>
@@ -86,10 +87,14 @@ export function BulkToolbar(props: BulkToolbarProps) {
               {sources.map((source) => <SelectItem key={source} id={source}>{source}</SelectItem>)}
             </Select>
           ) : null}
-          <Button variant="danger" size="small" disabled={busy || !selected.size}
-            onClick={() => onRun('rejected')}>拒绝所选</Button>
-          <Button variant="primary" size="small" disabled={busy || !selected.size || !approvable}
-            onClick={() => onRun('approved')}>通过所选</Button>
+          {queueView !== 'ignored' ? <Button variant="ghost" size="small" disabled={busy || !selected.size}
+            onClick={() => onRun('rejected')}>忽略所选</Button> : null}
+          {queueView === 'pending' ? <Button variant="secondary" size="small" disabled={busy || !selected.size}
+            onClick={() => onRun('skipped')}>稍后处理所选</Button> : <Button
+            variant={queueView === 'ignored' ? 'primary' : 'secondary'} size="small" disabled={busy || !selected.size}
+            onClick={() => onRun('restore')}>恢复所选</Button>}
+          {queueView !== 'ignored' ? <Button variant="primary" size="small" disabled={busy || !selected.size || !approvable}
+            onClick={() => onRun('approved')}>通过所选</Button> : null}
           <Button variant="ghost" size="small" disabled={busy}
             onClick={() => onSelected(new Set())}>取消选择</Button>
           {feedback
