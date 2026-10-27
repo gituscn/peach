@@ -3,13 +3,13 @@
  *
  * 分组方式和筛选项按**整条队列**算，卡片只画当前这一页：筛选里的计数说的是队列，不是
  * 这一屏。筛选条高度保持不变，勾选项目时不会把下滑后吸顶的内容往下推。 */
-import { RiCheckDoubleLine } from '@remixicon/react';
+import { useRef } from 'react';
 
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '../components/select';
 import { SelectionDock } from '../components/selection-dock';
-import { PillTabList } from '../components/pill-tabs';
-import { PillTab } from '../components/pill-tab';
+import { FilterGlassRows, GlassPill } from '../components/filter-glass';
+import { useViewGlide } from '../components/use-view-glide';
 import type { DecisionStatus, ReviewGroup, ReviewGrouping, ReviewQueue, ReviewRow } from './review';
 import { commonReviewSources, REVIEW_QUEUES, REVIEW_QUEUE_LABELS } from './review';
 
@@ -50,6 +50,9 @@ export function BulkToolbar(props: BulkToolbarProps) {
   const sources = commonReviewSources(selectedRows);
   const needsSource = metadata && selectedRows.some((row) => (row.candidates?.length || 0) > 1);
   const sourceLabel = sources.length ? '统一选择来源' : '所选项目无共同来源';
+  const statePane = useRef<HTMLSpanElement>(null);
+  const stateRow = useRef<HTMLDivElement>(null);
+  const stateGlide = useViewGlide(statePane, stateRow, '[data-entity-state][aria-pressed="true"]', queueView);
 
   const toggleAll = () => {
     const next = new Set(selected);
@@ -59,26 +62,31 @@ export function BulkToolbar(props: BulkToolbarProps) {
 
   return (
     <>
-      <div role="group" aria-label="复核筛选" data-review-filter data-glass-pane=""
-        className="sticky top-topbar z-10 flex flex-wrap items-center gap-2 p-3">
-        <PillTabList aria-label="复核状态" data-pill-nav=""
-          className="flex max-w-full flex-nowrap gap-1 overflow-x-auto">
-          {REVIEW_QUEUES.map(key => <PillTab key={key} variant="gray" isSelected={queueView === key}
-            disabled={busy} onSelect={() => { if (key !== queueView) onQueueChange(key) }}>
+      <FilterGlassRows label="复核筛选" topLabel="处理状态" attrs={{ 'data-review-filter': '' }}
+        className="mb-0 flex-row flex-wrap" topClassName="max-w-full flex-none"
+        bottomClassName={pageKeys.length ? 'min-h-12 max-w-full flex-none flex-wrap' : 'hidden'}
+        panes={<span ref={statePane} data-view-glide="" aria-hidden="true" />}
+        top={<div ref={stateRow} role="group" aria-label="复核状态" data-entity-states=""
+          onPointerLeave={stateGlide.leave}>
+          {REVIEW_QUEUES.map(key => <button key={key} type="button" data-entity-state={key} data-entity-press=""
+            disabled={busy} aria-pressed={queueView === key} onPointerEnter={stateGlide.hover}
+            onClick={() => { if (key !== queueView) onQueueChange(key) }}>
             <span data-copy-key={`review.queue.${key}`}>{REVIEW_QUEUE_LABELS[key]}</span>{' '}
-            <span className="tabular-nums text-caption-1-medium text-text-secondary">
+            <span className="ms-1.5 tabular-nums text-caption-1-medium text-text-secondary">
               {queueCounts ? queueCounts[key].toLocaleString() : '…'}
             </span>
-          </PillTab>)}
-        </PillTabList>
-        {pageKeys.length ? <>
+          </button>)}
+        </div>}
+        bottom={pageKeys.length ? <>
         <Select aria-label="筛选分组方式" size="sm" selectedKey={groupBy}
+          triggerClassName="border-0 bg-transparent px-2.5 text-body-2-regular text-inherit shadow-none hover:bg-transparent"
           onSelectionChange={(key) => { if (key !== null) onGroupBy(String(key) as ReviewGrouping) }}>
           {groupOptions.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}
         </Select>
         {/* 只有一组时没什么可筛的：一个「全部分类」的下拉读起来像坏了。 */}
         {groups.length > 1 ? (
           <Select aria-label={groupBy === 'field' ? '筛选字段分类' : '筛选当前分类'} size="sm" prefix="分类"
+            triggerClassName="border-0 bg-transparent px-2.5 text-body-2-regular text-inherit shadow-none hover:bg-transparent"
             selectedKey={filter || '*'}
             onSelectionChange={(key) => { if (key !== null) onFilter(String(key) === '*' ? '' : String(key)) }}>
             <SelectItem id="*">全部</SelectItem>
@@ -89,12 +97,10 @@ export function BulkToolbar(props: BulkToolbarProps) {
             ))}
           </Select>
         ) : null}
-        {locked ? null : <Button variant="secondary" size="small" leadingIcon={RiCheckDoubleLine}
-          aria-pressed={allShown} disabled={busy || !pageKeys.length} onClick={toggleAll}>
+        {locked ? null : <GlassPill busy={busy} onPress={toggleAll}>
           {allShown ? '清空当前选择' : filter ? '全选当前分类' : '全选本页'}
-        </Button>}
-        </> : null}
-      </div>
+        </GlassPill>}
+        </> : null} />
 
         <SelectionDock label="复核所选项目" visible={!locked && selected.size > 0} count={`已选 ${selected.size} 项`}>
           {needsSource && queueView !== 'ignored' ? (

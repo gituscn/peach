@@ -411,9 +411,13 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 `entity_identity_research` 与 `apply_entity_identity_research.py` 复用规范实体写入、字段归属保护、只读预览、SQLite 备份及冻结计划。逐行撤回回执核对后续修改，新增实体有额外引用时拒绝删除；观看历史和人工判断不被回滚覆盖。资料站调研复用 `performer_alias_followup.WikiSitePages`（包着 `sources/seesaa.py` 的 `WikiPages`，加 404 记忆与按站冷却）、作品表解析 `rows()` 与 `person_profile`，以及 EUC-JP 页名直取写法，不新增依赖；`creator_identity_followup` 的后继壳照抄补厂牌、补别名两条。
 
-## 发现推荐缓存
+## 复核队列
 
 复核状态复用 `review_decision`、候选 CSV、TanStack Query 和 BoardUI `Tabs`。`/api/review` 的根段提供待处理，`queues.later` 与 `queues.ignored` 提供独立分类和计数；页面地址保存状态与分类。旧 `skipped` 直接投影为稍后处理，人工 `rejected` 投影为已忽略，自动判定不混入人工忽略。迁移 `0050` 只新增 `review_decision_history`，不重写旧决定。显式恢复先在同一事务保存原决定，再删除当前拒绝或跳过决定；已批准和不在当前候选中的资料不可恢复。只读镜像校验三个状态完整性，旧缓存缺状态时报告未取得。无新增依赖。
+
+筛选浮窗复用首页的 `FilterGlassRows`、`useViewGlide`、`GlassPill` 和透明状态键。状态与分组、筛选按控件实际宽度自然排列，足宽同排，放不下时换排；空分类保留状态入口，只读模式不提供全选或写入。Select 沿用现有弹层，触发器使用透明表面。字号、控件高度、玻璃材质和吸顶沿用同一维护源，不另设页签皮肤。
+
+## 发现推荐缓存
 
 搜索推荐复用 `/api/items`、馆藏范围的 `/api/jav/discoveries`、`/api/follow`、`/api/follow/authors` 与 `/api/feeds/discoveries`，图片复用 `coverImage`、`feedNewCoverHtml`、`avatarInner` 和 `authorAvatarHtml`。JAV 保留 IDF/MMR 口味排序，关注取全部状态的随机作品，视频与图片复用 `groupMediaKinds`、`itemForMedia` 和附件缩略图；署名沿用 `followIdentity` 的发布者判据。搜索框不启动库外资料补齐；详情与订阅分别沿用现有作品、作者、关注管理路由。无新增依赖、迁移或 ledger 写入。
 

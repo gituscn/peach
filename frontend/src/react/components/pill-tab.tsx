@@ -154,7 +154,6 @@ export function PillTab({
   onSelect,
   children,
   className,
-  disabled,
 }: {
   variant?: PillTabVariant;
   icon?: IconComponent;
@@ -162,12 +161,10 @@ export function PillTab({
   onSelect: () => void;
   children: ReactNode;
   className?: string;
-  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       aria-pressed={isSelected}
       data-pill-selected={isSelected ? "" : undefined}
       data-pill-variant={variant}
