@@ -4,10 +4,10 @@
 
 本地优先的影片刮削与媒体管理工具。
 
-[官网](https://peach.video) · [下载](https://peach.video/#download) · [在线演示](https://demo.peach.video) · [文档](#文档) · [English](README.md)
+[官网](https://peach.video) · [下载](#下载与使用) · [在线演示](https://demo.peach.video) · [文档](#文档) · [English](README.md)
 
-[![Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownloads.peach.video%2Freleases.json&query=%24%5B0%5D.tag_name&label=release)](https://gitgud.io/peach-mitao/peach/-/releases)
-[![CI 流水线](https://img.shields.io/badge/CI-GitGud-554488?logo=gitlab&logoColor=white)](https://gitgud.io/peach-mitao/peach/-/pipelines?ref=master)
+[![Release](https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&sort=semver&label=release&logo=github)](https://github.com/peach-mitao/peach/releases)
+[![CI 流水线](https://img.shields.io/github/actions/workflow/status/peach-mitao/peach/test.yml?branch=master&label=CI&logo=githubactions&logoColor=white)](https://github.com/peach-mitao/peach/actions/workflows/test.yml)
 [![许可证](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&logoColor=white)](LICENSE)
 [![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4)](docs/TESTING_DESKTOP.md)
 [![macOS DMG](https://img.shields.io/badge/macOS-DMG-555555?logo=apple&logoColor=white)](docs/OPERATIONS.md#macos-独立测试包)
@@ -53,8 +53,8 @@
 
 | 方式 | 入口 |
 | --- | --- |
-| Windows | [安装包与免安装包](https://peach.video/#download) |
-| macOS | [Apple Silicon / Intel DMG](https://peach.video/#download) |
+| Windows x64 | [安装版](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-windows-x64-setup.exe) · [免安装版](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-windows-x64.zip) |
+| macOS | [Apple Silicon / ARM64](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-macos-arm64.dmg) · [Intel / x86_64](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-macos-x86_64.dmg) |
 | Docker / NAS | [部署说明](docs/DOCKER.md) |
 | 源码运行 | [安装步骤](docs/OPERATIONS.md#从源码运行windowsmacos)，需要 Git、uv 和 Python 3.14+ |
 
@@ -76,16 +76,18 @@
 
 ## Star 历史
 
-<a href="https://www.star-history.com/?repos=peach-mitao%2Fpeach&amp;type=date&amp;releases=&amp;legend=top-left">
+<a href="https://github.com/peach-mitao/peach/tree/star-history">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;theme=dark&amp;releases=&amp;legend=top-left">
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;releases=&amp;legend=top-left">
-    <img alt="Peach 累计 Star 数，线性坐标" src="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;releases=&amp;legend=top-left">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-light.svg">
+    <img alt="Peach 累计 Star 数，线性坐标" src="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-light.svg">
   </picture>
 </a>
 
+图表由 [Star Chart](https://github.com/leereilly/star-chart) 生成，采用 MIT 许可。
+
 ## 许可证
 
-[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 longmeidao。第三方组件保留各自的许可证。
+[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors。第三方组件保留各自的许可证。
 
 仅管理自行持有或获授权使用的媒体，遵守法律、版权及来源平台的访问、年龄和地区限制。Peach 不提供影片资源或付费内容访问权。

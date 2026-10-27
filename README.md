@@ -4,10 +4,10 @@
 
 A local-first video metadata scraper and media manager.
 
-[Website](https://peach.video) · [Download](https://peach.video/#download) · [Live demo](https://demo.peach.video) · [Documentation](#documentation) · [简体中文](README.zh-CN.md)
+[Website](https://peach.video) · [Download](#download-and-use) · [Live demo](https://demo.peach.video) · [Documentation](#documentation) · [简体中文](README.zh-CN.md)
 
-[![Release](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdownloads.peach.video%2Freleases.json&query=%24%5B0%5D.tag_name&label=release)](https://gitgud.io/peach-mitao/peach/-/releases)
-[![CI pipelines](https://img.shields.io/badge/CI-GitGud-554488?logo=gitlab&logoColor=white)](https://gitgud.io/peach-mitao/peach/-/pipelines?ref=master)
+[![Release](https://img.shields.io/github/v/release/peach-mitao/peach?include_prereleases&sort=semver&label=release&logo=github)](https://github.com/peach-mitao/peach/releases)
+[![CI pipelines](https://img.shields.io/github/actions/workflow/status/peach-mitao/peach/test.yml?branch=master&label=CI&logo=githubactions&logoColor=white)](https://github.com/peach-mitao/peach/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&logoColor=white)](LICENSE)
 [![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4)](docs/TESTING_DESKTOP.md)
 [![macOS DMG](https://img.shields.io/badge/macOS-DMG-555555?logo=apple&logoColor=white)](docs/OPERATIONS.md#macos-独立测试包)
@@ -53,8 +53,8 @@ Movie demo data; see [asset credits and licenses](https://peach.video/en/credits
 
 | Method | Get started |
 | --- | --- |
-| Windows | [Installer and portable builds](https://peach.video/#download) |
-| macOS | [Apple Silicon / Intel DMG](https://peach.video/#download) |
+| Windows x64 | [Installer](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-windows-x64-setup.exe) · [Portable](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-windows-x64.zip) |
+| macOS | [Apple Silicon / ARM64](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-macos-arm64.dmg) · [Intel / x86_64](https://github.com/peach-mitao/peach/releases/download/v0.50.0/Peach-0.50.0-macos-x86_64.dmg) |
 | Docker / NAS | [Deployment guide](docs/DOCKER.md) |
 | Source | [Setup instructions](docs/OPERATIONS.md#从源码运行windowsmacos); requires Git, uv and Python 3.14+ |
 
@@ -76,16 +76,18 @@ Thanks to [amane](https://github.com/sqzw-x/amane), [Gfriends](https://github.co
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=peach-mitao%2Fpeach&amp;type=date&amp;releases=&amp;legend=top-left">
+<a href="https://github.com/peach-mitao/peach/tree/star-history">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;theme=dark&amp;releases=&amp;legend=top-left">
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;releases=&amp;legend=top-left">
-    <img alt="Peach cumulative stars, linear scale" src="https://api.star-history.com/svg?repos=peach-mitao/peach&amp;type=date&amp;releases=&amp;legend=top-left">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-light.svg">
+    <img alt="Peach cumulative stars, linear scale" src="https://raw.githubusercontent.com/peach-mitao/peach/star-history/star-history-light.svg">
   </picture>
 </a>
 
+Generated with [Star Chart](https://github.com/leereilly/star-chart) (MIT).
+
 ## License
 
-[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 longmeidao. Third-party components retain their own licenses.
+[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors. Third-party components retain their own licenses.
 
 Manage only media you own or are authorized to use, subject to laws, copyright and source-platform access, age and regional restrictions. Peach does not provide video resources or access to paid content.
