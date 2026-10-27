@@ -1369,7 +1369,7 @@ class _MetadataResults:
 class _RemoteSession:
     """一个任务共用的外部来源连接，加上来源说过「没有」的记忆。"""
 
-    def __init__(self, config, provider_factory, misses, *, retrying, routes=None):
+    def __init__(self, config, provider_factory, misses, *, retrying, recheck_existing=False, routes=None):
         self._config = config
         self._factory = provider_factory
         self._provider = None
@@ -1377,7 +1377,7 @@ class _RemoteSession:
         #: 用户对每种内容类型的来源链覆盖，形状见 `metadata_routes.parse_route_overrides`。
         self._routes = routes or None
         # 定向重试或明确重采不看旧记忆；本次答复仍照记。
-        self._consult = not retrying
+        self._consult = not (retrying or recheck_existing)
         self._task_evidence = {}
         self._task_absent = set()
 
@@ -2705,7 +2705,7 @@ def process_library(config, db_path, candidate_root, cover_root, *, location='co
 
         update()
         remote = _RemoteSession(config, provider_factory, _MissCache(misses_path(config)),
-                                retrying=retrying or recheck_existing, routes=routes)
+                                retrying=retrying, recheck_existing=recheck_existing, routes=routes)
         flush_candidates = lambda force=False: None
 
         try:

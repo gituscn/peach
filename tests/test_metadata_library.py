@@ -124,11 +124,11 @@ class LibraryNfoTests(unittest.TestCase):
                 document = {'id': 'DASS-468', 'title': '原题', 'maker': 'Das', 'release_date': '2024-09-10',
                             'actresses': [{'japanese_name': '胡桃さくら'}]}
                 provider = stub_provider()
-                provider.query.side_effect = lambda code, source='r18dev', **kwargs: (
+                provider.query.side_effect = lambda code, source='r18dev', document=document, **kwargs: (
                     {**document, 'genres': ['高跟鞋'], 'javdb_rule': 2} if source == 'javdb' else document)
                 provider.cover.return_value = False
                 process_library(config, db, root / 'generated', root / 'covers', asset_ids=[1],
-                                stage='metadata', recheck_existing=recheck, provider_factory=lambda: provider)
+                                stage='metadata', recheck_existing=recheck, provider_factory=lambda provider=provider: provider)
                 javdb_calls = [call for call in provider.query.call_args_list if call.args[1] == 'javdb']
                 self.assertEqual(len(javdb_calls), 1 if recheck else 0)
                 self.assertTrue(_MissCache(misses_path(config)).fresh('javdb', 'DASS-469'))
