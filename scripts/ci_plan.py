@@ -112,7 +112,7 @@ def github_verified_base(root: Path) -> str:
     runs = json.loads(payload)['workflow_runs']
     rows = [{'sha': run['head_sha'], 'status': 'success'} for run in runs
             if run.get('conclusion') == 'success' and run.get('event') == 'push' and run.get('head_branch') == 'master']
-    current = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
+    current = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True, encoding='utf-8').strip()
     base = verified_base(rows, current, ancestor_of_head(root))
     if base is None:
         raise ValueError('最近成功的主线 Test 中没有当前提交的祖先')
