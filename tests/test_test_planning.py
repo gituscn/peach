@@ -130,6 +130,15 @@ class TestPlanningTests(unittest.TestCase):
         self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/upgrade-smoke.yml'])['wheel'])
         self.assertTrue(ci_plan.plan('pull_request', ['.github/workflows/unknown.yml'])['wide'])
 
+    def test_chart_workflow_checks_tooling_and_preserves_mixed_runtime_coverage(self):
+        path = '.github/workflows/star-history.yml'
+        self.assertEqual(runner.scopes_for_changes([path])[0], ('tooling',))
+        plan = ci_plan.plan('pull_request', [path])
+        for job in ('wide', 'browser', 'frontend', 'vendor', 'wheel'):
+            with self.subTest(job=job):
+                self.assertFalse(plan[job])
+        self.assertTrue(ci_plan.plan('pull_request', [path, 'src/peach/server.py'])['browser'])
+
     def setUp(self):
         environment = patch.dict(os.environ, {'PEACH_TEST_FOCUS': '', 'PEACH_E2E_FILES': ''})
         environment.start()
@@ -342,6 +351,39 @@ class TestPlanningTests(unittest.TestCase):
                 patch.object(ci_plan.subprocess, 'check_output', side_effect=[json.dumps({'workflow_runs':runs}), 'head']), \
                 patch('scripts.ci_scope.ancestor_of_head', return_value=lambda sha:sha=='ancestor'):
             self.assertEqual(ci_plan.github_verified_base(runner.ROOT), 'ancestor')
+
+    def test_actions_output_passes_a_git_revision_and_json_values_to_downstream_jobs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+
+            def git(*args):
+                return subprocess.check_output(
+                    ['git', '-C', str(root), '-c', 'user.name=Test',
+                     '-c', 'user.email=test@example.invalid', *args],
+                    text=True, encoding='utf-8').strip()
+
+            git('init', '--quiet')
+            readme = root / 'README.md'
+            readme.write_text('first\n', encoding='utf-8')
+            git('add', 'README.md')
+            git('commit', '--quiet', '-m', 'first')
+            base = git('rev-parse', 'HEAD')
+            readme.write_text('second\n', encoding='utf-8')
+            git('add', 'README.md')
+            git('commit', '--quiet', '-m', 'second')
+            output_file = root / 'actions-output'
+            with patch.object(sys, 'argv', ['ci_plan.py', '--event', 'push', '--base', base]), \
+                    patch.object(ci_plan, '__file__', str(root / 'scripts' / 'ci_plan.py')), \
+                    patch.object(ci_plan, 'github_verified_base', return_value=base), \
+                    patch.dict(os.environ, {'GITHUB_OUTPUT': str(output_file)}), \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                ci_plan.main()
+            values = dict(line.split('=', 1) for line in output_file.read_text('utf-8').splitlines())
+            self.assertEqual(values['base'], base)
+            self.assertEqual(git('diff', '--name-only', values['base'] + '...HEAD'), 'README.md')
+            result = json.loads(output.getvalue())
+            for key in result.keys() - {'base'}:
+                self.assertEqual(json.loads(values[key]), result[key])
 
     def test_venv_interpreter_path_keeps_environment_identity(self):
         with tempfile.TemporaryDirectory() as directory:

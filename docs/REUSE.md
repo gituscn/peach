@@ -4,6 +4,12 @@
 
 `/api/jav-browser/people` 复用现有专用令牌与浏览器权限检查、规范实体关联和男优排除判据。人物名只读本地账本与发现资料快照，头像通过既有 `PreviewService.entity_image` 查找已安装文件；已有 Pillow 将其在内存缩为 64px JPEG，不落新头像、不抓外站。未初始化发现资料服务时直接读取快照，避免初始化恢复外站任务。缺头像省略图片字段，缺人物信息返回空数组，接口失败与正常缺失分别反馈。用户脚本显示灰底首字母，不显示作品封面，无新增依赖。
 
+## README Star 图
+
+复用 [Star Chart](https://github.com/leereilly/star-chart) 的稳定版 v0.3，固定提交 `e7fa78bdf8f78da6c3feeb3a97b528fd97d62727`，MIT，版权为 Lee Reilly。使用 `neon-glow-stream` 霓虹流图、线性绝对值坐标、浅深双主题与蜜桃粉橙配色；不新增应用运行依赖。数据来自 GitHub 原生公开 Star 历史，不补造缺失记录，也不把历史累计增加数当作完整取消 Star 的净变化账本。
+
+独立 `Star History` 工作流生成 SVG 并保留上游许可，只在 `star-history` 分支保存产物，不触发主线测试或阻塞发版。静态 SVG 发布思路参考 SakuraMedia；未复制其受 PolyForm Noncommercial 约束的生成脚本。
+
 ## 复核字段筛选与文本差异
 
 复核文本差异复用 [jsdiff](https://github.com/kpdecker/jsdiff) 的 `diffChars`，前端精确固定 `diff@9.0.0`（BSD-3-Clause，自带类型），按 Unicode 码点比较并仅展示当前文本中的差异片段。当前值和候选相互对照，尚无当前值时对照其他来源；来源依据只比较同名字段。Peach 保留参照选择、语义高亮与字段筛选，不自行实现通用差异算法；原始候选值、提交契约和 ledger 均不改变。
