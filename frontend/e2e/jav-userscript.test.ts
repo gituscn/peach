@@ -65,6 +65,13 @@ async function open(browser: Browser, options: {
       GM_info: { script: { version } },
       GM_registerMenuCommand: (label: string, callback: () => void) => { mock.menu = callback; mock.menus[label] = callback; },
       GM_xmlhttpRequest: (request: MockRequest) => {
+        if (new URL(request.url).pathname === '/api/jav-browser/people') {
+          setTimeout(() => request.onload({ status: 200, responseText: JSON.stringify({
+            ok: true, source: 'local-cache', items: Object.fromEntries(
+              new URL(request.url).searchParams.get('codes')!.split(',').map(code => [code, []])),
+          }) }), 0);
+          return { abort: () => request.onabort?.() };
+        }
         if (request.url.endsWith('/api/jav-browser/errors')) { mock.reports.push(request); return; }
         const call = { method: request.method, url: request.url, headers: request.headers,
           anonymous: request.anonymous, ...(request.data ? { data: request.data } : {}) };
@@ -156,7 +163,7 @@ async function selectCode(page: Page) {
     const selection = window.getSelection()!;
     selection.removeAllRanges();
     selection.addRange(range);
-    window.javMock.menus['选中番号加入 Peach']!();
+    window.javMock.menus['开启']!();
   });
 }
 
@@ -269,7 +276,10 @@ describe('JAV 用户脚本', () => {
     let alerts = 0;
     page.on('dialog', dialog => { alerts++; void dialog.dismiss(); });
     try {
-      for (const value of ['', 'SSIS-057 作品标题', 'SSIS-057 ABW-123', 'H264', 'X1234', 'SSIS-057'.repeat(30)]) {
+      await selectCode(page);
+      await page.locator('#peach-jav-batch').getByRole('button', { name: '返回 Peach 主界面', exact: true }).click();
+      await page.locator('#peach-jav-batch').waitFor({ state: 'detached' });
+      for (const value of ['SSIS-057 作品标题', 'SSIS-057 ABW-123', 'H264', 'X1234', 'SSIS-057'.repeat(30)]) {
         await page.locator('#selected-code').evaluate((element, value) => { element.textContent = value; }, value);
         await selectCode(page);
       }
@@ -378,17 +388,21 @@ describe('JAV 用户脚本', () => {
       await fillSettings(page, BASE, TOKEN);
       await ready(page);
       assert.equal(await page.evaluate(() => window.javMock.calls.length), 1);
+      await page.locator(ROOT).getByRole('button', { name: '展开 Peach 面板', exact: true }).click();
+      await ready(page);
+      assert.equal(await page.evaluate(() => window.javMock.calls.length), 2);
       await page.evaluate(() => { window.javMock.automatic = false; });
       await button(page).click();
       await page.locator(ROOT).evaluate(root => {
         root.shadowRoot!.querySelector<HTMLButtonElement>('[data-action="add"]')!.click();
         root.shadowRoot!.querySelector<HTMLButtonElement>('[data-action="add"]')!.click();
       });
-      await pending(page, 2);
+      await pending(page, 3);
       const calls = await page.evaluate(() => window.javMock.calls);
       assert.equal(calls[0]!.method, 'GET');
-      assert.equal(calls[1]!.method, 'POST');
-      assert.deepEqual(JSON.parse(calls[1]!.data!), { code: 'SSIS-057', source_url: 'https://missav.ws/en/ssis-057' });
+      assert.equal(calls[1]!.method, 'GET');
+      assert.equal(calls[2]!.method, 'POST');
+      assert.deepEqual(JSON.parse(calls[2]!.data!), { code: 'SSIS-057', source_url: 'https://missav.ws/en/ssis-057' });
       for (const call of calls) {
         assert.equal(new URL(call.url).origin, BASE);
         assert.equal(call.anonymous, true);
@@ -403,16 +417,16 @@ describe('JAV 用户脚本', () => {
         storage: JSON.stringify(localStorage), cookies: document.cookie, url: location.href,
       }));
       assert.equal(JSON.stringify(surface).includes(TOKEN), false);
-      await reply(page, 1, body('queued'));
-      await page.clock.fastForward(2100);
-      await pending(page, 3);
-      await reply(page, 2, body('searching'));
+      await reply(page, 2, body('queued'));
       await page.clock.fastForward(2100);
       await pending(page, 4);
-      await reply(page, 3, body('submitted'));
+      await reply(page, 3, body('searching'));
       await page.clock.fastForward(2100);
       await pending(page, 5);
-      await reply(page, 4, body('ingested'));
+      await reply(page, 4, body('submitted'));
+      await page.clock.fastForward(2100);
+      await pending(page, 6);
+      await reply(page, 5, body('ingested'));
       await ready(page, '已有该影片');
       assert.equal(await button(page).isDisabled(), true);
       assert.deepEqual(opened.problems, []);

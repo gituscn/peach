@@ -40,6 +40,7 @@ React 与 BoardUI 的组件、颜色和尺寸采用 [BoardUI 适配](BOARD_UI.md
 - 管理页单面板分区的标题放在面板内，不在框外重复；多卡片分组可用框外标题。同级分区标题用 `text-title-2-medium`，加载态与内容态共用 500 字重、20px 字号和 26px 行高。
 - 控件高度只取 `--control-h-inline`／`-compact`／`--control-h`／`-large` 四档，同一行的同类控件同档；与文字同行的图标用 `--icon-inline`，单独图标按控件档取固定值；下拉不点开也要看得出在选什么（上方标签、触发键前缀或格子选择器的弹层标题三选一）。判据与坏例见 `docs/DESIGN_GUIDELINES.md` 第 2、10、11 节。
 - React 使用 BoardUI 语义 token，遗留样式使用对应 `:root` token；新增 token 须说明现有词汇无法表达的语义。
+- 无图头像、首字母与默认人像复用 [BoardUI 无图头像规范](BOARD_UI.md#无图头像与浮卡子页)，同时核对承载面的深浅主题、悬停和选中态；不能把数据未取得当作动作禁用而降低前景对比度。表格、表单与浮卡使用完整字阶和对应间距，复用快照须包含 Peach 已登记的暗色例外。
 - 字重只有 400／500／600 三档，标题按既定层级选择 medium 或 semibold；圆角只用 `--badge-radius`／`--control-radius`／`--surface-radius`／`--floating-radius`／`--pill-radius` 加 `50%` 与 `0`，带边框容器里的头尾条用 `calc(… - 1px)` 保持同心。两者的字面值由 `tests/test_web_ui.py` 拒绝，归属判据见 `:root` 注释。
 - 遗留 Geist 层单色优先：`--tungsten` 只给焦点环、链接、进度／数据与 Toggle 开态。主动作用 `--ink` 底 `--ground` 字且每屏最多一个。标题悬停下划线不变蓝，计数徽章中性灰。其它选择器引用 `--tungsten` 由 `tests/test_web_ui.py` 拒绝；实测见 `vercel-geist-semantics-measured.md`「选中态与开关色」「Button 全变体与状态」。
 - 选中态只有填充：一律 `--hover` 底 `--ink` 字，不加边框、不加 `inset` 一圈线、不加字重（Geist Switch／Tabs 的类名里三样都没有）。填充既然专属选中，**同一排横向**互斥选项的未选中项悬停就只提文字色到 `--ink`；没有选中态的按钮和没有并排邻居的孤立开关悬停照旧抬填充。侧栏导航（`.edge`／`.dnav`）分工相反：实测 Geist 左栏是悬停抬填充、当前项握着文字与图标色，别把横排那条推广过去。清单见同一份快照的「选中态与它的悬停」和「侧栏导航是例外」。
