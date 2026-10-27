@@ -22,8 +22,6 @@ import { EmptyState } from '../components/empty-state';
 import { Note } from '../components/note';
 import { Page } from '../components/page';
 import { PillAriaTabList } from '../components/pill-aria-tab-list';
-import { PillTabList } from '../components/pill-tabs';
-import { PillTab } from '../components/pill-tab';
 import { ExternalLink } from '../settings/section';
 import { BulkToolbar } from './bulk-toolbar';
 import { GenreTagList } from './candidate-form';
@@ -102,6 +100,9 @@ export function ReviewPage(props: ReviewProps) {
   const data: ReviewData = review.data || { sections: {}, counts: {},
     queues: { later: { sections: {}, counts: {} }, ignored: { sections: {}, counts: {} } } };
   const snapshot = reviewQueueData(data, queueView);
+  const queueCounts = review.data ? Object.fromEntries(REVIEW_QUEUES.map(key => [key,
+    REVIEW_CATEGORIES.reduce((sum, category) =>
+      sum + Number(reviewQueueData(data, key).counts[category] || 0), 0)])) as Record<ReviewQueue, number> : undefined;
   const queue = snapshot.sections[category] || [];
   const metadata = category === 'metadata_fields';
   const locked = readOnly;
@@ -270,19 +271,6 @@ export function ReviewPage(props: ReviewProps) {
       ) : null}
       <GenreTagList tags={genreTags} />
 
-        <PillTabList aria-label="复核状态" data-pill-nav=""
-          className="flex w-fit max-w-full flex-nowrap gap-1 overflow-x-auto">
-          {REVIEW_QUEUES.map(key => <PillTab key={key} variant="gray" isSelected={queueView === key}
-            disabled={decide.isPending || bulk.isPending}
-            onSelect={() => { if (key !== queueView) goQueue(key) }}>
-            <span data-copy-key={`review.queue.${key}`}>{REVIEW_QUEUE_LABELS[key]}</span>{' '}
-            <span className="tabular-nums text-caption-1-medium text-text-secondary">
-              {review.data ? REVIEW_CATEGORIES.reduce((sum, category) =>
-                sum + Number(reviewQueueData(data, key).counts[category] || 0), 0).toLocaleString() : '…'}
-            </span>
-          </PillTab>)}
-        </PillTabList>
-
       {/* 分类目录位于正文左侧；窄屏使用正文上方的导航。 */}
       <Tabs orientation={narrow ? 'horizontal' : 'vertical'} selectedKey={category} onSelectionChange={(key) => {
         const next = String(key);
@@ -311,8 +299,8 @@ export function ReviewPage(props: ReviewProps) {
         </div>
 
         <TabPanel id={category} className="flex min-w-0 flex-1 flex-col gap-5">
-          {queue.length && !locked ? (
-            <BulkToolbar queueView={queueView} groupOptions={groupOptions} groupBy={activeGroupBy}
+            <BulkToolbar queueView={queueView} queueCounts={queueCounts} onQueueChange={goQueue} locked={locked}
+              groupOptions={groupOptions} groupBy={activeGroupBy}
               onGroupBy={(next) => { setGroupBy(next); setFilter(''); setPage(1) }}
               groups={groups} filter={activeFilter}
               onFilter={(next) => { setFilter(next); setPage(1) }}
@@ -321,7 +309,6 @@ export function ReviewPage(props: ReviewProps) {
               approvable={selectedRows.every((row) => canApprove(category, row))}
               busy={bulk.isPending || decide.isPending} feedback={feedback}
               onUnifySource={unifySource} onRun={runBulk} />
-          ) : null}
 
           {win.rows.length ? pageGroups.map((group) => (
             <section key={group.key} className="flex flex-col gap-3">

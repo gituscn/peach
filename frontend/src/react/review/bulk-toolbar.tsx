@@ -8,11 +8,16 @@ import { RiCheckDoubleLine } from '@remixicon/react';
 import { Button } from '@/components/base/buttons/button';
 import { Select, SelectItem } from '../components/select';
 import { SelectionDock } from '../components/selection-dock';
+import { PillTabList } from '../components/pill-tabs';
+import { PillTab } from '../components/pill-tab';
 import type { DecisionStatus, ReviewGroup, ReviewGrouping, ReviewQueue, ReviewRow } from './review';
-import { commonReviewSources } from './review';
+import { commonReviewSources, REVIEW_QUEUES, REVIEW_QUEUE_LABELS } from './review';
 
 export interface BulkToolbarProps {
   queueView?: ReviewQueue;
+  queueCounts?: Record<ReviewQueue, number>;
+  onQueueChange(queue: ReviewQueue): void;
+  locked: boolean;
   groupOptions: [ReviewGrouping, string][];
   groupBy: ReviewGrouping;
   onGroupBy(next: ReviewGrouping): void;
@@ -38,6 +43,7 @@ export function BulkToolbar(props: BulkToolbarProps) {
   const {
     groupOptions, groupBy, onGroupBy, groups, filter, onFilter, pageKeys, selected, onSelected,
     selectedRows, metadata, approvable, busy, feedback, onUnifySource, onRun, queueView = 'pending',
+    queueCounts, onQueueChange, locked,
   } = props;
   const shown = pageKeys.filter((key) => selected.has(key));
   const allShown = shown.length > 0 && shown.length === pageKeys.length;
@@ -55,6 +61,17 @@ export function BulkToolbar(props: BulkToolbarProps) {
     <>
       <div role="group" aria-label="复核筛选" data-review-filter data-glass-pane=""
         className="sticky top-topbar z-10 flex flex-wrap items-center gap-2 p-3">
+        <PillTabList aria-label="复核状态" data-pill-nav=""
+          className="flex max-w-full flex-nowrap gap-1 overflow-x-auto">
+          {REVIEW_QUEUES.map(key => <PillTab key={key} variant="gray" isSelected={queueView === key}
+            disabled={busy} onSelect={() => { if (key !== queueView) onQueueChange(key) }}>
+            <span data-copy-key={`review.queue.${key}`}>{REVIEW_QUEUE_LABELS[key]}</span>{' '}
+            <span className="tabular-nums text-caption-1-medium text-text-secondary">
+              {queueCounts ? queueCounts[key].toLocaleString() : '…'}
+            </span>
+          </PillTab>)}
+        </PillTabList>
+        {pageKeys.length ? <>
         <Select aria-label="筛选分组方式" size="sm" selectedKey={groupBy}
           onSelectionChange={(key) => { if (key !== null) onGroupBy(String(key) as ReviewGrouping) }}>
           {groupOptions.map(([key, name]) => <SelectItem key={key} id={key}>{name}</SelectItem>)}
@@ -72,13 +89,14 @@ export function BulkToolbar(props: BulkToolbarProps) {
             ))}
           </Select>
         ) : null}
-        <Button variant="secondary" size="small" leadingIcon={RiCheckDoubleLine}
+        {locked ? null : <Button variant="secondary" size="small" leadingIcon={RiCheckDoubleLine}
           aria-pressed={allShown} disabled={busy || !pageKeys.length} onClick={toggleAll}>
           {allShown ? '清空当前选择' : filter ? '全选当前分类' : '全选本页'}
-        </Button>
+        </Button>}
+        </> : null}
       </div>
 
-        <SelectionDock label="复核所选项目" visible={selected.size > 0} count={`已选 ${selected.size} 项`}>
+        <SelectionDock label="复核所选项目" visible={!locked && selected.size > 0} count={`已选 ${selected.size} 项`}>
           {needsSource && queueView !== 'ignored' ? (
             <Select aria-label="统一选择来源" size="sm" selectedKey=""
               isDisabled={busy || !sources.length}

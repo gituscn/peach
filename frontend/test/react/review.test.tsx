@@ -322,6 +322,19 @@ it('已忽略通过链接打开，只提供恢复，跨状态清空选择', asyn
   expect(host.querySelector('[data-selection-dock]')).toBeNull();
 });
 
+it('空分类仍可在筛选浮窗切换状态，只读时保留筛选并隐藏全选', async () => {
+  const { host, props } = await open({ data: review({
+    sections: { metadata_fields: [] }, counts: { metadata_fields: 0 },
+  }) }, { readOnly: true });
+  const filter = host.querySelector('[aria-label="复核筛选"]');
+  expect(filter?.querySelector('[aria-label="复核状态"]')).toBeTruthy();
+  expect(buttonIn(filter!, '全选本页')).toBeNull();
+  await click(stateNamed(filter!, '已忽略'));
+  expect(props.route).toHaveBeenLastCalledWith({ category: '', queue: 'ignored' });
+  expect(host.textContent).toContain('此分类没有已忽略项目');
+  expect(filter?.querySelector('[aria-label="复核状态"]')).toBeTruthy();
+});
+
 it('批量状态移动只采用成功项，失败行和其他类别保持不变', () => {
   queryClient.setQueryData(REVIEW_KEY, review());
   settleReviewRows('metadata_fields', ['row-1', 'row-2'], 'rejected');
