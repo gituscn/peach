@@ -3,7 +3,7 @@
    已绑定的横排、自动滚动的那几排与弹簧取值都是模块级状态，只有一份。 */
 import { esc } from '../core';
 
-import { attachOverlayScrollbar, detachOverlayScrollbar, pruneOverlayScrollbars, releaseOverlayScrollbars } from './overlay-scrollbar';
+import { attachOverlayScrollbar, detachOverlayScrollbar, pruneOverlayScrollbars, refreshOverlayScrollbars, releaseOverlayScrollbars } from './overlay-scrollbar';
 
 const horizontalControls=new Map<Element,any>();
 let horizontalCleanup:MutationObserver|null|undefined;
@@ -349,7 +349,9 @@ export function wireOverlayScrollbars(root:ParentNode=document,subtree=true):voi
   // 样式读取与轨道挂载分两段，避免每插入一条轨道就重新计算后面所有节点的样式。
   const candidates=nodes.flatMap<{el:HTMLElement;axes:readonly ('x'|'y')[]}>(el=>{
     if(!(el instanceof HTMLElement)||el===document.body||el===document.documentElement
-      ||el.closest('.ovtrack,.ui-ov-edges,[data-skeleton],[inert]'))return [];
+      ||el.closest('.ovtrack,.ui-ov-edges'))return [];
+    if(el.closest('[data-skeleton],[data-skeleton-tier]')){detachOverlayScrollbar(el);return []}
+    if(el.closest('[inert]'))return [];
     const horizontalGesture=gesture(el),axes=horizontalGesture?['y'] as const:['y','x'] as const;
     if(el.dataset.overlayScrollbar&&el.dataset.overlayAxes===axes.join(''))return [];
     const style=getComputedStyle(el);
@@ -380,14 +382,17 @@ export function observeScrollRegions(root:HTMLElement=document.body):()=>void{
   const observer=new MutationObserver(records=>{
     for(const record of records){
       if(record.type==='attributes'){
-        if(record.target instanceof HTMLElement)queue(record.target,record.attributeName!=='style');
+        if(record.target instanceof HTMLElement){
+          if(record.attributeName==='data-theater')refreshOverlayScrollbars(record.target);
+          queue(record.target,record.attributeName!=='style');
+        }
       }else{
         for(const node of record.addedNodes)if(node instanceof HTMLElement)queue(node);
         if(record.removedNodes.length&&!frame)frame=requestAnimationFrame(flush);
       }
     }
   });
-  observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden','open','inert','data-skeleton','data-horizontal-scroll']});
+  observer.observe(root,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','hidden','open','inert','data-skeleton','data-skeleton-tier','data-horizontal-scroll','data-theater']});
   const resize=()=>queue(root);
   window.addEventListener('resize',resize,{passive:true});
   queue(root);

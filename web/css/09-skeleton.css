@@ -7,6 +7,10 @@
 /* 标签页骨架里的视图切换靠在读数行右缘，同页面落地后那一枚的位置。 */
 .index .board-filter-frame .count>.iconswitch{margin:0 0 0 auto}
 .skeleton{display:block;height:18px;border-radius:var(--control-radius);background:var(--hover)}
+/* 占位沿用内容的滚动布局，但不显示原生滚动条或此前内容留下的覆盖轨道。 */
+:is([data-skeleton],[data-skeleton-tier]),:is([data-skeleton],[data-skeleton-tier]) *{scrollbar-width:none}
+:is([data-skeleton],[data-skeleton-tier])::-webkit-scrollbar,:is([data-skeleton],[data-skeleton-tier]) *::-webkit-scrollbar{display:none}
+:is([data-skeleton],[data-skeleton-tier]) .ovtrack{display:none}
 [data-jav-skeleton-cover]{height:auto}
 .board-page-skeleton[data-skeleton="board/jav"]{max-width:none}
 /* 读数占位是行内的一截：它坐在最终那枚 `b`、`strong`、说明行里，行高仍由那枚元素自己给，
