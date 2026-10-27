@@ -147,7 +147,6 @@ def prepare_install_tools(program: Path, cache: Path, error_file: Path, *, stage
     """在安装器临时目录备齐工具，不读取馆藏设置或修改现有安装。"""
     from . import __version__, release_updates, standalone_update, update_packages
     from .fsutil import atomic_write_text
-    import httpx
     import tempfile
     stage = (stage or Path(sys.executable).resolve().parent).resolve()
     try:
@@ -159,14 +158,10 @@ def prepare_install_tools(program: Path, cache: Path, error_file: Path, *, stage
                 shutil.copy2(cached, archive)
                 progress(size)
             else:
-                try:
-                    standalone_update.download(url, archive, size, checksum, progress)
-                except (httpx.HTTPError, ValueError):
-                    fallback = f'{release_updates.RELEASES_URL}/download/v{__version__}/{cached.name}'
-                    standalone_update.download(fallback, archive, size, checksum, progress)
+                standalone_update.download(url, archive, size, checksum, progress)
 
         release = {'latest_version': __version__,
-                   'asset_url': f'{release_updates.DOWNLOADS_BASE}/v{__version__}/package.zip'}
+                   'asset_url': f'{release_updates.RELEASES_URL}/download/v{__version__}/package.zip'}
         with tempfile.TemporaryDirectory(prefix='peach-installer-tools-', dir=stage.parent) as folder:
             standalone_update.prepare_tools(stage, program, Path(folder).resolve(), release, {'total': 0, 'downloaded': 0},
                                             report=lambda data, **changes: data.update(changes), fetch=fetch)

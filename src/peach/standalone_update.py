@@ -112,6 +112,17 @@ def extract(archive: Path, destination: Path, progress, *, tool_files: set[str] 
 
 
 def download(url: str, archive: Path, size: int, digest: str, progress) -> None:
+    sources = release_updates.download_sources(url)
+    for index, source in enumerate(sources):
+        try:
+            _download_once(source, archive, size, digest, progress)
+            return
+        except (httpx.HTTPError, ValueError):
+            if index == len(sources) - 1:
+                raise
+
+
+def _download_once(url: str, archive: Path, size: int, digest: str, progress) -> None:
     from .peach_proxy import http_client
     checksum = hashlib.sha256()
     received = 0
