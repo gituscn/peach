@@ -49,7 +49,7 @@ export interface ShellActions {
   /** 让安装教程重新出现。 */
   reopenTutorial(): Promise<void>;
   /** 复核页把分类写回地址栏，不重开。 */
-  routeReview(params: { category: string }): void;
+  routeReview(params: { category: string; queue?: string }): void;
   /** 关注管理页把页签、页码与排序写回地址栏，不重开。 */
   routeFollowManage(params: { tab: string; page: number; sort: string; dir: string }): void;
   /** 关注管理页的偏好改了，存储归壳。 */
@@ -166,7 +166,7 @@ export interface ManagedOpenProps extends Record<ConfigurationPath, { section?: 
   '/jav': { tab: string; readOnly: boolean };
   '/stats': Record<string, never>;
   '/taste': { onboarding: boolean };
-  '/review': { category: string; readOnly: boolean; readOnlyMessage: string; writerUrl: string };
+  '/review': { category: string; queue?: string; readOnly: boolean; readOnlyMessage: string; writerUrl: string };
   '/data-cleanup': Record<string, never>;
   '/duplicates': Record<string, never>;
   '/quality-goals': Record<string, never>;

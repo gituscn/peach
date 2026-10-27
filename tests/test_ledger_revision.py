@@ -117,6 +117,14 @@ class LedgerRevisionTests(unittest.TestCase):
         self.assertEqual(self.contract.cached_until_changed("review", self.compute, "csv-2"), 2)
         self.assertEqual(len([key for key in self.contract.cache if key == "review"]), 1)
 
+    def test_scoped_cache_without_revisions_honors_commit_invalidation(self):
+        with closing(sqlite3.connect(self.db_path)) as connection, connection:
+            connection.execute("DROP TABLE ledger_revision")
+        self.assertEqual(self.contract.cached_until_changed('review', self.compute, tables=('genre_decision',)), 1)
+        self.assertEqual(self.contract.cached_until_changed('review', self.compute, tables=('genre_decision',)), 1)
+        self.contract.cache_bust()
+        self.assertEqual(self.contract.cached_until_changed('review', self.compute, tables=('genre_decision',)), 2)
+
     def test_a_ledger_without_revisions_falls_back_to_the_time_limit(self):
         with closing(sqlite3.connect(self.db_path)) as connection, connection:
             connection.execute("DROP TABLE ledger_revision")

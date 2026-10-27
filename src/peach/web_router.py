@@ -270,7 +270,9 @@ def _get_review(contract, args):
     payload = contract.cached_until_changed(
         "review", lambda: q_review(contract),
         candidate_root_version(contract.candidate_root),
-        path_version(contract.cover_root), path_version(contract.avatar_root))
+        path_version(contract.cover_root), path_version(contract.avatar_root),
+        tables=("asset", "asset_entity", "entity", "entity_alias", "entity_redirect",
+                "review_decision", "genre_decision"))
     # 数据管理页只要一个待复核条数。完整 payload 带着每条候选的全文，实测是
     # 兆级；卡片上的一个数字不值这趟传输，但计数本身仍来自同一份缓存快照，
     # 不另立一套口径。

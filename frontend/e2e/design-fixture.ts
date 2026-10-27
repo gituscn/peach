@@ -170,6 +170,7 @@ export async function openReview(browser: Browser, rows = [REVIEW_ROW], viewport
     contentType: 'application/json',
     body: JSON.stringify({
       sections: { metadata_fields: rows }, counts: { metadata_fields: rows.length }, genre_tags: [],
+      queues: { later: { sections: {}, counts: {} }, ignored: { sections: {}, counts: {} } },
     }),
   }));
   await opened.page.reload({ waitUntil: 'load' });

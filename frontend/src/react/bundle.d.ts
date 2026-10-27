@@ -408,8 +408,9 @@ export interface FollowManageProps {
 export interface ReviewProps {
   /** 地址栏此刻带着的分类。不认识的值退回默认那一档。 */
   category: string;
+  queue?: string;
   /** 把分类写回地址栏。空串表示这一项此刻就是默认值，壳不写进去。 */
-  route(params: { category: string }): void;
+  route(params: { category: string; queue?: string }): void;
   /** 打开作品详情（遗留层的整页视图，含播放器与队列）。 */
   openItem(id: number): void;
   /** 打开实体资料页。`kind` 是 `creator`／`performer`。 */
