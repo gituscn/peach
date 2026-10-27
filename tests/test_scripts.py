@@ -1918,8 +1918,11 @@ class OperationalScriptTests(unittest.TestCase):
         self.assertIn("fromJSON(needs.plan.outputs.matrix)", workflow)
         from scripts.ci_plan import plan
         self.assertEqual({row["python"] for row in plan("workflow_dispatch", [])["matrix"]["include"]}, {floor})
-        self.assertIn(f"Python {floor} 或更高", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertIn(f"Python {floor} or newer", (ROOT / "README.en.md").read_text(encoding="utf-8"))
+        for readme, suffix in (("README.md", r"(?:\+| or newer)"),
+                               ("README.zh-CN.md", r"(?:\+| 或更高)")):
+            with self.subTest(readme=readme):
+                self.assertRegex((ROOT / readme).read_text(encoding="utf-8"),
+                                 rf"\bPython {re.escape(floor)}{suffix}")
 
     def test_functional_test_scopes_are_explicit(self):
         runner = load_script("test_runner")

@@ -967,8 +967,8 @@ class VerificationTests(unittest.TestCase):
         item = coordinator.create(self.repo, "codex", "verification", self.root / "worktrees")
         worker = Path(item["path"])
         (worker / "README.md").write_text("测试内容\n", encoding="utf-8")
-        (worker / "README.en.md").write_text("Test content\n", encoding="utf-8")
-        evidence.git(worker, "add", "README.md", "README.en.md")
+        (worker / "README.zh-CN.md").write_text("Test content\n", encoding="utf-8")
+        evidence.git(worker, "add", "README.md", "README.zh-CN.md")
         evidence.git(worker, "commit", "-m", "docs: test", "-m",
                      "README-Impact: updated; 测试文档\n"
                      "Co-Authored-By: Codex (GPT-5.5) <noreply@openai.com>")
