@@ -213,7 +213,8 @@ class ReviewQueueTests(unittest.TestCase):
             extra = {key: item for key, item in value.items()
                      if key not in {"source", "display", "value"}}
             value = value["value"]
-        return {**extra, "candidate_key": f"{item['item_key']}:{index}", "source": source,
+        return {**({'javdb_rule': 2, 'source_id': 'FixtureWork'} if source == 'javdb' else {}),
+                **extra, "candidate_key": f"{item['item_key']}:{index}", "source": source,
                 "display_value": display, "value": value, "confidence": 0.9,
                 # 来源自报的番号。落库前要和这一行的番号对得上，所以默认取同一个值；
                 # 用例给 `provider_id` 就能造出「来源返回的是别的作品」那一半。
@@ -228,6 +229,28 @@ class ReviewQueueTests(unittest.TestCase):
 
     def _auto(self):
         return auto_apply_metadata(self.contract.database, self.candidates)
+
+    def test_old_javdb_candidate_replay_cannot_fill_fields_but_current_identity_can(self):
+        self._asset(801, 'MIKR-023', 'MIKR-023.mp4')
+        for marker, identity, expected in ((None, '', 0), (2, '', 0), (2, 'XeYkdb', 1)):
+            with self.subTest(marker=marker, identity=identity):
+                path = self.write_metadata_rows([{'item_key': 'old-javdb-title', 'code': 'MIKR-023',
+                    'field': 'title', 'current': '', 'candidates': [{'source': 'javdb',
+                    'value': '原题', 'javdb_rule': marker, 'source_id': identity}]}])
+                before = path.read_bytes()
+                self.assertEqual(self._auto()['applied'], expected)
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_human_can_approve_old_javdb_evidence_explicitly(self):
+        self._asset(802, 'MIKR-024', 'MIKR-024.mp4')
+        self.write_metadata_rows([{'item_key': 'old-human-title', 'code': 'MIKR-024',
+            'field': 'title', 'current': '', 'candidates': [{'source': 'javdb',
+            'value': '人工核对标题', 'javdb_rule': None, 'source_id': ''}]}])
+        candidate = self.queue_row('metadata_fields', 'old-human-title')['candidates'][0]
+        rm_review.w_review_decision(self.contract, {'category': 'metadata_fields', 'item_key': 'old-human-title',
+                                  'status': 'approved', 'candidate_key': candidate['candidate_key']})
+        with self.contract.database.read_connection() as connection:
+            self.assertEqual(connection.execute('SELECT catalog_title FROM asset WHERE id=802').fetchone()[0], '人工核对标题')
 
     def test_auto_batch_reads_only_its_metadata_decisions_across_query_chunks(self):
         keys = [f"batch-{index}" for index in range(205)]
