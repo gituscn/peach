@@ -28,11 +28,12 @@ if not __package__:
     sys.path.insert(0, str(ROOT))
     __package__ = "scripts"
 from . import change_impact, test_evidence, test_history, test_resume, test_run_progress, test_shard_results
+from .test_inputs import repository_paths_read_by as repository_paths_read_by
 
 COMMON_PATTERNS = ("test_context_budget.py", "test_test_collection.py", "test_complexity_ratchet.py",
                    "test_source_assertion_ratchet.py", "test_python_lint.py")
 SCOPES: dict[str, tuple[str, ...]] = {
-    "checks": ("test_copy_final_state.py", "test_dependency_policy.py", "test_repo_hygiene.py", "test_test_planning.py", "test_reference_updates.py",
+    "checks": ("test_copy_final_state.py", "test_dependency_policy.py", "test_repo_hygiene.py", "test_test_planning.py", "test_reference_updates.py", "test_readme_contracts.py",
                "test_complexity_ratchet.py", "test_source_assertion_ratchet.py", "test_python_lint.py"),
     "follow": ("test_follow*.py", "test_http.py", "test_migrations.py", "test_wants_web.py"),
     "catalog": ("test_ad_judgement.py", "test_composite_name_split.py", "test_media_libraries.py", "test_media_folders.py",
@@ -266,8 +267,6 @@ AUTO_SCOPE_FILES: dict[str, tuple[str, ...]] = {
     # 入口页共用件的测试住在首启与配置来源那两份 tooling 测试里。
     "src/peach/web_entry.py": ("catalog", "tooling", "web"),
     # 这几份文档有测试在读它们的正文：改文档也要跑到那条测试。
-    "README.md": ("checks", "tooling"),
-    "README.zh-CN.md": ("checks", "tooling"),
     # 差异表是 token 判据的另一半：偏离上游的每一条都要在那张表里写明原因，所以
     # `test_frontend_build.py` 读它——改表就得跑到 web。
     "frontend/src/react/boardui/ORIGIN.md": ("checks", "web"),
@@ -380,7 +379,7 @@ FULL_ONLY_PREFIXES: tuple[str, ...] = (
     "scripts/ci_plan.py", "scripts/test_environment.py", "scripts/change_impact.py", "scripts/test_focus.py",
     "scripts/test_history.py", "uv.lock",
     "scripts/test_resume.py", "scripts/test_run_progress.py", "scripts/test_environment_identity.py",
-    "scripts/test_shard_results.py",
+    "scripts/test_shard_results.py", "scripts/test_inputs.py",
     "migrations/",
     "tests/support/",
     "package.json",
@@ -486,32 +485,6 @@ def scopes_of_importers(stem: str, seen: frozenset[str] = frozenset()) -> tuple[
     return tuple(scope for scope in SCOPES if scope in found)
 
 
-#: `<某个 Path> / "a" / "b/c.js"` 这种拼接。要求左边有个 `/`，是为了把「路径当字符串
-#: 参数传进去」的写法排除掉：`scopes_for_changes(["web/app.js"])` 喂的是假清单，
-#: 不读真文件，不该因为字面量长得像路径就被算成读了它。
-_PATH_CHAIN = re.compile(r"""/\s*((?:["'][^"'\n]+["']\s*/\s*)*["'][^"'\n]+["'])""")
-_SEGMENT = re.compile(r"""["']([^"'\n]+)["']""")
-#: 测试文件顶上的 `FRONTEND = ROOT / "frontend"` 这类别名，用来还原下面链式拼接的前缀。
-_ROOT_ALIAS = re.compile(r"""^\w+\s*=\s*\w+(?:\[\d+\])?\s*/\s*["']([\w./-]+)["']\s*$""", re.M)
-
-
-def repository_paths_read_by(source: str) -> tuple[str, ...]:
-    """一段测试源码实际读到的仓库文件，仓库相对路径。
-
-    只认拼在某个 Path 后面、且在仓库里真的存在的那一档。判据是「文件存在」而不是
-    「长得像路径」：不存在的字面量是别的东西，存在的才是这个测试真正依赖的输入。
-    """
-    prefixes = {"", *(alias.strip("/") for alias in _ROOT_ALIAS.findall(source))}
-    found: set[str] = set()
-    for chain in _PATH_CHAIN.findall(source):
-        joined = "/".join(segment.strip("/") for segment in _SEGMENT.findall(chain))
-        for prefix in prefixes:
-            candidate = f"{prefix}/{joined}".strip("/")
-            if (ROOT / candidate).is_file():
-                found.add(candidate)
-    return tuple(sorted(found))
-
-
 def dependency_inputs(source: str) -> dict:
     """提取依赖输入，供调用方比较构建与运行环境。"""
     return change_impact.dependency_inputs(source)
@@ -597,6 +570,13 @@ def scopes_for_changes(paths: Iterable[str], *, contents: dict | None = None,
         scopes = special_scopes(path, kind)
         if scopes is None:
             scopes = mapped_scopes(path)
+        if kind not in {"unsafe", "prose"} and path.startswith("src/peach/") and path.endswith(".py") \
+                and scopes and "full" not in scopes:
+            stem = path.removeprefix("src/peach/").split("/", 1)[0].removesuffix(".py")
+            tests, _, _ = _import_index()
+            consumers = {scope for name, modules in tests.items() if stem in modules
+                         for scope in scopes_of_test_file(name)}
+            scopes = tuple(scope for scope in SCOPES if scope in {*scopes, *consumers})
         if not scopes:
             full_reasons.append(f"{path} 映射不到任何域")
         elif "full" in scopes:
@@ -950,6 +930,9 @@ def tools_needed_by(scopes: tuple[str, ...]) -> frozenset[str]:
     新测试引入新工具时，手写的表会静静过期，而过期的表比没有表更坏——它会拿一个
     本次根本不启动的工具去挡住一次只改文档的 `checks`。
     """
+    if scopes == ('checks',):
+        # 文档与仓库契约仅启动 Git 和依赖入口；业务工具名也会出现在调度器的模拟用例中。
+        return frozenset({'git', 'uv'})
     names = tuple(name for name, _ in test_evidence.TOOL_PROBES)
     needed: set[str] = set()
     for path in {path for scope in scopes for path in selected_files(scope)}:
@@ -1048,7 +1031,7 @@ def rerun_failures(rows: list[dict], spawn=subprocess.run) -> bool:
     if not selectors:
         return False
     print(f"单独重跑失败的 {len(selectors)} 项，排除负载造成的偶发：{', '.join(selectors)}", flush=True)
-    command = [sys.executable, str(ROOT / "scripts" / "test_runner.py"), "--machine-lock-held",
+    command = [sys.executable, str(ROOT / "scripts" / "test_runner.py"),
                *(item for selector in selectors for item in ("--focus", selector))]
     if spawn(command, cwd=str(ROOT), check=False).returncode != 0:
         print("单独重跑仍失败：按真实失败处理。", flush=True)
@@ -1196,7 +1179,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--jobs", type=resolve_jobs, default=1,
                         help="本机同时跑几个分片子进程；auto 按核数定。默认串行，正式入口传 auto")
     parser.add_argument("--list-scopes", action="store_true")
-    parser.add_argument("--machine-lock-held", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if not 0 <= args.lock_timeout <= 1800:
         parser.error("锁等待时间必须在 0～1800 秒之间")
@@ -1232,56 +1214,32 @@ def main(argv: list[str] | None = None) -> int:
         print("CI 前端工具检查由 web-bundle 验证；本次不签发本机测试记录。", flush=True)
         success, count, _ = run_local_suite(scopes, args.jobs, f"{' '.join(requested)}:{' '.join(scopes)}")
         return 0 if success and count > 0 else 1
-    heavy = "full" in scopes or any(path.stem in HEAVY_FILES for path in files)
     try:
-        # 先拿整机的重负载锁，再拿仓库的全量锁；`integrate` 只拿后者，顺序固定就不会互相等死。
-        with machine_guard(args, heavy, scope=" ".join(scopes)):
-            guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
-                                      wait_seconds=args.lock_timeout,
-                                      scope=" ".join(scopes), root=str(ROOT)) \
-                if "full" in scopes else nullcontext()
-            with guard:
-                return verified_run(args, requested, scopes, files)
+        guard = test_evidence.held(test_evidence.evidence_dir(ROOT) / "full-suite.lock",
+                                  wait_seconds=args.lock_timeout,
+                                  scope=" ".join(scopes), root=str(ROOT)) \
+            if "full" in scopes else nullcontext()
+        with guard:
+            return verified_run(args, requested, scopes, files)
     except test_evidence.Timeout as error:
         return busy(error)
 
 
 def run_focus(parser, args) -> int:
-    """定向调试：不签发记录；浏览器与 vitest 文件起浏览器或 node，同样排整机的重负载锁。"""
+    """定向调试不签发记录，不取得机器级资源锁。"""
     if args.shard_count != 1:
         parser.error("定向调试不能与分片一起使用")
     from . import test_focus
-    heavy = any(selector.startswith("frontend/") for selector in args.focus)
-    try:
-        with machine_guard(args, heavy):
-            return test_focus.run(sys.modules[__name__], args)
-    except test_evidence.Timeout as error:
-        return busy(error)
+    return test_focus.run(sys.modules[__name__], args)
 
 
-#: 会起浏览器或整套 vitest 的测试文件。选中它们的运行与全量一样要排整机的重负载锁。
+#: 内部并行的前端与浏览器容器，和普通分片按阶段执行。
 HEAVY_FILES = frozenset({"test_web_e2e", "test_frontend_build"})
-
-
-def machine_guard(args, heavy: bool, **note):
-    """重负载运行排整机锁；父进程已持有时（全量里的隔离重跑）不再重复等待。
-
-    用例里调用运行器（测运行器自己的那些用例）时外层正式运行已持有这把锁，不能再去等它。
-    """
-    if not heavy or args.machine_lock_held or test_history.nested():
-        return nullcontext()
-    # CI 作业（GitLab 与 GitHub 都设 CI=true）有自己的时限（Windows 验收 90 分钟），排在本机两轮全量
-    # 后面也要等得到；本机交互仍按 --lock-timeout，最长 30 分钟。
-    wait = CI_MACHINE_LOCK_SECONDS if os.environ.get("CI") == "true" else args.lock_timeout
-    return test_evidence.held(test_evidence.machine_lock_path(), wait_seconds=wait, root=str(ROOT), **note)
-
-
-CI_MACHINE_LOCK_SECONDS = 3600
 
 
 def busy(error) -> int:
     lock = Path(error.lock_file)
-    what = {"full-suite.lock": "本仓库全量测试", "test-machine.lock": "本机另一项重负载测试或 CI 作业"}.get(
+    what = {"full-suite.lock": "本仓库全量测试"}.get(
         lock.name, "相同状态的验证")
     print(f"{what}正在运行（{test_evidence.describe_holder(lock)}），请等待该次结果。", flush=True)
     return 2

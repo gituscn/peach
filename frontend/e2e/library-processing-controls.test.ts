@@ -300,8 +300,21 @@ describe('扫描与采集控制', () => {
         assert.deepEqual(measured.offenders, []);
         await page.screenshot({ path: path.join(artifacts, `${viewport.name}-page.png`), fullPage: true });
         await card.screenshot({ path: path.join(artifacts, `${viewport.name}.png`) });
+        await page.route(url => url.pathname === '/api/items', route => route.fulfill({ json: {
+          items: [{ id: 11, name: '没有预览的本地影片.mp4', medium: 'video', location: 'local',
+            has_thumb: false, has_local_poster: false, size: 12345, duration: 3600 }],
+          total: 1, has_more: false,
+        } }));
         await page.goto(new URL('/', page.url()).href);
-        assert.equal(await page.locator('[data-library-completion]').count(), 0, '运行期间首页由常驻任务卡承接进度');
+        const completion = page.locator('[data-library-completion]');
+        await completion.getByText(/1 部暂无预览，当前任务结束后可单独补全/).waitFor();
+        const complete = completion.getByRole('button', { name: '同步这些影片', exact: true });
+        assert.equal(await complete.getAttribute('aria-disabled'), 'true');
+        const writesBefore = writes.length;
+        await complete.dispatchEvent('click');
+        await completion.getByRole('button', { name: '更多同步方式', exact: true }).dispatchEvent('click');
+        assert.equal(await completion.getByRole('button', { name: '更多同步方式', exact: true }).getAttribute('aria-expanded'), 'false');
+        assert.equal(writes.length, writesBefore, '运行期间不能追加或替换补全任务');
         await dock.getByRole('button', { name: '暂停', exact: true }).waitFor();
         await page.emulateMedia({ reducedMotion: 'no-preference' });
         await dock.getByText('查看明细', { exact: true }).click();

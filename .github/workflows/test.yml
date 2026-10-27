@@ -38,6 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
+      base: ${{ steps.plan.outputs.base }}
       matrix: ${{ steps.plan.outputs.matrix }}
       wheel_matrix: ${{ steps.plan.outputs.wheel_matrix }}
       wide: ${{ steps.plan.outputs.wide }}
@@ -59,6 +60,7 @@ jobs:
         id: plan
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: uv run --locked --python 3.14 scripts/ci_plan.py --event "$EVENT_NAME" --base "$BASE_SHA"
 
@@ -135,7 +137,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     env:
-      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+      BASE_SHA: ${{ needs.plan.outputs.base }}
     steps:
       - uses: actions/checkout@v7
         with:

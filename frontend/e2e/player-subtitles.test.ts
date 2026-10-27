@@ -201,6 +201,8 @@ describe('播放器字幕', () => {
     try {
       await page.locator('#stage .vjs-peach-bezel').waitFor({ state: 'attached' });
       await page.waitForFunction(id => [...(document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')?.textTracks || [])].some(track => track.id === id), key);
+      await page.waitForFunction(() => document.querySelector<HTMLVideoElement>('#stage video.vjs-tech')!.readyState >= 2);
+      await page.locator('#stage video.vjs-tech').evaluate((video: HTMLVideoElement) => { video.currentTime = .25 });
       await menu(page);
       await page.getByRole('menuitemradio', { name: 'SRT', exact: true }).click();
       await caption(page, '同目录字幕');
