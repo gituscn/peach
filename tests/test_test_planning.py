@@ -97,6 +97,21 @@ class CIFrontendOwnershipTests(unittest.TestCase):
 
 
 class TestPlanningTests(unittest.TestCase):
+    def test_checks_ci_omits_runtime_tool_installation_and_keeps_platforms(self):
+        for path in ("README.md", "CONTRIBUTING.md", ".github/PULL_REQUEST_TEMPLATE.md", "docs/TESTING.md"):
+            with self.subTest(path=path):
+                result = ci_plan.plan("push", [path])
+                rows = result["matrix"]["include"]
+                self.assertEqual({row["os"] for row in rows}, {"windows-latest", "macos-latest"})
+                self.assertTrue(all(not row["runtime_tools"] for row in rows))
+                self.assertIn("python", result["required_jobs"])
+                self.assertFalse(result["browser"])
+        for event, paths in (("workflow_dispatch", ["README.md"]),
+                             ("push", ["README.md", "src/peach/server.py"]),
+                             ("push", ["frontend/src/react/boardui/ORIGIN.md"]),
+                             ("push", ["unknown.runtime"])):
+            self.assertTrue(all(row["runtime_tools"] for row in ci_plan.plan(event, paths)["matrix"]["include"]))
+
     def test_comments_and_display_metadata_select_checks_without_hiding_logic(self):
         fixtures = {
             'tests/support/ledger.py': ('x = 1\n', '# 说明\nx = 1\n'),
