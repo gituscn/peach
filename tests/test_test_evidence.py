@@ -1394,7 +1394,7 @@ class VerificationTests(unittest.TestCase):
 
         def publish_locked(*args, **kwargs):
             with self.assertRaisesRegex(coordinator.WorkspaceError, "全量验证"):
-                coordinator.integrate(self.repo, "unused", lock_timeout=0)
+                coordinator.integrate(self.repo, "master", lock_timeout=0)
             return publish(*args, **kwargs)
 
         with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()), \
@@ -1413,7 +1413,7 @@ class VerificationTests(unittest.TestCase):
         with redirect_stdout(io.StringIO()), mock.patch.object(runner, "ROOT", self.repo), \
                 mock.patch.object(runner, "run_local_suite") as run, \
                 mock.patch.object(coordinator, "_integrate_locked", side_effect=merge):
-            self.assertTrue(coordinator.integrate(self.repo, "unused")["ok"])
+            self.assertTrue(coordinator.integrate(self.repo, "master")["ok"])
         run.assert_not_called()
 
     def test_integration_waits_for_full_verification_before_mutation(self):
@@ -1430,7 +1430,7 @@ class VerificationTests(unittest.TestCase):
                 mock.patch.object(coordinator, "_integrate_locked", return_value={"ok": True}) as merge, \
                 ThreadPoolExecutor(max_workers=1) as pool:
             with evidence.held(lock, scope="full"):
-                future = pool.submit(coordinator.integrate, self.repo, "unused", lock_timeout=5)
+                future = pool.submit(coordinator.integrate, self.repo, "master", lock_timeout=5)
                 self.assertTrue(waiting.wait(5), "集成应等待全量记录写入完成")
                 merge.assert_not_called()
             self.assertTrue(future.result(timeout=15)["ok"])
