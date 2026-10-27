@@ -4,7 +4,7 @@
 
 <h1 align="center">Peach</h1>
 
-<p align="center">给自己用的私人影片馆藏：本地硬盘、网盘和关注的创作者，放在一个地方看。</p>
+<p align="center">本地优先的影片刮削与媒体管理工具：整理影片资料，浏览本地硬盘、网盘和创作者更新。</p>
 
 <p align="center">
   <a href="https://peach.video">官网</a> ·
@@ -24,10 +24,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue?logo=gnu&amp;logoColor=white" alt="license"></a>
   <a href="docs/TESTING_DESKTOP.md"><img src="https://img.shields.io/badge/Windows-x64-0078D4" alt="Windows x64"></a>
   <a href="docs/OPERATIONS.md#macos-独立测试包"><img src="https://img.shields.io/badge/macOS-DMG-555555?logo=apple&amp;logoColor=white" alt="macOS 独立应用构建与安装"></a>
-  <img src="https://img.shields.io/badge/18%2B-adult%20content-critical" alt="18+ 成人内容">
 </p>
 
-> 仅用于管理自行持有或获授权使用的媒体。涉及成人内容时仅限成年人，并遵守适用法律、版权与来源平台条款；Peach 不提供影片资源或付费内容访问权。
+> 仅用于管理自行持有或获授权使用的媒体，并遵守适用法律、版权与来源平台条款，包括来源的年龄和地区限制。Peach 不提供影片资源或付费内容访问权。
 
 公开截图使用有来源与许可记录的电影演示资料，不含个人馆藏，见[素材来源与许可](https://peach.video/credits/)。仓库包含用于补齐资料的公开文字事实种子与品牌标识，不包含馆藏媒体和用户数据库；连接外部站点需有相应账号和访问权。
 
@@ -44,7 +43,7 @@
 - **跨站关注**：按已配置的来源汇总创作者更新，同一作品合成一张卡；来源支持和访问条件见[来源采集](docs/SOURCING.md)。
 - **追新作、找想看的**：按人物订阅新作，按口味发现作品，用「想要」清单留住待找的片子。
 - **云下载**：按番号查找或粘贴磁力，提交到支持云下载的媒体库，落地后自动整理入库。渠道随媒体库与网盘能力生成，支持 CloudDrive2 和 PikPak 直连；提交前须确认具有相应访问与使用权。
-- **浏览器添加 JAV**：在支持的资料页识别或选中番号，一键交给 Peach 云下载入库。[用户脚本](https://github.com/peach-mitao/peach-userscript)独立维护，来源范围与使用条件见[安装与配对](docs/JAV_BROWSER.md)。
+- **从浏览器添加影片**：在支持的资料页识别或选中影片编号，一键交给 Peach 云下载入库。[用户脚本](https://github.com/peach-mitao/peach-userscript)独立维护，来源范围与使用条件见[安装与配对](docs/JAV_BROWSER.md)。
 - **口味**：结合观看、反馈、馆藏、浏览历史、书签与关注关系分析偏好。一次读取本机浏览器的历史和书签，也可导入 HTML 书签或 Chromium Bookmarks JSON；来源可停止读取或删除。见[口味数据来源](docs/TASTE_SOURCES.md)。
 
 观看记录、收藏和设置保存在本机。扫描不动原文件；手动整理先预览，可撤回上一批。文件名带片名也能识别番号，特殊命名可在配置页补写[识别规则](docs/OPERATIONS.md#配置页)，不必为 Peach 改名。
@@ -59,7 +58,7 @@
 
 首次设置可选择 Peach 代理，保存后用于资料采集与依赖下载。Windows、macOS 与 Docker 随附 amane 独立运行环境；源码和 wheel 在首次需要时按 Peach 锁定版本自动准备。准备失败会保留待处理项目，修复网络或运行环境后可重试。
 
-扫描与采集显示视频与可识别 JAV 数量，首次目录分批预检；流量按待处理资料、缓存、同番号去重和本机同类样本估算，运行中显示已用流量和预计总流量。启动前还可查看预计新增磁盘占用、抽帧临时文件和各盘剩余空间。媒体库设置可读取和保存 CloudDrive 的 API／数据代理，按对应目录的连接方式汇总流量；“代理保护”限制自动读取视频。统计范围与估算限制见[运行与配置](docs/OPERATIONS.md#配置页)。
+扫描与采集显示视频与可识别编号数量，首次目录分批预检；流量按待处理资料、缓存、同番号去重和本机同类样本估算，运行中显示已用流量和预计总流量。启动前还可查看预计新增磁盘占用、抽帧临时文件和各盘剩余空间。媒体库设置可读取和保存 CloudDrive 的 API／数据代理，按对应目录的连接方式汇总流量；“代理保护”限制自动读取视频。统计范围与估算限制见[运行与配置](docs/OPERATIONS.md#配置页)。
 
 「发送版本统计与错误诊断（推荐）」默认勾选，可在安装、首次设置或设置页取消。两类技术事件由同一开关控制，已保存的关闭选择会保留。启用后向 Sentry 发送页面列出的技术字段，不自动上传完整日志、诊断 ZIP、媒体信息或观看记录。见[远程诊断说明](docs/DIAGNOSTICS.md#可选远程诊断)。
 
@@ -137,7 +136,7 @@ macOS 可在本机构建独立 `.app` 与 DMG，内含 FFmpeg、ffprobe、untrun
 
 ## 问题反馈
 
-先查看[用户反馈](https://github.com/peach-mitao/peach/issues)，或[提交问题](https://github.com/peach-mitao/peach/issues/new/choose)，附上版本、操作步骤、预期与实际结果。截图请遮掉凭据、局域网地址和完整路径，不要上传数据库或媒体；安全问题按[安全政策](SECURITY.md)私下报告。
+先查看[用户反馈](https://github.com/peach-mitao/peach/issues)，或[提交问题](https://github.com/peach-mitao/peach/issues/new/choose)，附上版本、操作步骤、预期与实际结果。公开截图使用不含露骨画面的演示资料，遮掉凭据、局域网地址和完整路径，不要上传数据库或媒体；安全问题按[安全政策](SECURITY.md)私下报告。
 
 ## 文档
 
