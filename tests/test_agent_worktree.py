@@ -5,7 +5,10 @@ import sys
 import tempfile
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
+from threading import Event
 from unittest import mock
 
 from scripts import agent_worktree, release_tag
@@ -103,6 +106,65 @@ class AgentWorktreeTests(_WorktreeCase):
         self.assertEqual(report["files"], ["README.md"])
         agent_worktree.require_verified.assert_called_once_with(worker, "master", {"README.md"})
         self.assertEqual((self.repo / "README.md").read_text(encoding="utf-8"), "# Example\n")
+
+    def test_other_document_paths_use_the_same_checks_boundary(self):
+        for index, name in enumerate(("CONTRIBUTING.md", ".github/PULL_REQUEST_TEMPLATE.md")):
+            with self.subTest(path=name):
+                result = create(self.repo, "Codex", f"document-{index}", self.root / "worktrees")
+                worker = Path(result["path"])
+                (worker / name).parent.mkdir(parents=True, exist_ok=True)
+                (worker / name).write_text("# Example\n", encoding="utf-8")
+                _git(worker, "add", name)
+                _git(worker, "commit", "-m", "docs: example")
+                folder = agent_worktree.test_evidence.evidence_dir(self.repo)
+                with agent_worktree.test_evidence.held(folder / "full-suite.lock", scope="full"):
+                    report = integrate(self.repo, str(result["branch"]), lock_timeout=0)
+                self.assertEqual(report["files"], [name])
+
+    def test_runtime_markdown_still_waits_for_full_suite(self):
+        result = create(self.repo, "Codex", "runtime-document", self.root / "worktrees")
+        worker = Path(result["path"])
+        name = "frontend/src/react/boardui/ORIGIN.md"
+        (worker / name).parent.mkdir(parents=True)
+        (worker / name).write_text("# Origin\n", encoding="utf-8")
+        _git(worker, "add", name)
+        _git(worker, "commit", "-m", "docs: origin")
+        folder = agent_worktree.test_evidence.evidence_dir(self.repo)
+        with agent_worktree.test_evidence.held(folder / "full-suite.lock", scope="full"), \
+                self.assertRaisesRegex(WorkspaceError, "全量验证"):
+            integrate(self.repo, str(result["branch"]), lock_timeout=0)
+        self.assertFalse((self.repo / name).exists())
+
+    def test_waiting_code_integration_does_not_block_documents(self):
+        code = create(self.repo, "Codex", "queued-code", self.root / "worktrees")
+        worker = Path(code["path"])
+        (worker / "worker.txt").write_text("code\n", encoding="utf-8")
+        commit(worker, "worker change")
+        docs = create(self.repo, "Codex", "parallel-docs", self.root / "worktrees")
+        (Path(docs["path"]) / "README.md").write_text("# Example\n", encoding="utf-8")
+        _git(Path(docs["path"]), "add", "README.md")
+        _git(Path(docs["path"]), "commit", "-m", "docs: example")
+        folder = agent_worktree.test_evidence.evidence_dir(self.repo)
+        waiting = Event()
+        held = agent_worktree.test_evidence.held
+
+        @contextmanager
+        def observed(lock, **kwargs):
+            if kwargs.get("branch") == code["branch"] and lock.name == "full-suite.lock":
+                waiting.set()
+            with held(lock, **kwargs):
+                yield
+
+        with ThreadPoolExecutor() as executor, mock.patch.object(
+                agent_worktree.test_evidence, "held", observed):
+            with held(folder / "full-suite.lock", scope="full"):
+                future = executor.submit(integrate, self.repo, str(code["branch"]), lock_timeout=120)
+                self.assertTrue(waiting.wait(5), "代码集成尚未进入全量锁等待")
+                report = integrate(self.repo, str(docs["branch"]), lock_timeout=0)
+                self.assertEqual(report["files"], ["README.md"])
+                self.assertFalse(future.done())
+            self.assertEqual(future.result(timeout=60)["files"], ["worker.txt"])
+        self.assertEqual((self.repo / "worker.txt").read_text(encoding="utf-8"), "code\n")
 
     def test_code_integration_waits_for_full_suite_without_changing_master(self):
         result = create(self.repo, "Codex", "code", self.root / "worktrees")

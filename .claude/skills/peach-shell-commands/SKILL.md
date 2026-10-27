@@ -5,8 +5,8 @@ description: 编写 Peach shell 命令、多行内容，处理路径、编码或
 
 # Peach 命令与路径
 
-最后复核：2026-10-26
-证据来源：命令故障记录、正式测试入口、临时目录别名与 Windows 权限边界。
+最后复核：2026-10-28
+证据来源：命令故障记录、迁回流程中的原生命令失败掩盖与输出截断、正式测试入口和 Windows 权限边界。
 
 ## 执行前
 
@@ -14,6 +14,8 @@ description: 编写 Peach shell 命令、多行内容，处理路径、编码或
 - 用户终端目录不确定时，项目 venv 与脚本写绝对路径或先进入已核实的项目目录。不要把自己的 shell 写法直接交给用户。
 - 参数查当前入口，不凭记忆：集成需要 `integrate --branch`，手动迁移使用 `migrate upgrade --yes`。备份文件名含时间戳，重跑不覆盖已生成备份。
 - `rg` 路径参数不含通配符，筛文件用 `-g`；退出码 1 表示无匹配。Python CLI 加 `-X utf8`，PowerShell 读取 UTF-8 文本加 `-Encoding utf8`。
+- PowerShell 复合命令同时启用 `$ErrorActionPreference='Stop'` 与 `$PSNativeCommandUseErrorActionPreference=$true`；`rg` 无匹配和 Git 祖先判断等布尔退出码单独解释，不让后续成功掩盖前一步失败。
+- 长任务先保存完整工具响应和会话标识，再输出摘要；每次日志读取限于当前阶段。启动回执不作成功证明，依赖结果时取得最终退出码并核对产物；项目测试仍直接走正式入口。
 
 ## 文件与转义
 
@@ -27,4 +29,5 @@ description: 编写 Peach shell 命令、多行内容，处理路径、编码或
 - Git common directory 写入、项目测试与构建需要正常权限时，从首次调用走受控授权和窄命令，不把隔离模式当管理员权限。
 - 创建子进程或 `index.lock` 拒绝访问时，原样重跑正式入口；不拆测试、不改断言、不跳过门槛。不修改 ACL 或关闭隔离来绕过失败。
 - 主检出依赖同步可能被运行中的 `peach.exe` 占用；按重启入口处理，工作树使用自己的 venv。`restart_windows_tray.py` 先确认托盘确实在运行。
+- Node 依赖替换先按用户级 `local-operations.md` 执行占用预检；活动预览使用隔离工作树或隔离安装，不先删除其依赖树再处理原生文件占用。
 - 测试、构建与媒体直接使用项目入口，不外套 CPU、内存、线程、进程数或机器级槽位限制；本机任务范围与取消按用户级 `resource-budget.md`。

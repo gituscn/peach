@@ -53,7 +53,7 @@ def updates(request: Request, service=Depends(browser_client)):
 
 
 def people(request: Request, codes: str, service=Depends(browser_client)):
-    from .jav_browser_people import cached_people
+    from .web_jav_browser_people import cached_people
     try:
         result = cached_people(service.contract, request.app.state.preview_service, codes)
         return JSONResponse(result, headers={'Cache-Control': 'no-store'})

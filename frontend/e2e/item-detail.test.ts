@@ -841,6 +841,34 @@ describe('作品详情岛', () => {
     }
   });
 
+  it('桩片源的连续解码错误不消耗真实诊断预算，其他错误继续下传', { timeout: 60_000 }, async () => {
+    const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, DESKTOP);
+    try {
+      const forwarded: unknown[] = [];
+      await opened.page.context().route((url) => url.pathname === '/api/diagnostics/client-error', (route) => {
+        forwarded.push(route.request().postDataJSON());
+        return route.fulfill({ json: { recorded: false } });
+      });
+      const before = opened.stub.mediaErrors.length;
+      const replies = await opened.page.evaluate(async () => {
+        const send = async (kind: string, source_route: string) => (await fetch('/api/diagnostics/client-error', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind, message: '夹具错误', playback: { source_route } }),
+        })).json();
+        const media = await Promise.all(Array.from({ length: 21 }, () => send('media', '/stream')));
+        return { media, other: await send('error', '/stream'), external: await send('media', '/external') };
+      });
+      assert.deepEqual(replies.media, Array.from({ length: 21 }, () => ({ recorded: true })));
+      assert.equal(opened.stub.mediaErrors.length - before, 21);
+      assert.deepEqual(replies.other, { recorded: false });
+      assert.deepEqual(replies.external, { recorded: false });
+      assert.deepEqual(forwarded, [
+        { kind: 'error', message: '夹具错误', playback: { source_route: '/stream' } },
+        { kind: 'media', message: '夹具错误', playback: { source_route: '/external' } },
+      ]);
+    } finally { await opened.close() }
+  });
+
   it('手机 390：详情不横向溢出，侧栏排在播放区下面', { timeout: 60_000 }, async () => {
     const opened = await openItemPage(browser, `/assets/${ITEM.plain}`, MOBILE);
     try {
