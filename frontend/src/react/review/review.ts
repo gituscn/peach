@@ -89,6 +89,8 @@ export interface ReviewRow {
   candidates?: ReviewCandidate[];
   field?: string;
   field_label?: string;
+  current_value?: string;
+  current_owner?: string;
   query?: string;
   code?: string;
   creator?: string;

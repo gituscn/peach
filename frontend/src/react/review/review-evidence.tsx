@@ -58,9 +58,9 @@ export function OriginAsset(
 ) {
   const name = asset.name || '';
   return (
-    <div className="flex min-w-0 items-center gap-2.5 rounded-surface bg-background-secondary-default p-2">
+    <div className="flex min-w-0 items-center gap-3">
       <button type="button" onClick={() => openItem(asset.id)}
-        className="flex aspect-card-cover w-review-cover-narrow shrink-0 review-tight:w-review-cover cursor-pointer items-center justify-center overflow-hidden rounded-2lg bg-background-tertiary-default outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
+        className="flex aspect-card-cover w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2lg bg-background-tertiary-default outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring">
         {asset.preview_url
           ? <img src={asset.preview_url} alt="" loading="lazy" className="size-full object-cover" />
           : <span className="text-caption-1-regular text-text-secondary">无封面</span>}

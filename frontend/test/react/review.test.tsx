@@ -112,6 +112,30 @@ const stateNamed = (root: ParentNode, name: string) =>
   [...root.querySelectorAll('[aria-label="复核状态"] button')].find(button => button.textContent?.startsWith(name)) ?? null;
 const statusText = (root: ParentNode) =>
   [...root.querySelectorAll('[role="status"]')].map((node) => node.textContent?.trim());
+
+it('展开来源依据不选择候选，也不提交资料判定', async () => {
+  const entry = row(1);
+  entry.candidates![0]!.catalog_evidence = { runtime: { display_value: '120 分钟' } };
+  const { host, fetcher } = await open({ data: review({ sections: { metadata_fields: [entry] } }) });
+  const card = cards(host)[0]!;
+  const toggle = card.querySelector('button[aria-label="展开 javdb 的来源依据"]')!;
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  await click(toggle);
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect([...card.querySelectorAll<HTMLInputElement>('input[type="radio"]')].every(input => !input.checked)).toBe(true);
+  expect(fetcher.mock.calls.some(([url]) => url === REVIEW_DECISION_URL)).toBe(false);
+  expect(card.textContent).toContain('120 分钟');
+});
+
+it('当前值独立显示人工归属，不混入旧说明中的维护实现细节', async () => {
+  const entry = { ...row(1), current_value: '用户整理的标题', current_owner: 'user:manual',
+    evidence: '旧说明里的维护脚本名称', videos: 1 };
+  const { host } = await open({ data: review({ sections: { metadata_fields: [entry] } }) });
+  const current = cards(host)[0]!.querySelector('[aria-label="当前信息"]')!;
+  expect(current.textContent).toContain('用户整理的标题');
+  expect(current.textContent).toContain('人工确认');
+  expect(current.textContent).not.toContain('旧说明里的维护脚本名称');
+});
 /** Note 按语气落在 `note`／`status`／`alert` 三种角色上。 */
 const noteText = (root: ParentNode) =>
   [...root.querySelectorAll('[role="note"], [role="status"], [role="alert"]')]

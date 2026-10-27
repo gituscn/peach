@@ -672,6 +672,32 @@ describe('设计决定：作品卡、管理页与复核', () => {
   });
 
   for (const viewport of [DESKTOP, MOBILE]) {
+    it(`复核长资料只在正文滚动，卡头和判断操作仍在卡内 ${viewport.width}`, { timeout: 60_000 }, async () => {
+      const row = { ...REVIEW_ROW, current_value: '当前已登记的完整资料。'.repeat(20),
+        candidates: ['dmm', 'javdb'].map(source => ({ candidate_key: `${source}:studio`, source,
+          content_id: 'very-long-content-identifier'.repeat(8),
+          display_value: '来源提供的长资料。'.repeat(30) })) };
+      const opened = await openReview(browser, [row], viewport);
+      try {
+        const geometry = await opened.page.locator('section[data-review-key]').first().evaluate(node => {
+          const box = node.getBoundingClientRect();
+          const body = node.querySelector('[data-overlay-scrollbar]')!;
+          const footer = node.querySelector('footer')!.getBoundingClientRect();
+          return { areas: node.querySelectorAll('[data-overlay-scrollbar]').length,
+            scrolls: body.scrollHeight > body.clientHeight,
+            footerInside: footer.top >= box.top && footer.bottom <= box.bottom + 1,
+            overflow: node.scrollWidth > node.clientWidth,
+            pageOverflow: document.documentElement.scrollWidth > innerWidth,
+            currentInBody: body.contains(node.querySelector('[aria-label="当前信息"]')),
+            sourceOverflow: [...node.querySelectorAll('label:has(input[type="radio"])')]
+              .some(label => label.scrollWidth > label.clientWidth + 1) };
+        });
+        assert.deepEqual(geometry, { areas: 1, scrolls: true, footerInside: true,
+          overflow: false, pageOverflow: false, currentInBody: true, sourceOverflow: false });
+        assert.deepEqual(opened.problems, []);
+      } finally { await opened.close() }
+    });
+
     it(`未收录词条之间使用分隔线 ${viewport.width}`, { timeout: 60_000 }, async () => {
       const row = { ...REVIEW_ROW, candidates: [{ ...REVIEW_ROW.candidates[0]!,
         unmapped_genres: ['アクメ・オーガズム', '美少女電影'] }] };
@@ -758,7 +784,7 @@ describe('设计决定：作品卡、管理页与复核', () => {
     });
   }
 
-  it('复核滚动边缘按方向出现，当前信息在分隔线之间居中', { timeout: 60_000 }, async () => {
+  it('复核滚动边缘按方向出现，当前信息与候选共用正文滚动', { timeout: 60_000 }, async () => {
     const opened = await openReview(browser);
     try {
       const card = opened.page.locator('section[data-review-key]').first();
@@ -801,13 +827,14 @@ describe('设计决定：作品卡、管理页与复核', () => {
       await opened.page.waitForFunction(() => !document.querySelector('[data-review-key] .ui-can-scroll-bottom'));
       await scroller.locator('[data-scroll-test]').evaluate((node) => node.remove());
       await opened.page.waitForFunction(() => !document.querySelector('[data-review-key] [data-scroll-edges]'));
-      const spacing = await card.getByRole('region', { name: '当前信息' }).evaluate((node) => {
+      const current = await card.getByRole('region', { name: '当前信息' }).evaluate((node) => {
         const style = getComputedStyle(node);
-        const footer = node.closest('section')!.querySelector('footer')!.getBoundingClientRect();
-        return { top: parseFloat(style.paddingTop), bottom: parseFloat(style.paddingBottom), gap: footer.top - node.getBoundingClientRect().bottom };
+        return { inBody: !!node.closest('[data-overlay-scrollbar]'), overflow: style.overflowY,
+          areas: node.closest('section[data-review-key]')!.querySelectorAll('[data-overlay-scrollbar]').length };
       });
-      assert.equal(spacing.top, spacing.bottom);
-      assert.ok(Math.abs(spacing.gap) <= 1, `当前信息下方多出 ${spacing.gap}px`);
+      assert.equal(current.inBody, true, '当前资料不在候选共用的正文里');
+      assert.equal(current.areas, 1, '一张卡片出现多个独立滚动区');
+      assert.notEqual(current.overflow, 'auto', '当前资料不应再次单独滚动');
       assert.deepEqual(opened.problems, []);
     } finally { await opened.close() }
   });

@@ -419,6 +419,8 @@ JAV 作品详情与馆藏视频共用 `IdentityCell` 的头像、标识和首字
 
 筛选浮窗复用首页的 `FilterGlassRows`、`useViewGlide` 和透明状态键。状态与分组、筛选按控件实际宽度自然排列，足宽同排并以首页同款竖线分组，放不下时换排并隐藏竖线；空分类保留状态入口，只读模式不提供全选或写入。分组下拉与全选保留原 Select、Button 样式。字号、状态键高度、玻璃材质和吸顶沿用同一维护源，不另设页签皮肤。
 
+复核卡片的来源选择复用官方 `RadioCard` 与 `RadioGroup`；当前值与候选共用一个正文滚动区，来源依据通过现有 `CollapseRegion` 独立展开。外框与操作带复用管理页卡面和 Fieldset 布局，字段徽章及忽略操作保持中性，通过使用原主按钮。来源、取值和资料采用规则不变；官方源码与差异见[复核卡片取证](reference-snapshots/boardui-review-cards.md)。
+
 ## 发现推荐缓存
 
 搜索推荐复用 `/api/items`、馆藏范围的 `/api/jav/discoveries`、`/api/follow`、`/api/follow/authors` 与 `/api/feeds/discoveries`，图片复用 `coverImage`、`feedNewCoverHtml`、`avatarInner` 和 `authorAvatarHtml`。JAV 保留 IDF/MMR 口味排序，关注取全部状态的随机作品，视频与图片复用 `groupMediaKinds`、`itemForMedia` 和附件缩略图；署名沿用 `followIdentity` 的发布者判据。搜索框不启动库外资料补齐；详情与订阅分别沿用现有作品、作者、关注管理路由。无新增依赖、迁移或 ledger 写入。
