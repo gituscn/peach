@@ -13,7 +13,16 @@ RELEASES_URL = "https://github.com/peach-mitao/peach/releases"
 API_URL = "https://api.github.com/repos/peach-mitao/peach/releases?per_page=100"
 DOWNLOADS_BASE = "https://downloads.peach.video"
 DOWNLOADS_API = DOWNLOADS_BASE + "/releases.json"
-GITGUD_RELEASES = "https://gitgud.io/peach-mitao/peach/-/releases"
+
+
+def download_sources(url: str) -> tuple[str, ...]:
+    """发行包保留同版本、同文件名的另一公开源；校验沿用原发布摘要。"""
+    github = RELEASES_URL + "/download/"
+    mirror = DOWNLOADS_BASE + "/"
+    for primary, backup in ((github, mirror), (mirror, github)):
+        if url.startswith(primary):
+            return url, backup + url.removeprefix(primary)
+    return (url,)
 
 
 def snapshot() -> dict:
@@ -50,10 +59,9 @@ def _release_candidates(rows: list, endpoint: str) -> list[tuple]:
             if not all(re.fullmatch(r"sha256:[0-9a-f]{64}", item.get("digest") or "") for item in (asset, full)):
                 continue
             directory = f"{DOWNLOADS_BASE}/{tag}"
-            release_url = f"{GITGUD_RELEASES}/{tag}"
         else:
             directory = f"{RELEASES_URL}/download/{tag}"
-            release_url = f"{RELEASES_URL}/tag/{tag}"
+        release_url = f"{RELEASES_URL}/tag/{tag}"
         releases.append((version, tag, asset, full, directory, release_url))
     return releases
 
@@ -64,8 +72,7 @@ def check(*, transport=None) -> dict:
     try:
         releases = []
         obtained = False
-        downloads = False
-        for endpoint in (DOWNLOADS_API, API_URL):
+        for endpoint in (API_URL, DOWNLOADS_API):
             try:
                 headers = {"Accept": "application/json"}
                 if endpoint == API_URL:
@@ -77,7 +84,6 @@ def check(*, transport=None) -> dict:
                 if not isinstance(rows, list):
                     continue
                 obtained = True
-                downloads = downloads or endpoint == DOWNLOADS_API
                 releases.extend(_release_candidates(rows, endpoint))
             except (OSError, ValueError, TypeError, TimeoutError, httpx.HTTPError):
                 continue
@@ -89,10 +95,6 @@ def check(*, transport=None) -> dict:
         if current is None:
             raise ValueError("current version required")
         state = "available" if version > current else "ahead" if version < current else "current"
-        if not downloads and state != "available":
-            # 新版本只发在 R2；GitHub 上停在旧版本。R2 没取到时，GitHub 的旧版本既说明不了
-            # 「已是最新」也说明不了「高于已发布版本」。
-            return dict(result, state="error", message="未能取得版本信息，请重试。")
         message = {"available": "有新版本可下载。", "ahead": "当前版本高于已发布测试版。", "current": "已是最新测试版。"}[state]
         return dict(result, latest_version=tag.removeprefix("v"), state=state, message=message,
                     asset_url=f"{directory}/{asset['name']}",
