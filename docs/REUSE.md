@@ -543,6 +543,7 @@ OneJAV、Free JAV Torrent 只给种子链接。这类条目经索引器同源的
 - 搜索玻璃用 `glideEase()` 的采样弹簧，`frontend/src/application/search-morph.js` 只管视口边界与轮廓关键帧。
 - 横排滚到头的回弹是 `wireHorizontalScroller` 内的 `edgeBounce`，头像排、厂牌排、新作排、筛选条共用；transitions.dev 的 43 条配方里没有（2026-09-23 核对）。越界位移借 UIScrollView 的橡皮筋公式 `(1 - 1/(x·c/d + 1))·d`，c = 0.55，与 use-gesture（MIT）的 `rubberband` 同一条，回弹走 `--spring-pane`。只抄公式不引依赖：拖动与滚轮归属已由 `wireHorizontalScroller` 判定。新作排自动滚动是同文件的 `wireAutoScroll`。
 - React 横向导航通过 `useHorizontalScroller` 绑定上述共享行为，适用于页签、分段控件、筛选栏和首字跳转；`data-horizontal-scroll` 隐藏原生滚动条，左右渐隐由实际溢出方向决定。容器和子项尺寸、文本及增删变化都会重算，竖向分类列关闭绑定；表格和代码块继续使用覆盖式滑块，不新增依赖。
+- 详情影院模式通过 `data-theater` 改变已有容器的 overflow，共享滚动区观察器同步接管新滚动轴。`data-skeleton` 与 `data-skeleton-tier` 期间隐藏原生滚动条并移除旧轨道，内容恢复后由同一观察器重新接管；首页与资料页共用的新作占位在整条横向容器上标记 `data-skeleton="feed/new"`。保留原占位尺寸与排版，不为占位另建滚动组件。
 - 管理页头及 `manageHeaderSkeletonHtml` 共用一级导航、面包屑、页面标题的顺序，页内分类放在标题之后；管理条保持跨模块导航，面包屑保留上级链接与当前页语义。
 - 浮层筛选首页是页面内组件 `catalog-filter`，资料页是 `entity-filter`，共用 `FilterGlassRows` 两排、交集条与排序键，滑动玻璃走 `use-view-glide.ts`。外框管玻璃与吸顶，壳管查询状态和取数，岛只画、动作回壳，按下态在发请求前由壳经 `updateManagedRoute` 推到；身份与观看状态的组合沿用 `/api/items`。
 - `web/board.css` 共用正式页面结构。首启、登录与错误三页是独立页面包 `/dist/peach-pages.js` 里的 React 页，服务端只吐 `web_entry.page_shell()` 那一张薄壳，外框是 `frontend/src/react/pages/auth-card.tsx`，SPA 外壳之外的新页面挂进同一个包。
