@@ -28,6 +28,16 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual([item.version for item in upgrade(self.db, MIGRATIONS)], ['0050'])
             self.assertEqual(connection.execute('SELECT * FROM review_decision ORDER BY item_key').fetchall(), before)
             self.assertEqual(connection.execute('SELECT COUNT(*) FROM review_decision_history').fetchone()[0], 0)
+            def revision():
+                return connection.execute("SELECT n FROM ledger_revision WHERE tbl='review_decision_history'").fetchone()[0]
+            self.assertEqual(revision(), 0)
+            connection.execute("INSERT INTO review_decision_history(category,item_key,status,reviewer,note,decided_at,restored_at) VALUES('creator_tags','kept','skipped','本人','旧记录','old','now')")
+            self.assertEqual(revision(), 1)
+            connection.execute("UPDATE review_decision_history SET note='保留原文' WHERE item_key='kept'")
+            self.assertEqual(revision(), 2)
+            connection.execute("DELETE FROM review_decision_history WHERE item_key='kept'")
+            self.assertEqual(revision(), 3)
+            connection.commit()
             self.assertEqual(connection.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
             self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
             self.assertEqual(upgrade(self.db, MIGRATIONS), [])

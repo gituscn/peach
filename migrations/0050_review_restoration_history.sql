@@ -12,3 +12,14 @@ CREATE TABLE review_decision_history(
 
 CREATE INDEX idx_review_decision_history_item
 ON review_decision_history(category,item_key,restored_at DESC);
+
+INSERT INTO ledger_revision(tbl) VALUES('review_decision_history');
+CREATE TRIGGER rev_review_decision_history_insert AFTER INSERT ON review_decision_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='review_decision_history';
+END;
+CREATE TRIGGER rev_review_decision_history_update AFTER UPDATE ON review_decision_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='review_decision_history';
+END;
+CREATE TRIGGER rev_review_decision_history_delete AFTER DELETE ON review_decision_history BEGIN
+    UPDATE ledger_revision SET n=n+1 WHERE tbl='review_decision_history';
+END;
