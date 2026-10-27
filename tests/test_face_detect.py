@@ -57,6 +57,63 @@ class EnsureModelTests(unittest.TestCase):
         self.assertIn(face_detect.ZOO_COMMIT, face_detect.MODEL_URL)
 
 
+class ModelLoadingTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.model = Path(temporary.name).resolve() / "中文模型" / "检出.onnx"
+        self.model.parent.mkdir()
+        self.payload = b"verified-yunet-model"
+        self.model.write_bytes(self.payload)
+        digest = patch.object(face_detect, "MODEL_SHA256", hashlib.sha256(self.payload).hexdigest())
+        digest.start()
+        self.addCleanup(digest.stop)
+
+    def test_unicode_model_path_is_read_as_onnx_bytes(self):
+        import cv2
+        import numpy
+
+        with patch.object(cv2, "FaceDetectorYN_create") as create:
+            detector = face_detect.FaceDetector(self.model, score=0.72, nms=0.12, allow_download=False)
+        args = create.call_args.args
+        self.assertEqual(args[0], "ONNX")
+        self.assertIsInstance(args[1], numpy.ndarray)
+        self.assertEqual((args[1].dtype, args[1].ndim, args[1].tobytes()),
+                         (numpy.dtype("uint8"), 1, self.payload))
+        self.assertEqual((args[2].dtype, args[2].size), (numpy.dtype("uint8"), 0))
+        self.assertEqual(args[3:], ((320, 320), face_detect.READ_FLOOR, 0.12, 5000))
+        self.assertEqual(detector.model_path, self.model)
+        self.assertIs(detector._detector, create.return_value)
+
+    def test_model_read_error_after_verification_reaches_the_caller(self):
+        import cv2
+
+        failure = PermissionError(13, "model read denied")
+        with patch.object(Path, "read_bytes", side_effect=[self.payload, failure]), \
+                patch.object(cv2, "FaceDetectorYN_create") as create, \
+                self.assertRaises(PermissionError) as caught:
+            face_detect.FaceDetector(self.model, allow_download=False)
+        self.assertIs(caught.exception, failure)
+        create.assert_not_called()
+
+    def test_an_onnx_import_error_is_not_reported_as_no_faces(self):
+        import cv2
+
+        failure = cv2.error("invalid ONNX buffer")
+        with patch.object(cv2, "FaceDetectorYN_create", side_effect=failure), \
+                self.assertRaises(cv2.error) as caught:
+            face_detect.FaceDetector(self.model, allow_download=False)
+        self.assertIs(caught.exception, failure)
+
+    def test_mismatched_model_bytes_never_reach_opencv(self):
+        import cv2
+
+        self.model.write_bytes(b"partial-model")
+        with patch.object(cv2, "FaceDetectorYN_create") as create, self.assertRaises(FaceModelUnavailable):
+            face_detect.FaceDetector(self.model, allow_download=False)
+        create.assert_not_called()
+
+
 class BundledModelTests(unittest.TestCase):
     """随包那份先认：在且哈希对得上就不联网、不往数据根写；对不上就退回原来的取法。"""
 

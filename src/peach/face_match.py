@@ -63,6 +63,7 @@ class FaceEmbedder:
     def __init__(self, model: Path | None = None, *, detector: FaceDetector | None = None,
                  allow_download: bool = True) -> None:
         import cv2
+        import numpy
 
         self._cv2 = cv2
         self.model_path = ensure_model(model, allow_download=allow_download)
@@ -70,7 +71,9 @@ class FaceEmbedder:
         if create is None:                       # pragma: no cover - 依赖版本兜底
             raise face_detect.FaceModelUnavailable(
                 "当前 OpenCV 没有 FaceRecognizerSF；需要 4.5.4 以上")
-        self._recognizer = create(str(self.model_path), "")
+        # 模型路径交给 Python 读取，OpenCV 只接收校验后的 ONNX 字节。
+        model_bytes = numpy.frombuffer(self.model_path.read_bytes(), dtype=numpy.uint8)
+        self._recognizer = create("ONNX", model_bytes, numpy.empty(0, dtype=numpy.uint8))
         self._detector = detector or FaceDetector(allow_download=allow_download)
 
     def embed(self, image):
