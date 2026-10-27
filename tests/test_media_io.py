@@ -46,7 +46,7 @@ class MediaIoTests(unittest.TestCase):
             children.append(child)
             return child
         def blocked(_command, **options):
-            return original_run([sys.executable, '-c', 'import time; time.sleep(60)'], **options)
+            return original_run([sys._base_executable, '-c', 'import time; time.sleep(60)'], **options)
         with patch.object(media_io, 'TIMEOUT_SECONDS', 0.2), \
                 patch.object(media_io.subprocess, 'run', side_effect=blocked), \
                 patch.object(media_io.subprocess, 'Popen', side_effect=spawn), \

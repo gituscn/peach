@@ -1,7 +1,6 @@
 """测试运行时的内容身份与浏览器定位。"""
 from __future__ import annotations
 
-from functools import lru_cache
 import hashlib
 import json
 import os
@@ -30,8 +29,7 @@ ENTRY_FLAGS = frozenset({'PYTHONPATH', 'PEACH_REPORTING_TEST_MODE', 'PEACH_TEST_
                          'PEACH_E2E_CHROME'})
 
 
-@lru_cache(maxsize=128)
-def _file_digest(path: str, modified: int, size: int) -> str:
+def _file_digest(path: str) -> str:
     with open(path, 'rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
@@ -41,8 +39,7 @@ def file_identity(path) -> dict:
         return {'available': False}
     try:
         item = Path(path)
-        stat = item.stat()
-        return {'sha256': _file_digest(str(item), stat.st_mtime_ns, stat.st_size)}
+        return {'sha256': _file_digest(str(item))}
     except OSError as error:
         return {'unavailable': type(error).__name__}
 

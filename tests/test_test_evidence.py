@@ -166,6 +166,7 @@ class EnvironmentIdentityTests(unittest.TestCase):
         self.enterContext(mock.patch.object(evidence, 'python_identity', return_value={
             'version': 'fixture-python', 'sites': []}))
         self.enterContext(mock.patch.object(evidence, 'tool_identities', return_value={}))
+        self.enterContext(mock.patch.object(evidence.platform, 'platform', return_value='fixture-platform'))
         self.packages = self.enterContext(mock.patch.object(evidence.importlib.metadata, 'distributions', return_value=[]))
 
     def test_equivalent_interpreters_in_separate_worktrees_share_identity(self):
@@ -175,7 +176,9 @@ class EnvironmentIdentityTests(unittest.TestCase):
         first = evidence.environment(self.root)
         with mock.patch.object(evidence, 'interpreter', return_value=other):
             self.assertEqual(evidence.environment(self.root), first)
+        stamp = other.stat()
         other.write_bytes(b'another-runtime')
+        os.utime(other, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
         with mock.patch.object(evidence, 'interpreter', return_value=other):
             self.assertNotEqual(evidence.environment(self.root), first)
 
