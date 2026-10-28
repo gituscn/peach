@@ -1,9 +1,10 @@
-"""用户脚本的人物补充：只读馆藏、元数据快照与已安装头像。"""
+"""用户脚本的人物补充：只读馆藏、元数据快照、详情页出演者与已安装头像。"""
 from __future__ import annotations
 
 import base64
 import io
 import json
+import re
 
 from PIL import Image, ImageOps
 
@@ -32,11 +33,32 @@ def _snapshots(contract, codes):
         raise ValueError('本地人物快照未取得') from error
 
 
-def cached_people(contract, preview, value: str) -> dict:
+def _page_names(performers) -> list[str]:
+    """详情页出演者原文：去掉 ♀ 标记，男演员（♂）不参与；只在查询单个番号时使用。"""
+    names = [str(name).strip() for name in performers or ()]
+    if len(names) > 10 or any(not name or len(name) > 60 for name in names):
+        raise ValueError('出演者最多 10 位，每位不超过 60 个字符')
+    return [name.replace('♀', '').strip() for name in names if '♂' not in name]
+
+
+def _page_person(connection, name: str) -> dict:
+    """「河北彩花（河北彩伽）」先按括号外的名字，再按括号里的别名匹配本地人物；都未匹配时只留名字。"""
+    base = re.sub(r'[（(][^）)]*[）)]', '', name).strip() or name
+    for candidate in (base, *re.findall(r'[（(]([^（）()]+)[）)]', name)):
+        found = entities.resolve_entity(connection, 'performer', candidate.strip())
+        if found:
+            return {'id': found['id'], 'name': found['canonical_name']}
+    return {'id': None, 'name': base}
+
+
+def cached_people(contract, preview, value: str, performers=()) -> dict:
     raw = value.split(',')
     if not 1 <= len(raw) <= 50:
         raise ValueError('每次最多查询 50 个番号')
     codes = list(dict.fromkeys(code_key(code) for code in raw))
+    page_names = _page_names(performers)
+    if page_names and len(codes) != 1:
+        raise ValueError('出演者只能随单个番号查询')
     items, avatars = {}, {}
     snapshots = _snapshots(contract, codes)
     with contract.database.read_connection() as connection:
@@ -58,6 +80,11 @@ def cached_people(contract, preview, value: str) -> dict:
                 if key and key not in people:
                     found = entities.resolve_entity(connection, 'performer', name)
                     people[key] = {'id': found['id'] if found else None, 'name': name}
+            for name in page_names:
+                person = _page_person(connection, name)
+                key = entities.normalize_entity_name(person['name'])
+                if key and key not in people and person['id'] not in excluded:
+                    people[key] = person
             for person in people.values():
                 entity_id = person['id']
                 if entity_id is None or not contract.has_entity_image('performer', entity_id):

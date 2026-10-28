@@ -32,6 +32,10 @@ MESSAGES = {
     "submitted": "云下载进行中", "ingested": "已加入 Peach 馆藏", "owned": "馆藏已有该番号影片",
     "failed": "添加失败，可重试", "no_match": "未找到可自动下载的磁力，可重试",
 }
+#: 下载失败按原因分给用户脚本：磁力本身的问题换一个磁力，网盘一侧的问题修好后重试同一个磁力。
+MAGNET_FAILURES = frozenset({"rejected", "invalid_link", "no_source", "mismatch"})
+CLOUD_FAILURES = frozenset({"config", "quota", "network", "not_landed", "duplicate"})
+NO_OTHER_MAGNET = "没有其他可用磁力，可在 Peach 手动选择资源"
 
 
 @lru_cache(maxsize=1)
@@ -110,7 +114,8 @@ def identify_source(value: object, hint: str = "") -> str:
     return code
 
 
-def _download_candidate(items, code):
+def _download_candidate(items, code, skip=frozenset()):
+    """搜索结果里第一个番号相符的正片磁力；`skip` 是换磁力时排除的 infohash。"""
     for item in items:
         name = str(item.get("name") or "")
         matches = (same_release_code(scan_code(name), code)
@@ -118,8 +123,10 @@ def _download_candidate(items, code):
         if not matches or re.search(r"(?i)\b(?:sample|trailer|preview)\b|予告|预告|預告", name):
             continue
         try:
-            parse_magnet(str(item.get("uri") or ""))
+            magnet = parse_magnet(str(item.get("uri") or ""))
         except ValueError:
+            continue
+        if magnet.info_hash in skip:
             continue
         return item
     return None
@@ -251,6 +258,10 @@ class JavBrowser:
                 state = "ingested" if task.state == INGESTED else (
                     "failed" if task.state in RESUBMITTABLE_STATES or task.blocked_at else "submitted")
                 row.update(state=state, message=task.failure_detail or MESSAGES[state])
+                if state == "failed":
+                    detail["failure"] = task.failure or ""
+                    detail["cause"] = ("magnet" if task.blocked_at or task.failure in MAGNET_FAILURES
+                                       else "cloud" if task.failure in CLOUD_FAILURES else "")
                 if task.asset_id:
                     row["asset_id"] = task.asset_id
                 progress = task.progress
@@ -282,13 +293,23 @@ class JavBrowser:
             status = self.status(code)
             if status["state"] in ACTIVE | {"owned", "submitted", "ingested"}:
                 return status
+            if body.get("switch") not in (None, False, True):
+                raise ValueError("换磁力参数无效")
+            # 换磁力：把上一次提交的磁力记入跳过名单，重新搜索时取下一个。
+            previous = self.rows.get(code, {})
+            skip = list(previous.get("skip", ()))
+            if body.get("switch") is True and previous.get("task_id"):
+                task = self.downloads.store.get(previous["task_id"])
+                if task is not None and task.info_hash and task.info_hash not in skip:
+                    skip.append(task.info_hash)
             self._ready(config.get("provider", ""), remote=False)
             if code not in self.rows and len(self.rows) >= 200:
                 completed = next((key for key, row in self.rows.items() if row["state"] not in ACTIVE), None)
                 if completed is None:
                     raise ValueError("添加队列已满，请等待当前任务结束")
                 del self.rows[completed]
-            self.rows[code] = {"state": "queued", "provider": config["provider"], "source_url": page}
+            self.rows[code] = {"state": "queued", "provider": config["provider"], "source_url": page,
+                               **({"skip": skip[-20:]} if skip else {})}
             self._save()
             self._wake.set()
             return self.status(code)
@@ -312,7 +333,7 @@ class JavBrowser:
         try:
             self._ready(provider)
             result = self.search(self.contract, {"code": code, "goal": "quality"})
-            candidate = _download_candidate(result.get("items", ()), code)
+            candidate = _download_candidate(result.get("items", ()), code, frozenset(row.get("skip", ())))
             should_submit = False
             with self._lock:
                 if row["state"] != "searching" or not self._config().get("token_hash"):
@@ -324,7 +345,8 @@ class JavBrowser:
                 elif candidate is None:
                     failed = result.get("state") in {"error", "unavailable"} or bool(result.get("error"))
                     row.update(state="failed" if failed else "no_match", message=(
-                        "资源搜索暂不可用，请在 Peach 检查来源后重试" if failed else MESSAGES["no_match"]))
+                        "资源搜索暂不可用，请在 Peach 检查来源后重试" if failed
+                        else NO_OTHER_MAGNET if row.get("skip") else MESSAGES["no_match"]))
                 else:
                     self._submitting.add(code)
                     should_submit = True

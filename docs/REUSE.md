@@ -12,7 +12,7 @@ YuNet 与 SFace 沿用既有模型哈希校验，Python 读取模型字节后交
 
 ## 浏览器添加的本地人物资料
 
-`/api/jav-browser/people` 复用现有专用令牌与浏览器权限检查、规范实体关联和男优排除判据。人物名只读本地账本与发现资料快照，头像通过既有 `PreviewService.entity_image` 查找已安装文件；已有 Pillow 将其在内存缩为 64px JPEG，不落新头像、不抓外站。未初始化发现资料服务时直接读取快照，避免初始化恢复外站任务。缺头像省略图片字段，缺人物信息返回空数组，接口失败与正常缺失分别反馈。用户脚本显示灰底首字母，不显示作品封面，无新增依赖。
+`/api/jav-browser/people` 复用现有专用令牌与浏览器权限检查、规范实体关联和男优排除判据。人物名只读本地账本与发现资料快照；查询单个番号时还可带上详情页的出演者名字，按既有 `resolve_entity` 先规范名后唯一别名匹配，括号里的别名一并尝试，未匹配的只返回名字。头像通过既有 `PreviewService.entity_image` 查找已安装文件；已有 Pillow 将其在内存缩为 64px JPEG，不落新头像、不抓外站。未初始化发现资料服务时直接读取快照，避免初始化恢复外站任务。缺头像省略图片字段，缺人物信息返回空数组，接口失败与正常缺失分别反馈。用户脚本显示灰底首字母，不显示作品封面，无新增依赖。
 
 ## README Star 图
 
@@ -297,7 +297,7 @@ Windows 复用 FFmpeg 的 D3D11VA 解码与 `h264_amf`、`h264_qsv` 编码，沿
 
 用户脚本由 [peach-mitao/peach-userscript](https://github.com/peach-mitao/peach-userscript)（AGPL-3.0-or-later）独立维护，使用 [Tampermonkey 官方 GM API](https://www.tampermonkey.net/documentation.php) 的本机存储、菜单与 `GM_xmlhttpRequest`；SPA 通知依据 `window.onurlchange` 契约。上游使用 Node.js 24 LTS 内置模块确定性构建，运行时零依赖。Peach 的 `web/integrations/` 消费同一发布的完整安装脚本与站点快照，固定版本、上游提交与 SHA256 见 `jav-userscript-release.json`。安装端点直接返回制品，后端独立校验已登记域名与作品参数；上游导出工具在隔离工作树同步这两份制品和来源记录。Sleazy 热门脚本只提供显式域名与镜像发现证据，不复制其实现或执行第三方代码。宿主扩展由用户安装，兼容性以实际浏览器及脚本管理器授权为准；模拟 GM API 的真实 Chromium 页面完成回归，DMM 与 MGS 实页通过隔离只读 GM 适配核验番号、页面浮层与设置窗口。真实扩展、Peach 与网盘联合下载验收未取得。
 
-Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
+Peach 保留页面粗提取与身份冲突提示，服务端复用 `catalog_rules` 的唯一番号规则、`feeds.scan_code`、`web_resource_search.q_resource_search` 的来源顺序与质量排序、`submit_offline_download` 的 infohash 幂等、现有云下载落地与后处理。浏览器添加在共享提交锁内按番号接管已有任务，覆盖其他入口同时提交不同磁力的情况。失败原因直接复用下载任务的 `FAILURE_KINDS` 分为磁力与网盘两类；换磁力把失败任务的 infohash 记入该番号的跳过名单，候选挑选沿用同一份搜索结果与番号判据。专用令牌经 `CredentialStore` 仅保存 SHA-256 摘要，不声明跨机同步字段。队列用已有 `atomic_write_text` 保存本机运行状态，关闭功能会撤销令牌并停止尚未提交的添加。
 
 DMM / MGS 的只读商品号识别复用 `sources.dmm` 的 CID 结构与 `catalog_rules.release_code_from_product`。浏览器提交净化后的详情地址及可选厂家番号；DMM 的目录数字头按来源解释，MGS 保留三位发行前缀，尾字母和日期分隔符保留为身份。`release_code_from_text` 继续处理普通文件名的字幕与画质标记，不用文件名噪声规则改写明确商品身份。资源名称的完整商品号匹配复用同一编目模式，元数据身份校验与 DMM 搜索核对尾字母。运行时不新增 HTTP 请求或依赖；已有 DMM／OpenAver 取证与来源协议足以覆盖转换，不引入第二套外部番号库。完整脚本连接临时账本的真实识别接口，联合验证 DMM／MGS 桌面与手机场景；保留基于模拟响应的跨站交互回归。
 
