@@ -97,6 +97,50 @@ class CIFrontendOwnershipTests(unittest.TestCase):
 
 
 class TestPlanningTests(unittest.TestCase):
+    def test_additive_exact_test_registration_selects_affected_domains_and_collection_guards(self):
+        from scripts import change_impact
+        before = ("SCOPES = {'checks': ('test_context_budget.py',), "
+                  "'tooling': ('test_scripts.py',), 'catalog': ('test_search_suggest.py',)}\n"
+                  "AUTO_SCOPE_FILES = {}\ndef execute(): return 1\n")
+        after = before.replace("'test_scripts.py',", "'test_scripts.py', 'test_new_script.py',")
+        contents = {'scripts/test_runner.py': (before, after)}
+        self.assertEqual(runner.scopes_for_changes(contents, contents=contents)[0], ('checks', 'tooling'))
+        planned = ci_plan.plan('pull_request', list(contents), contents)
+        self.assertFalse(planned['wide'])
+        self.assertFalse(planned['browser'])
+        first = change_impact.signatures('scripts/test_runner.py', before)
+        second = change_impact.signatures('scripts/test_runner.py', after)
+        from scripts import test_evidence
+        self.assertTrue(test_evidence.valid_manifest({'files': {}, 'signatures': {'scripts/test_runner.py': first}}))
+        for entries in ({}, [['tooling', [None]]], [['tooling', []], ['tooling', []]]):
+            self.assertFalse(test_evidence.valid_manifest({'files': {}, 'signatures': {
+                'scripts/test_runner.py': {**first, 'scope_entries': entries}}}))
+        self.assertFalse(test_evidence.valid_manifest({'files': {}, 'signatures': {'other.py': first}}))
+        paths, kinds = change_impact.delta(
+            {'files': {'scripts/test_runner.py': [420, 'before', '100644']}, 'signatures': {'scripts/test_runner.py': first}},
+            {'files': {'scripts/test_runner.py': [420, 'after', '100644']}, 'signatures': {'scripts/test_runner.py': second}})
+        self.assertEqual(runner.scopes_for_changes(paths, kinds=kinds)[0], ('checks', 'tooling'))
+        catalog = before.replace("'test_search_suggest.py',", "'test_search_suggest.py', 'test_new_catalog.py',")
+        self.assertEqual(runner.scopes_for_changes(['scripts/test_runner.py'], contents={
+            'scripts/test_runner.py': (before, catalog)})[0], ('checks', 'catalog', 'tooling'))
+
+    def test_registration_narrowing_does_not_hide_changes_to_existing_coverage_or_execution(self):
+        before = ("SCOPES = {'checks': ('test_context_budget.py',), "
+                  "'tooling': ('test_scripts.py',), 'catalog': ('test_search_suggest.py',)}\n"
+                  "AUTO_SCOPE_FILES = {}\ndef execute(): return 1\n")
+        changed = [before.replace("'test_scripts.py',", ''),
+                   before.replace("'test_scripts.py',", "'test_scripts.py', 'test_*.py',"),
+                   before.replace("'test_scripts.py',", "'test_scripts.py', '../outside.py',"),
+                   before.replace("'test_scripts.py',", "'test_new_script.py', 'test_scripts.py',"),
+                   before.replace('return 1', 'return 2'),
+                   before.replace('AUTO_SCOPE_FILES = {}', "AUTO_SCOPE_FILES = {'x.py': ('checks',)}"),
+                   before + "SCOPES['tooling'] = ()\n",
+                   before.replace("'catalog':", "'new_scope':")]
+        for after in changed:
+            with self.subTest(after=after):
+                self.assertEqual(runner.scopes_for_changes(['scripts/test_runner.py'], contents={
+                    'scripts/test_runner.py': (before, after)})[0], ('full',))
+
     def test_checks_ci_omits_runtime_tool_installation_and_keeps_platforms(self):
         for path in ("README.md", "CONTRIBUTING.md", ".github/PULL_REQUEST_TEMPLATE.md", "docs/TESTING.md"):
             with self.subTest(path=path):
