@@ -8,9 +8,9 @@ The Peach source code is licensed under AGPL-3.0-or-later; that license covers c
 
 - 名称「Peach」，用于称呼本软件或与之相似的软件时；
 - 桃子图标，包括 `resources/` 下的 `peach-logo*.png`、`peach.ico`、`peach.icns`，以及应用界面和官网上的同一图形；
-- GitHub 组织名 `peach-mitao` 与域名 `peach.video`。
+- GitHub 组织 Peach 的账号名 `peach-mitao` 与域名 `peach.video`。
 
-标识由 Peach 维护者（GitHub 组织 `peach-mitao`）管理。「Peach」目前未注册商标。
+标识由 GitHub 组织 [Peach](https://github.com/peach-mitao)（账号 `peach-mitao`）的维护者管理。「Peach」目前未注册商标。
 
 ## 与源码许可证的关系
 
