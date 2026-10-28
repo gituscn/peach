@@ -52,6 +52,35 @@ def composition_times(moov: bytes, sample_delta: int) -> list[int]:
     return [index * sample_delta + offset for index, offset in enumerate(offsets)]
 
 
+def edit_list_of(header: RepairedHeader) -> bytes:
+    moov = moov_of(header.prefix)
+    trak = _find(moov, 0, len(moov), b"trak")
+    assert trak is not None
+    edts = _find(moov, *trak, b"edts")
+    assert edts is not None
+    elst = _find(moov, *edts, b"elst")
+    assert elst is not None
+    return moov[elst[0]:elst[1]]
+
+
+def legacy_sidecar(path: Path, rows: list[tuple[int, int, int]], *, version=0) -> RepairedHeader:
+    """旧版本实际生成的 ctts 与明确存储起点；不依赖新 retimer 来构造旧错误。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    source = path.with_suffix(".mp4")
+    source.write_bytes(minimal_mp4(timescale=1000, sample_delta=400,
+                                  samples=len(DECODE_TO_DISPLAY), keyframe_every=6))
+    layout = ">QqI" if version == 1 else ">IiI"
+    elst = struct.pack(">II", version << 24, len(rows)) + b"".join(
+        struct.pack(layout, *row) for row in rows)
+    with patch.object(mp4repair, "_display_order", return_value=list(DECODE_TO_DISPLAY)), \
+            patch.object(mp4repair, "_retimed_edit_list", return_value=elst):
+        header = repaired_header(source, Path("ffprobe"))
+    path.write_bytes(b"PEACHMP4\x01" + struct.pack(">QQQQ", len(header.prefix), len(header.suffix),
+                                               header.payload_start, header.payload_end)
+                     + header.prefix + header.suffix)
+    return header
+
+
 class Mp4HeaderRepairTests(unittest.TestCase):
     def setUp(self) -> None:
         self._temporary = TemporaryDirectory()
@@ -110,11 +139,34 @@ class Mp4HeaderRepairTests(unittest.TestCase):
 
         self.assertEqual(entries(self.edit_list(header), ">IiI"), [(5200, 400, 1 << 16)])
 
+    def test_an_edit_list_with_rounding_error_is_not_shifted_twice(self):
+        source = self.broken_mp4(self.root / "broken.mp4", edit_list=(5200, 398))
+        header = self.repair(source)
+
+        self.assertEqual(entries(self.edit_list(header), ">IiI"), [(5200, 398, 1 << 16)])
+
     def test_a_real_trim_keeps_its_own_start_and_takes_the_shift_on_top(self):
         source = self.broken_mp4(self.root / "broken.mp4", edit_list=(4000, 2000))
         header = self.repair(source)
 
         self.assertEqual(entries(self.edit_list(header), ">IiI"), [(4000, 2400, 1 << 16)])
+
+    def test_the_half_frame_boundary_preserves_compensation_and_shifts_other_trims(self):
+        for start, expected in ((0, 400), (199, 599), (200, 200), (600, 600),
+                                (601, 1001), (2000, 2400)):
+            with self.subTest(start=start):
+                source = self.broken_mp4(self.root / "broken.mp4", edit_list=(5200, start))
+                header = self.repair(source)
+                self.assertEqual(entries(self.edit_list(header), ">IiI"), [(5200, expected, 1 << 16)])
+
+    def test_variable_frame_rounding_keeps_empty_edits_and_64_bit_segments(self):
+        elst = struct.pack(">II", 1 << 24, 3) + b"".join(struct.pack(">QqI", *row) for row in (
+            (200, -1, 1 << 16), (1 << 35, 40039, 1 << 16), (100, 200000, 1 << 15)))
+        payload = mp4repair._retimed_edit_list(elst, 40041, 0,
+                                              mp4repair._half_frame([0, 40040, 80081]))
+
+        self.assertEqual(entries(payload, ">QqI"), [
+            (200, -1, 1 << 16), (1 << 35, 40039, 1 << 16), (100, 240041, 1 << 15)])
 
     def test_a_file_without_an_edit_list_gets_one_that_starts_at_the_shift(self):
         source = self.broken_mp4(self.root / "broken.mp4")
@@ -123,14 +175,7 @@ class Mp4HeaderRepairTests(unittest.TestCase):
         self.assertEqual(entries(self.edit_list(header), ">IiI"), [(5200, 400, 1 << 16)])
 
     def edit_list(self, header: RepairedHeader) -> bytes:
-        moov = moov_of(header.prefix)
-        trak = _find(moov, 0, len(moov), b"trak")
-        assert trak is not None
-        edts = _find(moov, *trak, b"edts")
-        assert edts is not None
-        elst = _find(moov, *edts, b"elst")
-        assert elst is not None
-        return moov[elst[0]:elst[1]]
+        return edit_list_of(header)
 
     def test_a_file_that_already_has_composition_offsets_is_refused(self):
         source = self.broken_mp4(self.root / "fine.mp4", composition_offsets=True)
@@ -183,6 +228,57 @@ class SidecarTests(unittest.TestCase):
 
     def test_a_missing_sidecar_reads_as_missing(self):
         self.assertIsNone(read_sidecar(self.root / "nothing.mp4hdr"))
+
+    def test_legacy_rounding_is_corrected_without_reading_or_decoding_the_source(self):
+        for version in (0, 1):
+            with self.subTest(version=version):
+                path = self.root / "legacy.mp4hdr"
+                old = legacy_sidecar(path, [(200, -1, 1 << 16), (5200, 798, 1 << 16),
+                                            (4000, 2400, 1 << 15)], version=version)
+                original = path.read_bytes()
+                path.with_suffix(".mp4").unlink()
+                with patch.object(mp4repair, "repaired_header", side_effect=AssertionError("不重新解码")):
+                    header = read_sidecar(path)
+                self.assertIsNotNone(header)
+                self.assertEqual(entries(edit_list_of(header), ">QqI" if version else ">IiI"), [
+                    (200, -1, 1 << 16), (5200, 398, 1 << 16), (4000, 2400, 1 << 15)])
+                self.assertEqual((header.payload_start, header.payload_end, header.suffix),
+                                 (old.payload_start, old.payload_end, old.suffix))
+                self.assertEqual(len(header.prefix), len(old.prefix))
+                self.assertEqual(table(moov_of(header.prefix), b"stco"), table(moov_of(old.prefix), b"stco"))
+                self.assertEqual(table(moov_of(header.prefix), b"ctts"), table(moov_of(old.prefix), b"ctts"))
+                self.assertEqual(path.read_bytes(), original)
+                self.assertEqual(read_sidecar(path), header)
+
+    def test_unaffected_legacy_compensation_and_trims_are_reused_byte_for_byte(self):
+        for start in (400, 599, 1001, 2400):
+            with self.subTest(start=start):
+                path = self.root / "legacy.mp4hdr"
+                old = legacy_sidecar(path, [(5200, start, 1 << 16)])
+                self.assertEqual(read_sidecar(path), old)
+
+    def test_legacy_correction_uses_the_same_inclusive_half_frame_boundary(self):
+        for stored, expected in ((600, 200), (798, 398), (802, 402), (1000, 600)):
+            with self.subTest(stored=stored):
+                path = self.root / "legacy.mp4hdr"
+                legacy_sidecar(path, [(5200, stored, 1 << 16)])
+                self.assertEqual(entries(edit_list_of(read_sidecar(path)), ">IiI"),
+                                 [(5200, expected, 1 << 16)])
+
+    def test_new_headers_close_to_twice_the_shift_are_not_legacy_adjusted(self):
+        path = self.root / "current.mp4hdr"
+        header = legacy_sidecar(path, [(5200, 900, 1 << 16)])
+        write_sidecar(path, header)
+
+        self.assertEqual(read_sidecar(path), header)
+        self.assertTrue(path.read_bytes().startswith(b"PEACHMP4\x02"))
+
+    def test_legacy_headers_with_incomplete_time_tables_read_as_missing(self):
+        path = self.root / "invalid.mp4hdr"
+        header = RepairedHeader(b"head", 8, 64)
+        path.write_bytes(b"PEACHMP4\x01" + struct.pack(">QQQQ", 4, 0, 8, 64) + header.prefix)
+
+        self.assertIsNone(read_sidecar(path))
 
 
 class HeaderRepairStoreTests(unittest.TestCase):
@@ -255,6 +351,23 @@ class HeaderRepairStoreTests(unittest.TestCase):
 
         with patch.object(mp4repair, "repaired_header", _never_called):
             self.assertFalse(self.store.repair_now(6297, self.source))
+
+    def test_an_unreadable_existing_sidecar_can_be_rebuilt(self):
+        self.sidecar().parent.mkdir(parents=True)
+        self.sidecar().write_bytes(b"PEACHMP4\x01truncated")
+
+        with patch.object(mp4repair, "repaired_header", return_value=self.header) as build:
+            self.assertTrue(self.store.repair_now(6297, self.source))
+            build.assert_called_once()
+        self.assertEqual(self.store.lookup(6297, self.source), self.header)
+
+    def test_a_legacy_rounding_header_is_reused_without_a_second_probe(self):
+        legacy_sidecar(self.sidecar(), [(5200, 798, 1 << 16)])
+
+        with patch.object(mp4repair, "repaired_header", side_effect=AssertionError("不重新解码")):
+            self.assertFalse(self.store.repair_now(6297, self.source))
+            header = self.store.lookup(6297, self.source)
+        self.assertEqual(entries(edit_list_of(header), ">IiI"), [(5200, 398, 1 << 16)])
 
     def test_a_fresh_header_replaces_the_one_left_by_an_older_copy(self):
         stale = self.store.root / "6297-1-1.mp4hdr"
