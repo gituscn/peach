@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { Locator, Page } from 'playwright-core';
-import { settle } from './harness.ts';
+import { settle, withPageDiagnostics } from './harness.ts';
 
 /** 标题与整组操作共享一行或分行，同组列设置按钮保持在一起。 */
 async function verifyToolbarWrapping(page: Page) {
@@ -61,7 +61,8 @@ export async function verifyTablePreferences(page: Page, table: Locator, label: 
   const initial = await width();
   const handle = header.getByRole('slider');
   await handle.focus(); await handle.press('Enter');
-  await header.locator('.react-aria-ColumnResizer[data-resizing]').waitFor();
+  await withPageDiagnostics(page, `${label}进入键盘列宽调整`,
+    () => header.locator('.react-aria-ColumnResizer[data-resizing]').waitFor());
   await handle.press('ArrowRight'); await handle.press('ArrowRight');
   await page.waitForFunction(({ node, initial }) => node && node.getBoundingClientRect().width > initial,
     { node: await header.elementHandle(), initial }, { timeout: 5000 });

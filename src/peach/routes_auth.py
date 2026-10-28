@@ -110,7 +110,11 @@ def _origin_key(value: str) -> tuple[str, str, int | None] | None:
         port = parsed.port
     except ValueError:
         return None
-    return parsed.scheme.lower(), parsed.hostname.rstrip(".").lower(), port
+    scheme = parsed.scheme.lower()
+    # 浏览器通常省略默认端口，代理或客户端可能显式保留；二者是同一个 origin。
+    if port == {"http": 80, "https": 443}[scheme]:
+        port = None
+    return scheme, parsed.hostname.rstrip(".").lower(), port
 
 
 def _tunnel_origin(request: Request) -> tuple[str, str, int | None] | None:

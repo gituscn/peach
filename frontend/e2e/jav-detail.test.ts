@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import type { Browser } from 'playwright-core';
-import { launch, layout, requiredEnv, settle, VIEWPORTS } from './harness.ts';
+import { launch, layout, requiredEnv, settle, VIEWPORTS, withPageDiagnostics } from './harness.ts';
 import { JAV_DETAIL, mockJavDetail } from './jav-detail-fixture.ts';
 
 describe('库外 JAV 作品详情', () => {
@@ -89,7 +89,9 @@ describe('库外 JAV 作品详情', () => {
       await panel.waitFor({ state: 'detached' });
       await page.keyboard.press('Escape');
       await page.locator('[data-modal-surface]').waitFor({ state: 'detached' });
-      assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');
+      await withPageDiagnostics(page, 'Escape 只关掉里层弹层', async () => {
+        assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');
+      });
       await page.locator('[data-jav-actions]').getByRole('button', { name: '想要', exact: true }).click();
       await page.locator('#toasts [data-sonner-toast]').filter({ hasText: '已加入想要' }).waitFor();
       assert.deepEqual(await hit('#toasts [data-sonner-toast]'), { onTop: true, inStage: true }, '操作回执被详情浮窗盖住');

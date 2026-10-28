@@ -515,6 +515,12 @@ def changed_contents(root: Path, base: str, paths: Iterable[str]) -> dict:
 
 def special_scopes(path: str, kind: str) -> tuple[str, ...] | None:
     """内容类型、共享设施和工作流职责的优先边界。"""
+    if path == 'scripts/test_runner.py' and kind.startswith('registration:'):
+        added = kind.removeprefix('registration:').split(',')
+        if all(scope in SCOPES for scope in added):
+            # tooling 保留登记完整性与证据协议回归，checks 保留选测计划和公共门槛。
+            return tuple(scope for scope in SCOPES if scope in {'checks', 'tooling', *added})
+        return ('full',)
     if kind == "unsafe":
         return ("full",)
     if kind == "prose":
