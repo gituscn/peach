@@ -30,7 +30,7 @@
 | 触发条件 | 技能 |
 | --- | --- |
 | 代码任务、创建或交付工作树、暂存、提交、集成、回收、顶层归置 | `.claude/skills/peach-worktree/SKILL.md` |
-| 代码交付、issue、PR 与关闭 | `.claude/skills/peach-issue-delivery/SKILL.md` |
+| 收集或汇总反馈、代码交付、issue、PR 与关闭 | `.claude/skills/peach-issue-delivery/SKILL.md` |
 | 迁移、实体合并、真相字段、真实 ledger 写入与删除 | `.claude/skills/peach-ledger-write/SKILL.md` |
 | 界面、API、数据层、契约或用户可见文案的影响面验收 | `.claude/skills/peach-surfaces/SKILL.md` |
 | 长跑批处理、刮削、磁盘、流量、限流与续跑 | `.claude/skills/peach-batch-jobs/SKILL.md` |

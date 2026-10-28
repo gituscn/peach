@@ -5,7 +5,7 @@ description: Peach 代码任务开工，以及创建、提交、集成或回收�
 
 # 工作树与集成交付
 
-最后复核：2026-10-27
+最后复核：2026-10-28
 证据来源：工作树入口、交付门槛、集成与回收事故、用户确认的存量生效判据。
 
 ## 开工与职责
@@ -44,7 +44,8 @@ description: Peach 代码任务开工，以及创建、提交、集成或回收�
 
 - 逐文件暂存后核对 `git diff --cached --name-status` 与任务边界，不使用目录、glob、`git add .` 或 `git add -A`。实现与对应测试原子提交。
 - 主题为 `type(scope): 中文描述`，类型以 `scripts/commit_subject.py` 为准。
-- 每个交付提交带 `Co-Authored-By: 工具 (实际模型版本) <厂商 noreply>`，名单见 `scripts/co_author.py`；接力作者并列，人类共同作者保留姓名与邮箱。
+- 本机提交者自己的交付提交带 `Co-Authored-By: 工具 (实际模型版本) <厂商 noreply>`，名单见 `scripts/co_author.py`；接力作者并列，人类共同作者保留姓名与邮箱。
+- 采纳社区补丁时保留原作者为提交作者，写 `Source-PR`、`Original-Commit`，不替贡献者补 AI 署名；只有智能体改写或补充了代码时，才加它自己的署名。
 - 最后提交写唯一 `README-Impact`，需要时带 `README-Reviewed`，按 `docs/README_MAINTENANCE.md` 核对中英文。所有 trailer 连续放末尾同一块，块内无空行，块前空一行。
 
 ## 回收与顶层归置
