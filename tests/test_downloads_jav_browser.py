@@ -125,6 +125,34 @@ class BrowserTests(unittest.TestCase):
         self.assertEqual(self.service.rows, {})
         self.service.search.assert_not_called()
 
+    def test_people_matches_detail_page_performers_for_a_title_outside_the_library(self):
+        from PIL import Image
+        from peach.entities import upsert_asset_entity
+        contract = self.app.state.web_contract
+        contract.avatar_root = self.root / 'avatars'
+        contract.cover_root = self.root / 'covers'
+        self.app.state.preview_service.avatar_root = contract.avatar_root
+        with contract.database.write_transaction() as connection:
+            asset_id = connection.execute(
+                'INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,?,?,?)',
+                ('R:\\Media\\ABC-123.mp4', 'ABC-123.mp4', 'local', 'video', 'ABC-123')).lastrowid
+            person = upsert_asset_entity(connection, asset_id=asset_id, kind='performer', name='河北彩花',
+                                         role='performer', source='user:test')
+        contract.avatar_root.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', (80, 80), 'gray').save(contract.avatar_root / f'performer-{person}.img', format='JPEG')
+        response = self.client.get('/api/jav-browser/people', headers=self.script_headers, params={
+            'codes': 'XYZ-999', 'performers': ['河北彩花（河北彩伽）', '未登记女优♀', '男优♂']})
+        self.assertEqual(response.status_code, 200, response.text)
+        people = response.json()['items']['XYZ-999']
+        self.assertEqual([(row['id'], row['name']) for row in people], [(person, '河北彩花'), (None, '未登记女优')])
+        self.assertTrue(people[0]['avatar'].startswith('data:image/jpeg;base64,'))
+        for params in ({'codes': 'ABC-123,XYZ-999', 'performers': ['河北彩花']},
+                       {'codes': 'XYZ-999', 'performers': ['女优'] * 11},
+                       {'codes': 'XYZ-999', 'performers': ['长' * 61]}):
+            self.assertEqual(self.client.get('/api/jav-browser/people', params=params,
+                                             headers=self.script_headers).status_code, 400)
+        self.assertEqual(self.service.rows, {})
+
     def test_people_rejects_unpaired_or_invalid_queries_and_leaves_missing_avatar_empty(self):
         self.assertEqual(self.client.get('/api/jav-browser/people', params={'codes':'ABC-123'}).status_code, 401)
         for codes in ('bad code', ','.join(['ABC-123']*51)):
@@ -197,12 +225,39 @@ class BrowserTests(unittest.TestCase):
         self.service.process_one()
         self.assertEqual(self.service.search.call_count, 2)
 
+    def test_magnet_failure_can_switch_to_the_next_magnet_until_none_are_left(self):
+        other_hash = "b" * 40
+        other = f"magnet:?xt=urn:btih:{other_hash}&dn=ABC-123"
+        self.service.search.return_value = {"items": [{"name": "ABC-123 1080p", "uri": MAGNET},
+                                                      {"name": "ABC-123 720p", "uri": other}]}
+        self.remote.submit.side_effect = dl.DownloadError("no_source", "没有可用下载源")
+        self.add()
+        self.service.process_one()
+        failed = self.status().json()
+        self.assertEqual((failed["state"], failed["failure"], failed["cause"]), ("failed", "no_source", "magnet"))
+        self.assertEqual(self.add(switch="yes").status_code, 400)
+        self.remote.submit.side_effect = None
+        self.assertEqual(self.add(switch=True).json()["state"], "queued")
+        self.service.process_one()
+        switched = self.status().json()
+        self.assertEqual(switched["state"], "submitted")
+        self.assertNotEqual(switched["task_id"], failed["task_id"])
+        self.assertEqual(self.downloads.store.get(switched["task_id"]).info_hash, other_hash)
+        task = self.downloads.store.get(switched["task_id"])
+        task.state, task.failure = dl.FAILED, "invalid_link"
+        self.downloads.store.save(task)
+        self.assertEqual(self.add(switch=True).json()["state"], "queued")
+        self.service.process_one()
+        exhausted = self.status().json()
+        self.assertEqual((exhausted["state"], exhausted["message"]), ("no_match", "没有其他可用磁力，可在 Peach 手动选择资源"))
+
     def test_cloud_failure_is_visible_and_a_manual_retry_uses_existing_task(self):
         self.remote.submit.side_effect = dl.DownloadError("config", "请更新网盘账号")
         self.add()
         self.service.process_one()
         failed = self.status().json()
         self.assertEqual(failed["state"], "failed")
+        self.assertEqual((failed["failure"], failed["cause"]), ("config", "cloud"))
         self.assertEqual(failed["message"], "请更新网盘账号")
         self.remote.submit.side_effect = None
         self.add()

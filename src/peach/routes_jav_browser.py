@@ -1,7 +1,7 @@
 """JAV 用户脚本的专用权限端点与本机配对设置。"""
 import json
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from .config import PROJECT_ROOT
@@ -52,10 +52,10 @@ def updates(request: Request, service=Depends(browser_client)):
     return JSONResponse(snapshot(request.app.state.automatic_updates), headers={'Cache-Control': 'no-store'})
 
 
-def people(request: Request, codes: str, service=Depends(browser_client)):
+def people(request: Request, codes: str, performers: list[str] = Query(default=[]), service=Depends(browser_client)):
     from .web_jav_browser_people import cached_people
     try:
-        result = cached_people(service.contract, request.app.state.preview_service, codes)
+        result = cached_people(service.contract, request.app.state.preview_service, codes, performers)
         return JSONResponse(result, headers={'Cache-Control': 'no-store'})
     except ValueError as error:
         raise HTTPException(400, str(error)) from None
