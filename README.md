@@ -84,8 +84,6 @@ Thanks to [amane](https://github.com/sqzw-x/amane), [Gfriends](https://github.co
   </picture>
 </a>
 
-Generated with [Star Chart](https://github.com/leereilly/star-chart) (MIT).
-
 ## License
 
 [AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors. Third-party components retain their own licenses.

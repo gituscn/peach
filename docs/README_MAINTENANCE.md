@@ -118,4 +118,4 @@ SHA-256 对不上是硬错误，不降级放行。
 - **演示素材**：README 里任何截图或视频都按上面「演示数据集」一节的边界取图，换素材时重新核对
   那几条边界。
 - **篇幅取舍（2026-10-27）**：参考 amane 的一行一功能与安装入口，以及 SakuraMedia 的主图与折叠截图。README 保留六条特色、安装表、文档导航和必要限制；参数、缓存、任务恢复、诊断与升级细节由专题文档承载。当前原文版本见 `docs/reference-sources.json`，不复制外部文案或使用条款。
-- **截图与 Star 历史（2026-10-27）**：五张电影演示库截图保留，首页主图直接展示，其余四张折叠；WebP 均链接 PNG 原图。Star History 使用 MIT 许可的 Star Chart，采用蜜桃色 `neon-glow-stream`、线性绝对值坐标和深浅主题。独立 GitHub Actions 每日生成 SVG，仅写入 `star-history` 分支，README 不承诺即时刷新；渲染器版本和许可见 [复用记录](REUSE.md)。
+- **截图与 Star 历史（2026-10-27）**：五张电影演示库截图保留，首页主图直接展示，其余四张折叠；WebP 均链接 PNG 原图。Star History 由 `scripts/render_star_history.py` 按逐日记录生成，横轴从第一个 Star 开始，采用蜜桃色霓虹描边、线性绝对值坐标和深浅主题（2026-10-28 起取代 Star Chart 的周粒度图）。独立 GitHub Actions 每日生成 SVG，仅写入 `star-history` 分支，README 不承诺即时刷新；取数与取舍见 [复用记录](REUSE.md)。

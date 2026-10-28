@@ -84,8 +84,6 @@
   </picture>
 </a>
 
-图表由 [Star Chart](https://github.com/leereilly/star-chart) 生成，采用 MIT 许可。
-
 ## 许可证
 
 [AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors。第三方组件保留各自的许可证。
