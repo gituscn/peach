@@ -1,6 +1,6 @@
 # 名称与标识
 
-The Peach source code is licensed under AGPL-3.0-or-later; that license covers copyright in the code and grants no rights to the Peach name or logo. This policy covers the name and logo only and does not narrow what the AGPL lets you do with the code. You may redistribute unmodified Peach under its name, and refer to Peach by name in articles, reviews and tutorials. A modified version that you distribute or offer as a network service must use its own name and icon; it may say it is "based on Peach" or "a fork of Peach" but must not suggest that the Peach maintainers made, endorse or sponsor it. Do not use the Peach name, logo, repository or website in advertising, affiliate links or paid recommendations. "Peach" is not a registered trademark. Ask in a GitHub issue when unsure. The rest of this document is in Chinese.
+The Peach source code is licensed under AGPL-3.0-or-later; that license covers copyright in the code and grants no rights to the Peach name or logo. This policy covers the name and logo only and does not narrow what the AGPL lets you do with the code. You may redistribute unmodified Peach under its name, and refer to Peach by name in articles, reviews and tutorials. A modified version that you distribute or offer as a network service must use its own name and icon; it may say it is "based on Peach" or "a fork of Peach" but must not suggest that the Peach project made, endorses or sponsors it. Do not use the Peach name, logo, repository or website in advertising, affiliate links or paid recommendations. The owners of the Peach organization on GitHub (`peach-mitao`) manage the name and logo; contributors keep copyright in their contributions but gain no rights to the name or logo. "Peach" is not a registered trademark. Ask in a GitHub issue when unsure. The rest of this document is in Chinese.
 
 ## 适用范围
 
@@ -10,7 +10,7 @@ The Peach source code is licensed under AGPL-3.0-or-later; that license covers c
 - 桃子图标，包括 `resources/` 下的 `peach-logo*.png`、`peach.ico`、`peach.icns`，以及应用界面和官网上的同一图形；
 - GitHub 组织 Peach 的账号名 `peach-mitao` 与域名 `peach.video`。
 
-标识由 GitHub 组织 [Peach](https://github.com/peach-mitao)（账号 `peach-mitao`）的维护者管理。「Peach」目前未注册商标。
+标识由 GitHub 组织 [Peach](https://github.com/peach-mitao)（账号 `peach-mitao`）的所有者管理，并代表 Peach 项目解释本政策。「Peach」目前未注册商标。贡献代码的人对自己的贡献保留版权，但不因此取得名称和标识的权利。
 
 ## 与源码许可证的关系
 
@@ -30,7 +30,7 @@ The Peach source code is licensed under AGPL-3.0-or-later; that license covers c
 修改功能、界面或默认行为后对外分发，或作为网络服务提供给他人使用时：
 
 - 使用自己的名称和图标，名称中不含「Peach」，也不使用容易混淆的写法；
-- 不暗示由 Peach 维护者发布、认可或赞助，例如不写「Peach 官方版」「Peach 推荐」；
+- 不暗示由 Peach 项目发布、认可或赞助，例如不写「Peach 官方版」「Peach 推荐」；
 - 更新检查、下载链接和问题反馈指向自己的仓库，不让使用者把衍生版本的问题报到 Peach。
 
 ## 推广与商业使用
@@ -42,6 +42,6 @@ The Peach source code is licensed under AGPL-3.0-or-later; that license covers c
 
 拿不准的用法，在[官方仓库](https://github.com/peach-mitao/peach/issues)开 issue 询问。发现冒用时也可以在 issue 中报告，附上链接。
 
-维护者可以要求不符合本政策的项目改名或移除标识，必要时通过托管平台的投诉渠道处理。
+组织所有者可以要求不符合本政策的项目改名或移除标识。
 
 本政策自 2026-10-28 起适用。
