@@ -20,6 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # 渲染器只有周粒度数据；列数多于整周数时出现空列，整条线会退成阶梯。
+      - name: 按仓库整周数取列数
+        id: columns
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          created=$(gh api "repos/${{ github.repository }}" --jq .created_at)
+          weeks=$(( ($(date -u +%s) - $(date -u -d "$created" +%s)) / 604800 ))
+          echo "value=$(( weeks < 1 ? 1 : (weeks > 52 ? 52 : weeks) ))" >> "$GITHUB_OUTPUT"
       - name: 生成蜜桃色绝对值图表
         uses: leereilly/star-chart@e7fa78bdf8f78da6c3feeb3a97b528fd97d62727 # v0.3
         with:
@@ -29,6 +39,7 @@ jobs:
           dual_theme: 'true'
           scale: absolute
           period: all
+          columns: ${{ steps.columns.outputs.value }}
           width: '900'
           animation: none
           level_1_color: '#ffded4'

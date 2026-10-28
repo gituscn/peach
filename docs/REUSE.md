@@ -18,6 +18,8 @@ YuNet 与 SFace 沿用既有模型哈希校验，Python 读取模型字节后交
 
 复用 [Star Chart](https://github.com/leereilly/star-chart) 的稳定版 v0.3，固定提交 `e7fa78bdf8f78da6c3feeb3a97b528fd97d62727`，MIT，版权为 Lee Reilly。使用 `neon-glow-stream` 霓虹流图、线性绝对值坐标、浅深双主题与蜜桃粉橙配色；不新增应用运行依赖。数据来自 GitHub 原生公开 Star 历史，不补造缺失记录，也不把历史累计增加数当作完整取消 Star 的净变化账本。
 
+渲染器只按周累计，不读取逐日计数。全时段图按创建至今等分列，列数多于整周数时会出现无观测列，渲染器随之把整条线改画成阶梯。工作流因此按仓库整周数取列数，上限为默认的 52 列；每列至少跨一周，渲染器会用平滑曲线连接各周的累计值。
+
 独立 `Star History` 工作流生成 SVG 并保留上游许可，只在 `star-history` 分支保存产物，不触发主线测试或阻塞发版。静态 SVG 发布思路参考 SakuraMedia；未复制其受 PolyForm Noncommercial 约束的生成脚本。
 
 ## 复核字段筛选与文本差异
