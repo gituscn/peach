@@ -244,6 +244,28 @@ it('跑完那一轮显示摘要，失败那一轮显示原因', async () => {
   expect(host.querySelector('[data-status=succeeded] ul')).toBeNull();
 });
 
+it('做完的几批派发并成一张卡，摘要说一共处理了几项、失败几项，失败的明细排在前面', async () => {
+  const batch = (id: number, minute: number) => run({
+    id, task_key: 'upgrade-repairs', task_label: '自动修复', trigger: 'scheduled', status: 'succeeded',
+    progress_total: null, finished_at: `2026-10-28T08:${minute}:00Z`, result_summary: { outcome: '已安排 64 项处理' } });
+  const child = (id: number, parent: number, status: string) => followup(parent, {
+    id, task_key: 'upgrade-library', task_label: '自动修复资料', status,
+    result_summary: { outcome: '影片升级补全完成', name: `ABC-${id}` }, followup_key: `upgrade-library:x:${id}` });
+  const { host } = await open(payload({
+    finished: [batch(3, 43), batch(2, 42), batch(1, 41), child(31, 3, 'succeeded'), child(21, 2, 'failed'), child(11, 1, 'succeeded')],
+    followup_counts: { 1: { succeeded: 64 }, 2: { succeeded: 62, failed: 2 }, 3: { succeeded: 63, failed: 1 } },
+  }));
+  const cards = host.querySelectorAll('[data-task-key=upgrade-repairs]');
+  expect(cards).toHaveLength(1);
+  const card = cards[0]!;
+  expect(card.textContent).toContain('近 3 轮');
+  expect(card.querySelector('span')?.textContent).toBe('发现问题');
+  expect([...card.querySelectorAll(':scope > div:first-child ul > li')].map((node) => node.textContent))
+    .toEqual(['共处理 192 项', '其中 3 项失败']);
+  expect(card.querySelector('summary')?.textContent).toBe('任务明细 · 192 项');
+  expect(card.querySelector('[data-followup-key]')?.getAttribute('data-status')).toBe('failed');
+});
+
 it('派出几十条后继的几批合成一张进行中的卡，进度按计数，正在跑的排最前，排队的不给空的技术详情', async () => {
   const parent = (id: number, finished_at: string) => run({
     id, task_key: 'upgrade-repairs', task_label: '自动修复', trigger: 'scheduled', status: 'succeeded',

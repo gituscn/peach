@@ -42,6 +42,8 @@ import {
 
 /** 一张卡里最多列多少条后继。几批合成一张卡时会有上千条，全画出来一屏都是同一句。 */
 const FOLLOWUP_ROWS = 50;
+/** 自己只负责派发后继的任务：一轮只是「安排了几项」，要看的是那几项的结果。 */
+const DISPATCHERS = new Set(['upgrade-repairs']);
 
 /* 完成绿、失败红、进行中蓝、意外中断黄，主动取消和排队为中性。 */
 const BADGE_COLORS: Record<string, 'lime' | 'rose' | 'yellow' | 'blue' | 'neutral'> = {
@@ -102,7 +104,8 @@ function RunCard(
 ) {
   /* 一轮派出上千条后继时只下发最近几十条，合并的几批又可能各带几十条：标题写全数，
      列表先列在跑与排队的、再列最近结束的，最多 `FOLLOWUP_ROWS` 条，并说清只列了其中几条。 */
-  const rank = (row: TaskRunPayload) => (row.status === 'running' ? 2 : row.status === 'pending' ? 1 : 0);
+  const rank = (row: TaskRunPayload) => (row.status === 'running' ? 3 : row.status === 'pending' ? 2
+    : row.status === 'failed' || row.status === 'interrupted' ? 1 : 0);
   const listed = followups ? [...followups].sort((a, b) =>
     rank(b) - rank(a) || b.id - a.id).slice(0, FOLLOWUP_ROWS) : [];
   const shown = listed.length;
@@ -173,11 +176,17 @@ function RunningRun({ run, followups }: { run: TaskRunPayload; followups?: TaskR
  *  任务卡只记这一轮的历史：此刻还没解决的问题和「立即重试」在页顶「需要处理」那一块。
  *  `latest` 说它是不是同一种任务最新的那一轮：有些任务只有那一轮还有处理入口。 */
 function SettledRun(
-  { run, followups, runs, latest, followupTotal }:
+  { run, followups, runs, latest, followupTotal, followupFailed = 0 }:
   { run: TaskRunPayload; followups?: TaskRunPayload[]; runs?: TaskRunPayload[]; latest: boolean;
-    followupTotal?: number },
+    followupTotal?: number; followupFailed?: number },
 ) {
-  const summary = summaryItems(run.result_summary).filter((line) => line !== run.error);
+  /* 几批派发并成一张时，最新那一批的「已安排 64 项」说不清整件事：改说一共处理了几项、失败几项，
+     有失败时徽章写发现问题，失败的那几条在任务明细里排在前面。 */
+  const batches = Boolean(runs && runs.length > 1 && followupTotal);
+  const summary = batches
+    ? [`共处理 ${followupTotal!.toLocaleString()} 项`, followupFailed ? `其中 ${followupFailed.toLocaleString()} 项失败` : '']
+        .filter(Boolean)
+    : summaryItems(run.result_summary).filter((line) => line !== run.error);
   const issues = taskIssues(run);
   const destination = problemDestination(run, latest);
   const elapsed = elapsedText(run.elapsed_seconds);
@@ -188,7 +197,8 @@ function SettledRun(
     : [TRIGGER_LABELS[run.trigger] || run.trigger, momentText(run.finished_at),
        elapsed && `用时 ${elapsed}`]).filter(Boolean).join(' · ');
   return (
-    <RunCard run={run} meta={meta} footer={run.error} followups={followups} followupTotal={followupTotal}>
+    <RunCard run={run} meta={meta} footer={run.error} followups={followups} followupTotal={followupTotal}
+      badge={batches && followupFailed ? <Chip color="yellow">发现问题</Chip> : undefined}>
       {/* 只有一句摘要时不加项目符号：单独一个圆点读起来像漏了下文。 */}
       {summary.length === 1
         ? <p className="text-caption-1-regular text-text-secondary wrap-anywhere">{summary[0]}</p>
@@ -321,13 +331,15 @@ export function ActivityPage() {
   const finished = settled.filter((run) => !working.includes(run)
     && !skipped.some((row) => row.id === run.id));
   // 每小时一轮的定时检查什么也没发生时一条条摆出来，一页就被同一句「已检查 83」占满。
-  // 派了后继的那一轮，后继全部顺利做完才算例行，有一条失败就单独摆出来。
+  // 派了后继的那一轮，后继全部顺利做完才算例行，有一条失败就单独摆出来。只负责派发的那种
+  // （自动修复每分钟一批）例外：同一件事的几批照样并成一张，失败数写在卡上。
   const quietChildren = (run: TaskRunPayload) => {
     const children = byParent.get(run.id) || [];
     return children.every((row) => row.status === 'succeeded' && !hasResultProblems(row))
       && followupTally(counts, [run]).failed === 0;
   };
-  const folds = foldRoutine(finished, (run) => isRoutine(run) && quietChildren(run));
+  const folds = foldRoutine(finished, (run) => isRoutine(run)
+    && (quietChildren(run) || DISPATCHERS.has(run.task_key)));
   const newest = latestOfKind(allRuns);
   const quiet = !running.length && !working.length && !skipped.length && !finished.length;
   return (
@@ -364,9 +376,11 @@ export function ActivityPage() {
             {finished.length || hasEarlier
               ? <Section title="最近完成">
                   {finished.length
-                    ? <RunList>{folds.map(({ run, runs }) => (
-                        <SettledRun key={run.id} run={run} runs={runs} latest={newest.has(run.id)}
-                          followups={childrenOf(runs)} followupTotal={followupTally(counts, runs).total} />))}</RunList>
+                    ? <RunList>{folds.map(({ run, runs }) => {
+                        const tally = followupTally(counts, runs);
+                        return <SettledRun key={run.id} run={run} runs={runs} latest={newest.has(run.id)}
+                          followups={childrenOf(runs)} followupTotal={tally.total} followupFailed={tally.failed} />;
+                      })}</RunList>
                     : null}
                   {more.error ? <Note tone="error">{errorMessage(more.error)}</Note> : null}
                   {hasEarlier
