@@ -17,6 +17,8 @@ import { busyProps, useAction } from './use-action';
 const ACTIVE = new Set(['downloading', 'verifying', 'extracting', 'preparing', 'restarting', 'installing']);
 const STOPS = [65, 75, 90];
 const MAX_FAILURES = 120;
+/** 服务端没给发布页时的去处；检查到新版本后服务端给的是那一版自己的发布页。 */
+const RELEASES_URL = 'https://github.com/peach-mitao/peach/releases';
 
 export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState; initialJob?: UpdateJob | undefined }) {
   const [data, setData] = useState(initial);
@@ -120,11 +122,8 @@ export function ReleaseUpdates({ initial, initialJob }: { initial: ReleaseState;
       </Stack>}
       <Footer status={<div className="flex flex-wrap items-center gap-3">
         <ExternalLink href="https://peach.video/#download">官网</ExternalLink>
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <ExternalLink href="https://github.com/peach-mitao/peach">GitHub</ExternalLink>
-          <StatusLabel>暂无法更新</StatusLabel>
-        </span>
-        <ExternalLink href="https://gitgud.io/peach-mitao/peach/-/releases">查看发布页</ExternalLink>
+        <ExternalLink href="https://github.com/peach-mitao/peach">GitHub</ExternalLink>
+        <ExternalLink href={data.release_url || RELEASES_URL}>查看发布页</ExternalLink>
       </div>}>
         <Button variant={job.state === 'ready' || (data.state === 'available' && data.installation === '独立测试包') ? 'secondary' : 'primary'}
           disabled={running} onClick={check} {...busyProps(action.busy === 'check')}>检查更新</Button>

@@ -43,12 +43,44 @@ export interface ActivityData {
   finished: TaskRunPayload[];
   /** 「最近完成」这一页后面还有更早的。 */
   finished_has_more?: boolean;
+  /** 自己已结束、后继还在排或在跑的父任务里，不在 `running` 与 `finished` 这一页上的那些。 */
+  working_parents?: TaskRunPayload[];
+  /** 父任务 id → 它直接派出的后继按状态各几条。下发的后继只是一部分，进度与「还在不在跑」看这份。 */
+  followup_counts?: FollowupCounts;
 }
+
+export type FollowupCounts = Record<string, Record<string, number>>;
 
 /** 往前翻的一页：只有「最近完成」，在跑与被挡下的由轮询那一份负责。 */
 export interface FinishedPage {
   finished: TaskRunPayload[];
   finished_has_more: boolean;
+  followup_counts?: FollowupCounts;
+}
+
+/** 几轮派出的后继合在一起数：共几条、结束了几条、还有几条在排或在跑。 */
+export function followupTally(counts: FollowupCounts | undefined, runs: TaskRunPayload[]) {
+  let total = 0, active = 0, failed = 0;
+  for (const run of runs) {
+    for (const [status, count] of Object.entries(counts?.[String(run.id)] || {})) {
+      total += count;
+      if (status === 'pending' || status === 'running') active += count;
+      if (status === 'failed' || status === 'interrupted') failed += count;
+    }
+  }
+  return { total, active, failed, settled: total - active };
+}
+
+/** 同一种任务连着派出的几轮合成一件事：自动修复每分钟派一批，一屏十几张「已完成」卡说的是同一件事。
+ *  每组按最新那一轮排在前面，`runs[0]` 是最新那一轮。 */
+export function foldByKind(rows: TaskRunPayload[]): RunFold[] {
+  const folds = new Map<string, RunFold>();
+  for (const run of rows) {
+    const fold = folds.get(run.task_key);
+    if (fold) fold.runs.push(run);
+    else folds.set(run.task_key, { run, runs: [run] });
+  }
+  return [...folds.values()];
 }
 
 /** 以 `oldest` 为游标取它之前的一页。游标是它的结束时刻加 id，与服务端的排序键一致。 */

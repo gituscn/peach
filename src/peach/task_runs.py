@@ -729,11 +729,16 @@ class TaskRunStore:
         一页数的是顶层那几轮，它们已结束的后继跟着一起回来：一轮拉取派出二十条后继时，
         按行数翻页会让后继占满这一页、把派出它们的那一轮挤到下一页，页面上就只剩一串
         没有父卡片可挂的散行。父行已被 `prune` 掉的后继自己算顶层。
+
+        后继还在排或在跑的那几轮不算「完成」，由 `active_parents` 单独交给「正在进行」：
+        自动修复每分钟派一批，它们留在这里会占满第一页，「最近完成」就只剩一个「加载更早」。
         """
         size = max(1, min(int(limit), 500))
         marks = ",".join(f"'{name}'" for name in TERMINAL_STATUSES)
+        active = ",".join(f"'{name}'" for name in ACTIVE_STATUSES)
         where = (f"t.status IN ({marks}) AND (t.parent_run_id IS NULL OR NOT EXISTS "
-                 "(SELECT 1 FROM task_run p WHERE p.id=t.parent_run_id))")
+                 "(SELECT 1 FROM task_run p WHERE p.id=t.parent_run_id)) AND NOT EXISTS "
+                 f"(SELECT 1 FROM task_run c WHERE c.parent_run_id=t.id AND c.status IN ({active}))")
         values: list[object] = []
         if before is not None:
             where += " AND (t.finished_at<? OR (t.finished_at=? AND t.id<?))"
@@ -759,6 +764,38 @@ class TaskRunStore:
                 f"AND id NOT IN ({holes}) AND status IN ({marks}) ORDER BY id",
                 [*ids, *ids]).fetchall()
         return [_row(row) for row in rows]
+
+    def active_parents(self) -> list[TaskRun]:
+        """自己已经结束、派出的后继还有在排或在跑的那几轮，新的在前。"""
+        if not self.enabled:
+            return []
+        marks = ",".join(f"'{name}'" for name in ACTIVE_STATUSES)
+        with self.database.read_connection() as connection:
+            rows = connection.execute(
+                f"SELECT {_COLUMNS} FROM task_run WHERE id IN (SELECT DISTINCT parent_run_id FROM task_run "
+                f"WHERE status IN ({marks}) AND parent_run_id IS NOT NULL) AND status NOT IN ({marks}) "
+                "ORDER BY id DESC").fetchall()
+        return [_row(row) for row in rows]
+
+    def followup_counts(self, parent_ids) -> dict[int, dict[str, int]]:
+        """这几轮直接派出的后继按状态各有几条。
+
+        活动页只取得到最近几十条后继，一轮派出上千条时，父任务还算不算在进行、
+        做到第几条，要靠这份计数回答，不能数页面上那几行。
+        """
+        ids = sorted({int(run_id) for run_id in parent_ids})
+        if not self.enabled or not ids:
+            return {}
+        counts: dict[int, dict[str, int]] = {}
+        with self.database.read_connection() as connection:
+            for offset in range(0, len(ids), 900):
+                batch = ids[offset:offset + 900]
+                for parent, status, count in connection.execute(
+                        f"SELECT parent_run_id, status, count(*) FROM task_run "
+                        f"WHERE parent_run_id IN ({','.join('?' * len(batch))}) GROUP BY parent_run_id, status",
+                        batch):
+                    counts.setdefault(int(parent), {})[str(status)] = int(count)
+        return counts
 
     # -- 调用方的便利入口 --------------------------------------------------
 

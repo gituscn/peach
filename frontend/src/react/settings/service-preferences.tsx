@@ -19,7 +19,7 @@ import {
   fetchFollowSchedule, fetchSettings, fetchThumbnailJobs, schedulePollInterval, useRunSchedule,
   useSaveFollowSchedule, useSaveSettings, useSaveThumbnailMode, type FollowScheduleStatus,
 } from '../settings-panel/settings-data';
-import { ErrorText, Help, Rows, Section, Stack } from './section';
+import { ErrorText, Help, Rows, Section, Stack, TaskCenterLink } from './section';
 import { busyProps } from './use-action';
 
 const THUMBNAIL_OPTIONS = [['off', '关闭'], ['precise', '每 10 秒一张'], ['coarse', '每 30 秒一张']] as const;
@@ -49,7 +49,10 @@ export function VideoThumbnailControls({ epoch = 0, disabled = false }: { epoch?
         </SettingsRow>
       </Rows>
       {save.isPending || data?.status === 'running'
-        ? <Stack divided><Help role="status">{save.isPending ? '正在保存…' : '正在采集，进度在活动页查看。'}</Help></Stack>
+        ? <Stack divided>
+            <Help role="status">{save.isPending ? '正在保存…' : '正在采集。'}</Help>
+            {save.isPending ? null : <TaskCenterLink />}
+          </Stack>
         : null}
       {error ? <Stack divided><ErrorText>{errorMessage(error)}</ErrorText></Stack> : null}
     </>

@@ -64,9 +64,23 @@ class DataStorageTests(unittest.TestCase):
         write(self.data / "logs" / "tray.log", 4)
         write(self.data / "logs" / "tray.until-20260101.log", 6)
         write(self.data / "logs" / "crash-123.log", 2)
+        write(self.data / "state" / "job-recovery" / "scan.json", 11)
+        write(self.data / "review" / "names.csv", 12)
+        write(self.data / "archive" / "old.csv", 13)
+        write(self.data / "tools" / "ffmpeg" / "ffmpeg.exe", 14)
+        write(self.data / "secrets" / "auth-token", 15)
+        reports = []
 
-        usage = data_storage.measure(self.config())
+        with patch.object(data_storage, "REPORT_INTERVAL", 0):
+            usage = data_storage.measure(self.config(), report=lambda files, size: reports.append((files, size)))
         groups = usage["categories"]
+
+        self.assertEqual(groups["records"], {"bytes": 36, "files": 3, "reclaimable": 0})
+        self.assertEqual(groups["tools"]["bytes"], 14)
+        self.assertEqual(groups["accounts"]["bytes"], 15)
+        self.assertTrue(reports)
+        self.assertEqual(reports, sorted(reports))
+        self.assertLessEqual(reports[-1][0], usage["total_files"])
 
         self.assertEqual(groups["backups"]["bytes"], 250)
         self.assertEqual(groups["backups"]["reclaimable"], 100)
@@ -254,7 +268,7 @@ class DataStorageTests(unittest.TestCase):
         started = []
         with patch.object(data_storage, "_startup", return_value=None), \
                 patch("peach.windows_restart.process_alive", return_value=False), \
-                patch.object(distribution, "user_data_root", return_value=self.base / "default" / "peach-data"):
+                patch.object(data_storage, "_bootstrap", return_value=self.base / "default" / "peach-data"):
             code = data_storage.apply(request, 1, environ={}, start=lambda exe, env: started.append(env))
 
         self.assertEqual(code, 0)
@@ -269,7 +283,8 @@ class DataStorageTests(unittest.TestCase):
         request = self.request_file(busy)
         started = []
         with patch.object(data_storage, "_startup", return_value=None), \
-                patch("peach.windows_restart.process_alive", return_value=False):
+                patch("peach.windows_restart.process_alive", return_value=False), \
+                patch.object(data_storage, "_bootstrap", return_value=self.base / "default" / "peach-data"):
             code = data_storage.apply(request, 1, environ={}, start=lambda exe, env: started.append(env))
 
         self.assertEqual(code, 1)
@@ -297,11 +312,68 @@ class DataStorageTests(unittest.TestCase):
         written = json.loads((self.data / "state" / data_storage.REQUEST_NAME).read_text(encoding="utf-8"))
         self.assertEqual((written["source"], written["target"]), (str(self.data), str(target)))
 
-    def test_only_the_windows_installation_can_relocate_from_the_settings_page(self):
-        with patch.object(distribution, "standalone", return_value=False):
-            available, message = data_storage.availability(self.config())
+    def availability_with(self, **environ):
+        names = ("PEACH_DISTRIBUTION", "PEACH_TRAY_MANAGED", "PEACH_HEADLESS_MANAGED")
+        clean = {key: value for key, value in os.environ.items() if key not in names}
+        with patch.object(distribution, "standalone", return_value=False), \
+                patch.dict(os.environ, {**clean, **environ}, clear=True):
+            return data_storage.availability(self.config()), data_storage.manual_steps()
+
+    def test_tray_and_headless_services_can_relocate_from_the_settings_page(self):
+        for marker in ("PEACH_TRAY_MANAGED", "PEACH_HEADLESS_MANAGED"):
+            with self.subTest(marker):
+                (available, message), steps = self.availability_with(**{marker: "1"})
+                self.assertEqual((available, message, steps), (True, "", []))
+
+    def test_a_directly_started_service_explains_how_to_relocate(self):
+        (available, message), steps = self.availability_with()
         self.assertFalse(available)
         self.assertIn("PEACH_DATA_ROOT", message)
+        self.assertEqual(steps, [])
+
+    def test_containers_get_host_side_steps_instead_of_a_relocation(self):
+        (available, message), steps = self.availability_with(PEACH_DISTRIBUTION="docker", PEACH_HEADLESS_MANAGED="1")
+        self.assertFalse(available)
+        self.assertIn("宿主机", message)
+        self.assertEqual([step["command"] for step in steps][1:2], ["docker compose down"])
+        self.assertIn("<新文件夹>:/data", steps[-1]["text"])
+
+    def test_relocation_never_redirects_another_live_data_directory(self):
+        make_ledger(self.data / "database" / "ledger.db")
+        other = self.base / "default" / "peach-data"
+        write(other / "config.toml", 0)
+        target = self.base / "new" / "peach-data"
+
+        data_storage.relocate(self.config(), target, bootstrap=other)
+
+        self.assertFalse((other / "state" / settings_file.DATA_ROOT_LOCATION).exists())
+        self.assertEqual((self.data / "state" / settings_file.DATA_ROOT_LOCATION).read_text(encoding="utf-8"),
+                         str(target))
+
+    def test_headless_supervisor_stops_the_service_moves_the_data_and_restarts_there(self):
+        make_ledger(self.data / "database" / "ledger.db")
+        target = self.base / "new" / "peach-data"
+        request = self.request_file(target)
+        stopped, restarted = [], []
+        original = settings_file.load_config
+
+        def load(environ=None):
+            # 看守进程自己读设置时还在原位置；助手读新旧两处时给的是显式环境。
+            return original(environ=environ if environ is not None else {settings_file.DATA_ROOT_ENV: str(self.data)})
+
+        with patch.object(settings_file, "load_config", side_effect=load), \
+                patch.object(data_storage, "_startup", return_value=None), \
+                patch.object(data_storage, "_bootstrap", return_value=self.base / "default" / "peach-data"), \
+                patch("peach.update_tasks.reserve", return_value="token-1"), \
+                patch("peach.update_tasks.wait_quiescent", return_value=True), \
+                patch("peach.update_tasks.release"):
+            handled = data_storage.poll_headless(lambda: stopped.append(True), restarted.append)
+
+        self.assertTrue(handled)
+        self.assertEqual(stopped, [True])
+        self.assertEqual(restarted[0][settings_file.DATA_ROOT_ENV], str(target))
+        self.assertFalse(request.exists())
+        self.assertEqual(data_storage.read_result(self.config(target))["state"], "done")
 
     def tray(self):
         return SimpleNamespace(_action_lock=threading.Lock(), icon=Mock(), exit=Mock())
@@ -318,7 +390,7 @@ class DataStorageTests(unittest.TestCase):
             data_storage.poll(tray)
         return transfer, release
 
-    @unittest.skipUnless(sys.platform == "win32", "迁移只在 Windows 安装版上由托盘接手")
+    @unittest.skipUnless(sys.platform == "win32", "安装版助手的命令按 Windows 的 Peach.exe 写")
     def test_tray_hands_the_request_to_the_helper_and_exits(self):
         target = self.base / "new" / "peach-data"
         request = self.request_file(target)
@@ -337,7 +409,7 @@ class DataStorageTests(unittest.TestCase):
         tray.exit.assert_called_once_with(reason="data-relocation")
         self.assertFalse(tray._action_lock.locked())
 
-    @unittest.skipUnless(sys.platform == "win32", "迁移只在 Windows 安装版上由托盘接手")
+    @unittest.skipUnless(sys.platform == "win32", "安装版助手的命令按 Windows 的 Peach.exe 写")
     def test_tray_failure_releases_the_reservation_and_keeps_running(self):
         request = self.request_file(self.base / "new" / "peach-data")
         tray = self.tray()
@@ -368,6 +440,9 @@ class DataStorageTests(unittest.TestCase):
             snapshot = client.get("/api/configuration/storage").json()
             self.assertEqual((snapshot["data_root"], snapshot["usage"]), (str(self.data), None))
             self.assertEqual(client.post("/api/configuration/storage/clean", json={"category": "downloads"}).status_code, 400)
+            self.assertEqual(client.post("/api/configuration/storage/clean",
+                                         json={"categories": ["logs", "previews"]}).status_code, 400)
+            self.assertEqual(client.post("/api/configuration/storage/clean", json={"categories": []}).status_code, 400)
             self.assertEqual(client.post("/api/configuration/storage/measure",
                                          headers={"origin": "https://other.invalid"}).status_code, 403)
             refused = client.post("/api/configuration/storage/relocate", json={"target": str(self.data / "inner")})
@@ -395,6 +470,29 @@ class DataStorageTests(unittest.TestCase):
         self.assertEqual(state["state"], "idle")
         self.assertIn("释放 2 KB", state["message"])
         self.assertIsNotNone(data_storage.read_usage(config))
+
+    def test_jobs_clean_several_categories_in_one_pass_and_estimate_from_the_last_count(self):
+        config = self.config()
+        write(self.data / "logs" / "tray.until-20260101.log", 2048)
+        write(self.data / "generated" / "stream-segments" / "1" / "0001.ts", 1024)
+        jobs = data_storage.StorageJobs()
+        jobs.start(config, "measure")
+        jobs.join(10)
+        counted = data_storage.read_usage(config)["total_files"]
+
+        with patch.object(data_storage, "measure", wraps=data_storage.measure) as measured:
+            started = jobs.start(config, ["logs", "playback"])
+            jobs.join(10)
+
+        # 按类别表的顺序依次清理，统计只在最后做一次；进度条按上次的文件数估。
+        self.assertEqual((started["state"], started["categories"]), ("cleaning", ["playback", "logs"]))
+        self.assertEqual(started["expected_files"], counted)
+        measured.assert_called_once()
+        message = jobs.snapshot()["message"]
+        self.assertIn("播放缓存、日志", message)
+        self.assertIn("释放 3 KB", message)
+        with self.assertRaisesRegex(ValueError, "不能在这里清理"):
+            jobs.start(config, ["logs", "downloads"])
 
 
 if __name__ == "__main__":

@@ -238,10 +238,40 @@ it('跑完那一轮显示摘要，失败那一轮显示原因', async () => {
   expect(host.querySelector('[data-status=succeeded]')?.textContent).toContain('已检查 7');
   expect(host.querySelector('[data-status=failed]')?.textContent).toContain('上游挡回来了');
   expect(host.querySelector('[data-status=succeeded] span')?.textContent).toBe('已完成');
-  // 跑成功那张没有说明区：没有原因可写时不留一条空条子。
-  expect(host.querySelectorAll('[data-status=succeeded] p')).toHaveLength(1);
-  expect([...host.querySelectorAll('[data-status=succeeded] ul > li')].map((node) => node.textContent))
-    .toEqual(['已检查 7']);
+  // 跑成功那张没有说明区：没有原因可写时不留一条空条子。只有一句摘要时不加项目符号。
+  expect([...host.querySelectorAll('[data-status=succeeded] p')].map((node) => node.textContent))
+    .toEqual([expect.stringContaining('手动'), '已检查 7']);
+  expect(host.querySelector('[data-status=succeeded] ul')).toBeNull();
+});
+
+it('派出几十条后继的几批合成一张进行中的卡，进度按计数，正在跑的排最前，排队的不给空的技术详情', async () => {
+  const parent = (id: number, finished_at: string) => run({
+    id, task_key: 'upgrade-repairs', task_label: '自动修复', trigger: 'scheduled', status: 'succeeded',
+    progress_total: null, started_at: finished_at, finished_at, result_summary: { outcome: '已安排 64 项处理' } });
+  const child = (id: number, parentId: number, status: string) => followup(parentId, {
+    id, task_key: 'upgrade-library', task_label: '自动修复资料', status, finished_at: null,
+    progress_label: status === 'running' ? 'ABC-001 · 采集缺失资料' : 'ABC-00' + id, result_summary: {},
+    followup_key: `upgrade-library:x:${id}` });
+  const { host } = await open(payload({
+    running: [child(12, 2, 'pending'), child(11, 1, 'running')],
+    finished: [parent(2, '2026-10-28T09:03:00Z')],
+    // 更早的那一批不在「最近完成」这一页上，接口单独给。
+    working_parents: [parent(1, '2026-10-28T09:02:00Z')],
+    followup_counts: { 1: { succeeded: 60, failed: 2, running: 1, pending: 1 }, 2: { pending: 64 } },
+  }));
+  expect(sections(host)).toEqual(['正在进行']);
+  const cards = host.querySelectorAll('[data-task-key=upgrade-repairs]');
+  expect(cards).toHaveLength(1);
+  const card = cards[0]!;
+  expect(card.querySelector('span')?.textContent).toBe('进行中');
+  expect(card.textContent).toContain('2 批');
+  expect(card.textContent).toContain('已处理 62 / 128 项 · 其中 2 项失败');
+  expect(card.querySelector('summary')?.textContent).toBe('任务明细 · 128 项');
+  expect(card.textContent).toContain('列出其中 2 项，正在处理的排在前面');
+  const rows = [...card.querySelectorAll('[data-followup-key]')];
+  expect(rows.map((row) => row.getAttribute('data-status'))).toEqual(['running', 'pending']);
+  expect(rows[0]!.textContent).toContain('ABC-001 · 采集缺失资料');
+  expect(rows.some((row) => row.textContent?.includes('技术详情'))).toBe(false);
 });
 
 it('链接检查显示失效和访问失败数量，技术详情使用可复制代码块', async () => {

@@ -12,7 +12,7 @@ import { actionOrder, buttonNamed, choose, click, fetchMock, mount, section, sen
 const automatic = { mode: 'off', interval_hours: 24, available: true, download_available: true };
 const release: ReleaseState = {
   current_version: '0.9.0', latest_version: null, channel: '测试版', installation: '独立测试包',
-  state: 'unchecked', message: '尚未检查', release_url: 'https://github.com/longmeidao/peach/releases',
+  state: 'unchecked', message: '尚未检查', release_url: 'https://github.com/peach-mitao/peach/releases',
 };
 const uninstall = { available: true, full_available: true, message: '', data_root: 'fixture', directories: ['fixture', 'fixture/cache'] };
 
@@ -123,9 +123,9 @@ describe('检查更新', () => {
       .toEqual([
         ['官网', 'https://peach.video/#download'],
         ['GitHub', 'https://github.com/peach-mitao/peach'],
-        ['查看发布页', 'https://gitgud.io/peach-mitao/peach/-/releases'],
+        ['查看发布页', 'https://github.com/peach-mitao/peach/releases'],
       ]);
-    expect(updates.textContent).toContain('GitHub暂无法更新');
+    expect(updates.textContent).not.toContain('暂无法更新');
     expect(document.activeElement).toBe(check);
     vi.stubGlobal('fetch', fetchMock(503, { detail: '连接失败' }));
     await click(check);
