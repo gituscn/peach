@@ -1,12 +1,19 @@
 ---
 name: peach-issue-delivery
-description: Peach 代码交付、issue 与 PR、合并或判断 issue 是否可以关闭时使用。
+description: Peach 收集或汇总用户反馈、代码交付、issue 与 PR、合并或判断 issue 是否可以关闭时使用。
 ---
 
-# Issue 交付与验证
+# 反馈、Issue 交付与验证
 
 最后复核：2026-10-28
-证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
+证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、用户指明「收集反馈汇总」须触发本技能并覆盖 Discussions、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
+
+## 反馈收集与汇总
+
+- 来源包括 GitHub issue（含评论与反应）、Discussions（全部分类，含评论与回复）、社区 PR 和 GitGud issue，只读其中一处不算收齐。Discussions 不在 `gh issue` 与 `gh pr` 的输出里，要用 GraphQL `repository.discussions` 读取。
+- 逐条对照 `CHANGELOG.md` 的已发布版本和「未发布」段、主线提交与当前代码，分为已发布修复、主线未发布、部分覆盖、未处理；没核实的写「未核实」，不凭 issue 开闭状态推断。
+- 合并重复和同根因的报告，写明报告人数、编号、关联的社区 PR 和还缺的复现信息。
+- 汇总只读：不评论、不改标签、不关单；后续动作按下列各节另行取得授权。
 
 ## Issue 与 PR 范围
 
@@ -17,7 +24,7 @@ description: Peach 代码交付、issue 与 PR、合并或判断 issue 是否可
 
 ## 沟通与标记
 
-- 默认不自动发表 issue 评论或回复报告者；只有用户明确要求代发时才发送。保留人工已有回复。
+- 默认不自动发表 issue 或 Discussions 评论，也不回复报告者；只有用户明确要求代发时才发送。保留人工已有回复。
 - 在用户授权的 issue 维护范围内，优先用现有标签表达平台、影响域与验证状态。先读取标签和原生 Issue Type，避免重复分类。
 
 ## 合并责任
