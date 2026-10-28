@@ -190,6 +190,10 @@ class UpgradeRepairTests(unittest.TestCase):
                 'peach.seed_followup.plan',return_value=[]), patch('peach.media_sources.cost_for',return_value='free'):
             planned=self.service._plan(receipt)
         self.assertEqual([row.key for row in planned],['upgrade-library:processing-v2:text-3:1'])
+        # 任务中心那一行写的是哪部片，不是一句笼统的「更新影片资料」。
+        with self.service.contract.database.read_connection() as connection:
+            code, name = connection.execute('SELECT code,name FROM asset WHERE id=1').fetchone()
+        self.assertEqual(planned[0].label, code or name)
 
     def test_text_only_dispatch_does_not_plan_unrelated_people(self):
         from peach.settings_file import load_config

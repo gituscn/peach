@@ -437,6 +437,41 @@ class TasksEndpointTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in payload["running"]], [parent.id])
         self.assertEqual([row["id"] for row in payload["finished"]], queued)
 
+    def test_a_dispatch_with_dozens_of_followups_stays_one_working_parent_with_counts(self):
+        """自动修复每批派几十条；接口只下发最近几条排队的，但在跑的、父任务与总数都不能丢。"""
+        older = self.store.start("upgrade-repairs", trigger="scheduled", mutex_key="upgrade-repairs")
+        self.store.finish(older.id, "succeeded", summary={"outcome": "已安排 30 项处理"})
+        first = self.store.enqueue_followups(
+            older.id, [(f"upgrade-library:x:{n}", "upgrade-library", f"ABC-{n:03}") for n in range(30)])["queued"]
+        self.store.finish(first[0], "succeeded")
+        claimed = self.store.claim_followup(("upgrade-library",))
+        newer = [self._settled(f"2026-10-28T09:{minute:02}:00.000Z") for minute in range(4)]
+
+        payload = web_tasks.q_tasks(self.contract, {"limit": "3"})
+
+        # 在跑的那条下发了，哪怕比它新的排队项有二十多条；排队的只取最近三条。
+        running_ids = [row["id"] for row in payload["running"]]
+        self.assertIn(claimed.id, running_ids)
+        self.assertEqual(len(running_ids), 4)
+        # 父任务比「最近完成」这一页还早，也不进这一页，单独作为进行中的父任务下发。
+        self.assertNotIn(older.id, [row["id"] for row in payload["finished"]])
+        self.assertEqual([row["id"] for row in payload["working_parents"]], [older.id])
+        self.assertEqual(payload["followup_counts"][str(older.id)],
+                         {"succeeded": 1, "running": 1, "pending": 28})
+        self.assertEqual([row["id"] for row in payload["finished"]], list(reversed(newer))[:3])
+
+    def test_a_parent_returns_to_recent_runs_once_its_followups_are_done(self):
+        parent = self.store.start("upgrade-repairs", trigger="scheduled")
+        self.store.finish(parent.id, "succeeded")
+        queued = self.store.enqueue_followups(
+            parent.id, [("upgrade-library:x:1", "upgrade-library", "ABC-001")])["queued"]
+        self.assertEqual(web_tasks.q_tasks(self.contract, {})["finished"], [])
+        self.store.finish(queued[0], "succeeded")
+        payload = web_tasks.q_tasks(self.contract, {})
+        self.assertEqual([row["id"] for row in payload["finished"]], [parent.id, *queued])
+        self.assertEqual(payload["working_parents"], [])
+        self.assertEqual(payload["followup_counts"][str(parent.id)], {"succeeded": 1})
+
     def test_a_short_history_says_there_is_nothing_earlier(self):
         self._settled("2026-09-11T10:00:00.000Z")
         self.assertFalse(web_tasks.q_tasks(self.contract, {})["finished_has_more"])
