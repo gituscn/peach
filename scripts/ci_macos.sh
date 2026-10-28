@@ -122,7 +122,7 @@ test -s "$mountpoint/Peach.app/Contents/Resources/LICENSE"
 "$python" -c 'import json,sys; config=json.load(open(sys.argv[1],encoding="utf-8")); assert config["dsn"] and config["library_dsn"], "包内 sentry.json 缺 DSN"' \
     "$mountpoint/Peach.app/Contents/Resources/sentry.json"
 codesign --verify --deep --strict "$mountpoint/Peach.app"
-lipo -verify_arch "$architecture" "$mountpoint/Peach.app/Contents/MacOS/Peach"
+lipo "$mountpoint/Peach.app/Contents/MacOS/Peach" -verify_arch "$architecture"
 "$python" scripts/smoke_macos.py "$mountpoint/Peach.app"
 "$python" scripts/smoke_macos_media.py "$mountpoint/Peach.app" --arch "$architecture"
 (cd "$output"; shasum -a 256 "${image##*/}" *-corresponding-source.zip > SHA256SUMS.txt)
