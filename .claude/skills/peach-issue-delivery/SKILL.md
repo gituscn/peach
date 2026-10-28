@@ -6,13 +6,15 @@ description: Peach 收集或汇总用户反馈、代码交付、issue 与 PR、�
 # 反馈、Issue 交付与验证
 
 最后复核：2026-10-28
-证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、用户指明「收集反馈汇总」须触发本技能并覆盖 Discussions、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
+证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、用户指明「收集反馈汇总」须触发本技能并覆盖 Discussions、Codex 反馈汇总会话中用户对优先级与修复批次的要求、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
 
 ## 反馈收集与汇总
 
-- 来源包括 GitHub issue（含评论与反应）、Discussions（全部分类，含评论与回复）、社区 PR 和 GitGud issue，只读其中一处不算收齐。Discussions 不在 `gh issue` 与 `gh pr` 的输出里，要用 GraphQL `repository.discussions` 读取。
-- 逐条对照 `CHANGELOG.md` 的已发布版本和「未发布」段、主线提交与当前代码，分为已发布修复、主线未发布、部分覆盖、未处理；没核实的写「未核实」，不凭 issue 开闭状态推断。
-- 合并重复和同根因的报告，写明报告人数、编号、关联的社区 PR 和还缺的复现信息。
+- 来源包括 GitHub issue（含评论与反应）、Discussions（全部分类，含评论与回复）、社区 PR、GitGud issue、Telegram 反馈群聊和 X 提及与回复，只读其中一处不算收齐；读不到的来源写明「未取得」及原因。Discussions 不在 `gh issue` 与 `gh pr` 的输出里，要用 GraphQL `repository.discussions` 读取。
+- 「汇总」指一份带优先级和修复批次的总表，不是逐条摘要。每条都要判断：本地是否已修复、属于需求还是缺陷、轻重缓急、马上修还是先讨论、适合放在哪个版本、关联 PR 能否直接合。
+- 已修复与否，逐条对照 `CHANGELOG.md` 的已发布版本和「未发布」段、主线提交与当前代码；没核实的写「未核实」，不凭 issue 开闭状态推断。建单日期晚于修复版本时，要先确认报告者的版本。
+- 报告之间可能互相包含，要按问题合并，不能只按编号去重。写明报告人数、编号、关联的社区 PR 和还缺的复现信息。
+- 批次由严重性决定先后，由是否共享代码和夹具决定合批。一个批次可以包含多个任务，各自独立提交、统一回归；能用社区 PR 的代码修复就优先采用，保留和社区的沟通记录。同时给出发版建议，说明做完哪几批可以发版，并按 [peach-worktree](../peach-worktree/SKILL.md) 写明升级后修复能否生效。
 - 汇总只读：不评论、不改标签、不关单；后续动作按下列各节另行取得授权。
 
 ## Issue 与 PR 范围
