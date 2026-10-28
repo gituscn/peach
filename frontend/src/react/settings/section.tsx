@@ -5,7 +5,7 @@
  * 提示与进度条另有页面共用的一份，在 `../components/`。 */
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, FormEvent, MouseEvent, ReactNode } from 'react';
-import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
+import { RiArrowRightLine, RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 import { setCollapseOpen } from '@peach/legacy/ui';
 
 import { SettingsCard, SettingsSectionLabel } from '@/components/application/settings/settings-rows';
@@ -100,6 +100,15 @@ export function ExternalLink({ href, children, leadingIcon }: {
     <LinkButton href={href} target="_blank" rel="noopener noreferrer" size="small"
       leadingIcon={leadingIcon} trailingIcon={RiExternalLinkLine} className="min-w-0 max-w-full">
       <span className="min-w-0 whitespace-normal break-all">{children}</span>
+    </LinkButton>
+  );
+}
+
+/** 后台任务的进度在任务中心看：说明句后面跟这一颗，点了站内跳过去。 */
+export function TaskCenterLink() {
+  return (
+    <LinkButton href="/tasks" size="small" trailingIcon={RiArrowRightLine} className="self-start">
+      在任务中心查看进度
     </LinkButton>
   );
 }
