@@ -6,8 +6,6 @@ A local-first video metadata scraper and media manager, packaged for self-hostin
 
 [Website](https://peach.video) · [Live demo](https://demo.peach.video) · [Source and full README](https://github.com/peach-mitao/peach) · [Docker guide (Chinese)](https://github.com/peach-mitao/peach/blob/master/docs/DOCKER.md) · [Releases](https://github.com/peach-mitao/peach/releases) · [Issues](https://github.com/peach-mitao/peach/issues) · [简体中文](https://github.com/peach-mitao/peach/blob/master/README.zh-CN.md)
 
-> **18+** For adults managing their own adult media library. The image contains no media, library data or site accounts; external sites are accessed with your own accounts and permissions.
-
 [![Video library with search, filters and posters](https://peach.video/assets/screenshots/home-wide-20261025-2-1280.webp)](https://demo.peach.video)
 
 Movie demo data; see [asset credits and licenses](https://peach.video/en/credits/). More screenshots are in the [GitHub README](https://github.com/peach-mitao/peach#screenshots).

@@ -80,7 +80,7 @@ async function open(browser: Browser, options: {
           mock.updates.push(call);
           const timer = setTimeout(() => request.onload({ status: 200, finalUrl: request.url,
             responseText: request.url === releaseMeta
-              ? `// ==UserScript==\n// @name Peach · JAV 入库\n// @namespace https://github.com/peach-mitao/peach-userscript\n// @version ${version}\n// ==/UserScript==`
+              ? `// ==UserScript==\n// @name Peach Userscript\n// @namespace https://github.com/peach-mitao/peach-userscript\n// @version ${version}\n// ==/UserScript==`
               : JSON.stringify({ runtime: { version: '1.0.0', build_id: 'fixture' }, release: { state: 'current' },
                 userscript: { version, minimum_version: '0.5.1', install_url: '/integrations/peach-jav.user.js' } }) }), 0);
           return { abort: () => { clearTimeout(timer); request.onabort?.(); } };
