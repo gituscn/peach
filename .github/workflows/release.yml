@@ -357,7 +357,17 @@ jobs:
             runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
+    # 与 Windows 仅下载验收相同：核对随包 amane 运行时要读发行锁与桥脚本，验收宿主从同一检出
+    # 加载辅助模块，被测应用启动时清除 PYTHONPATH。
+    env:
+      PYTHONPATH: ${{ github.workspace }}/source/scripts
     steps:
+      - uses: actions/checkout@v7
+        with:
+          path: source
+          sparse-checkout: |
+            scripts
+            tools/amane-bridge
       - uses: actions/download-artifact@v8
         with:
           name: macos-candidate-${{ matrix.arch }}
