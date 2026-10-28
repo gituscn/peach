@@ -60,9 +60,16 @@ export async function verifyTablePreferences(page: Page, table: Locator, label: 
   const width = async () => header.evaluate(node => node.getBoundingClientRect().width);
   const initial = await width();
   const handle = header.getByRole('slider');
-  await handle.focus(); await handle.press('Enter');
-  await withPageDiagnostics(page, `${label}进入键盘列宽调整`,
-    () => header.locator('.react-aria-ColumnResizer[data-resizing]').waitFor());
+  await withPageDiagnostics(page, `${label}进入键盘列宽调整`, async () => {
+    // React Aria 首次进入集合会先聚焦行导航；确认该状态后再移入列宽手柄。
+    await table.locator('tbody tr').first().focus();
+    await table.locator('tbody tr[data-focused]').first().waitFor();
+    await handle.focus();
+    assert.equal(await handle.evaluate(node => document.activeElement === node), true,
+      `${label}键盘调整前焦点必须位于列宽手柄`);
+    await handle.press('Enter');
+    await header.locator('.react-aria-ColumnResizer[data-resizing]').waitFor();
+  });
   await handle.press('ArrowRight'); await handle.press('ArrowRight');
   await page.waitForFunction(({ node, initial }) => node && node.getBoundingClientRect().width > initial,
     { node: await header.elementHandle(), initial }, { timeout: 5000 });
