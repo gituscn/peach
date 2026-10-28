@@ -43,6 +43,7 @@ description: Peach 代码任务开工，以及创建、提交、集成或回收�
 ## 暂存与提交
 
 - 逐文件暂存后核对 `git diff --cached --name-status` 与任务边界，不使用目录、glob、`git add .` 或 `git add -A`。实现与对应测试原子提交。
+- 一个提交只做一件能单独描述的事，长任务做完一项提交一项；`web/dist` 与对应源码同一提交，不另拆。
 - 主题为 `type(scope): 中文描述`，类型以 `scripts/commit_subject.py` 为准。
 - 本机提交者自己的交付提交带 `Co-Authored-By: 工具 (实际模型版本) <厂商 noreply>`，名单见 `scripts/co_author.py`；接力作者并列，人类共同作者保留姓名与邮箱。
 - 采纳社区补丁时保留原作者为提交作者，写 `Source-PR`、`Original-Commit`，不替贡献者补 AI 署名；只有智能体改写或补充了代码时，才加它自己的署名。
