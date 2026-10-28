@@ -64,7 +64,3 @@ kind = "reference"
 [[kinds]]
 path = "SECURITY.md"
 kind = "howto"
-
-[[kinds]]
-path = "TRADEMARKS.md"
-kind = "reference"

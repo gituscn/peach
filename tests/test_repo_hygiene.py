@@ -424,7 +424,7 @@ class ReleaseFilesTests(unittest.TestCase):
     #: 相对仓库根的路径。清单只增不减，删除任何一项都要先改 ADR-0023。
     REQUIRED = (
         "LICENSE",
-        "TRADEMARKS.md",
+        "docs/TRADEMARKS.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
         "CHANGELOG.md",

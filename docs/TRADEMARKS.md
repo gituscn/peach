@@ -14,7 +14,7 @@ The Peach source code is licensed under AGPL-3.0-or-later; that license covers c
 
 ## 与源码许可证的关系
 
-源码许可证仍是 [AGPL-3.0-or-later](LICENSE)，本政策不对代码附加限制，也不影响任何人依 AGPL 已经取得的权利。换掉名称和图标后，代码照常可以复制、修改、分发、商用或作为网络服务运行，源码提供义务按 AGPL 执行。
+源码许可证仍是 [AGPL-3.0-or-later](../LICENSE)，本政策不对代码附加限制，也不影响任何人依 AGPL 已经取得的权利。换掉名称和图标后，代码照常可以复制、修改、分发、商用或作为网络服务运行，源码提供义务按 AGPL 执行。
 
 图标文件随源码分发，用于构建未修改的 Peach。它们的使用按本政策，不因位于仓库中就适用 AGPL。
 
