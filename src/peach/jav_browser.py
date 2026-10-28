@@ -17,7 +17,7 @@ from .catalog_rules import is_jav_code, normalise_code_key, release_code_from_pr
 from .config import PROJECT_ROOT
 from .downloads import (
     CLOUDDRIVE_CREDENTIAL, INGESTED, POSTPROCESS_LABELS, REMOTE_RUNNING, RESUBMITTABLE_STATES,
-    STATE_LABELS, submit_offline_download, parse_magnet,
+    STATE_LABELS, never_seen, submit_offline_download, parse_magnet,
 )
 from .follow_secrets import CredentialError
 from .feeds import scan_code
@@ -34,8 +34,10 @@ MESSAGES = {
 }
 #: 下载失败按原因分给用户脚本：磁力本身的问题换一个磁力，网盘一侧的问题修好后重试同一个磁力。
 MAGNET_FAILURES = frozenset({"rejected", "invalid_link", "no_source", "mismatch"})
-CLOUD_FAILURES = frozenset({"config", "quota", "network", "not_landed", "duplicate"})
+CLOUD_FAILURES = frozenset({"config", "quota", "network", "not_landed", "duplicate", "not_accepted", "removed"})
 NO_OTHER_MAGNET = "没有其他可用磁力，可在 Peach 手动选择资源"
+#: 细分之前「列表里找不到」统一记为 no_source 的原文；这些旧任务从没被网盘列出过，按网盘问题处理。
+LEGACY_MISSING = "远端任务列表里找不到这个任务"
 
 
 @lru_cache(maxsize=1)
@@ -260,8 +262,12 @@ class JavBrowser:
                 row.update(state=state, message=task.failure_detail or MESSAGES[state])
                 if state == "failed":
                     detail["failure"] = task.failure or ""
-                    detail["cause"] = ("magnet" if task.blocked_at or task.failure in MAGNET_FAILURES
-                                       else "cloud" if task.failure in CLOUD_FAILURES else "")
+                    # 旧任务把「列表里找不到」记成 no_source；从没被网盘列出过的按网盘问题处理。
+                    legacy_unseen = (task.failure == "no_source" and never_seen(task)
+                                     and (task.failure_detail or "").startswith(LEGACY_MISSING))
+                    detail["cause"] = ("magnet" if task.blocked_at
+                                       else "cloud" if legacy_unseen or task.failure in CLOUD_FAILURES
+                                       else "magnet" if task.failure in MAGNET_FAILURES else "")
                 if task.asset_id:
                     row["asset_id"] = task.asset_id
                 progress = task.progress
@@ -332,7 +338,8 @@ class JavBrowser:
             provider = row["provider"]
         try:
             self._ready(provider)
-            result = self.search(self.contract, {"code": code, "goal": "quality"})
+            skip = list(row.get("skip", ()))
+            result = self.search(self.contract, {"code": code, "goal": "quality", **({"skip": skip} if skip else {})})
             candidate = _download_candidate(result.get("items", ()), code, frozenset(row.get("skip", ())))
             should_submit = False
             with self._lock:

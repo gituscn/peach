@@ -527,6 +527,21 @@ class ResourceIndexerRoutes(_App):
         self.assertEqual(direct.call_args.kwargs["goal"], "chinese")
         self.assertEqual(self.client.get("/api/resources/search?code=ABC-123&min_size=-1").status_code, 400)
 
+    def test_switching_magnets_searches_every_source_and_drops_skipped_hashes(self):
+        from peach.web_resource_search import q_resource_search
+        failed, other = "a" * 40, "b" * 40
+        hd = {"source": "manko.fun", "resolution": 1080, "info_hash": failed, "name": "ABC-123"}
+        fallback = {"source": "sukebei", "resolution": 1080, "info_hash": other, "name": "ABC-123 FHD"}
+        with mock.patch("peach.web_resource_search.direct_search", return_value={
+                "items": [hd, fallback], "warnings": [], "trace": [], "next_sources": [], "reference_only": []}) as direct,              mock.patch("peach.web_resource_search._SEARCH.run", return_value={
+                "ok": True, "state": "ready", "items": [], "warnings": [], "error": ""}) as search,              mock.patch("peach.web_resource_search.rank_candidates", side_effect=lambda rows, goal: rows):
+            result = q_resource_search(self.app.state.web_contract, {"code": "ABC-123", "skip": [failed]})
+            self.assertFalse(direct.call_args.kwargs["stop_on_preferred"])
+            self.assertIn(failed, search.call_args.args[3])
+            self.assertEqual([row["info_hash"] for row in result["items"]], [other])
+            q_resource_search(self.app.state.web_contract, {"code": "ABC-123", "skip": "not-a-list"})
+            self.assertTrue(direct.call_args.kwargs["stop_on_preferred"])
+
 
 if __name__ == "__main__":
     unittest.main()

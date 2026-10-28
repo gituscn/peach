@@ -147,6 +147,8 @@ class WebDataTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = str(fresh_ledger(self.tmp.name))
+        # 口味看板会列出本机浏览器；测试不读这台机器的真实浏览历史，也不受它的大小影响。
+        self.enterContext(mock.patch("peach.taste_history.discover_history_sources", return_value=[]))
         declared = mock.patch.object(web_batch, "LOCATION_ROOT_DECLARATIONS", {
             "local": (str(Path(self.tmp.name).resolve()),),
             "115": (str(Path(self.tmp.name).resolve()),),
