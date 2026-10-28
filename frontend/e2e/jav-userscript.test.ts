@@ -644,7 +644,7 @@ describe('JAV 用户脚本', () => {
     } finally { await opened.close(); }
   });
 
-  it('后台状态轮询有次数上限且不创建 POST，馆藏已有时不可加入', async () => {
+  it('后台状态轮询先 2 秒后 15 秒、满一小时停止且不创建 POST，馆藏已有时不可加入', async () => {
     const opened = await open(browser, { initial: 'queued' });
     try {
       await pending(opened.page, 1);
@@ -653,13 +653,20 @@ describe('JAV 用户脚本', () => {
         await opened.page.clock.fastForward(2100);
         await pending(opened.page, index + 2);
       }
-      await opened.page.clock.fastForward(10);
+      // 前 30 次之后改为 15 秒一次：2 秒时不再请求，满 15 秒才发下一次。
+      await opened.page.clock.fastForward(2100);
+      await opened.page.waitForTimeout(300);
+      assert.equal(await opened.page.evaluate(() => window.javMock.calls.length), 31);
+      await opened.page.clock.fastForward(13_000);
+      await pending(opened.page, 32);
+      // 跳过一小时期限：到点的那次等待结束后再查一次，随后停止并允许手动查询。
+      await opened.page.clock.fastForward(60 * 60_000);
+      await pending(opened.page, 33);
       await ready(opened.page, '查询 Peach 状态');
       const calls = await opened.page.evaluate(() => window.javMock.calls);
-      assert.equal(calls.length, 31);
       assert.ok(calls.every(call => call.method === 'GET'));
       await opened.page.clock.fastForward(60_000);
-      assert.equal(await opened.page.evaluate(() => window.javMock.calls.length), 31);
+      assert.equal(await opened.page.evaluate(() => window.javMock.calls.length), 33);
     } finally { await opened.close(); }
     const owned = await open(browser, { initial: 'owned' });
     try {
