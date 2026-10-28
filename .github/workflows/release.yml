@@ -191,7 +191,17 @@ jobs:
     needs: windows
     runs-on: windows-latest
     timeout-minutes: 25
+    # 验收脚本核对随包 amane 运行时要读发行锁与桥脚本；与 scripts/ci_windows.ps1 一样，验收宿主
+    # 从同一检出加载辅助模块，被测应用启动时清除 PYTHONPATH。
+    env:
+      PYTHONPATH: ${{ github.workspace }}\source\scripts
     steps:
+      - uses: actions/checkout@v7
+        with:
+          path: source
+          sparse-checkout: |
+            scripts
+            tools/amane-bridge
       - uses: actions/download-artifact@v8
         with:
           name: desktop-candidate
@@ -269,7 +279,8 @@ jobs:
           - arch: x86_64
             runner: macos-15-intel
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # 媒体工具缓存未命中时要在 runner 上从源码编译 FFmpeg 与 untrunc，首轮冷编译耗时长。
+    timeout-minutes: 180
     env:
       MACOSX_DEPLOYMENT_TARGET: '11.0'
       ARCHFLAGS: '-arch ${{ matrix.arch }}'
@@ -292,6 +303,23 @@ jobs:
           uv sync --locked --all-extras --python python
           uv pip check --python .venv/bin/python
           npm ci --prefix frontend
+      # 与 scripts/ci_macos.sh 相同的媒体工具准备：缓存按 media_build_cache.py 的输入与工具链身份核对，
+      # 不一致时在本机重新编译。
+      - name: 复用固定源码的 macOS 媒体工具与对应源码包
+        uses: actions/cache@v6.1.0
+        with:
+          key: macos-media-v1-${{ matrix.arch }}-${{ runner.os }}-${{ hashFiles('scripts/ffmpeg-sources.json', 'scripts/untrunc-sources.json', 'scripts/build_macos_media.py', 'scripts/fetch_ffmpeg_sources.py', 'scripts/fetch_untrunc_sources.py', 'scripts/setup_macos_media_tools.py', 'scripts/media_build_cache.py', 'src/peach/user_agent.py', 'LICENSE') }}
+          path: build/media-cache/macos-${{ matrix.arch }}
+      - name: 安装固定版本的媒体编译工具
+        run: |
+          .venv/bin/python scripts/setup_macos_media_tools.py --root build/macos-media-toolchain
+          echo "$PWD/build/macos-media-toolchain/env/bin" >> "$GITHUB_PATH"
+      - name: 构建或复用媒体工具并取得 cloudflared
+        run: |
+          for tool in ffmpeg untrunc; do
+            .venv/bin/python scripts/media_build_cache.py macos --tool "$tool" --arch '${{ matrix.arch }}'
+          done
+          .venv/bin/python scripts/fetch_cloudflared_macos.py --arch '${{ matrix.arch }}' --destination "build/media-macos/${{ matrix.arch }}/cloudflared"
       - name: 构建独立应用与拖放安装镜像
         run: .venv/bin/python scripts/build_macos_standalone.py --target-arch '${{ matrix.arch }}' --destination release
       - name: 上传 macOS 构建的浏览器 source maps
