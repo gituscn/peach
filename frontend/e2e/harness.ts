@@ -63,6 +63,29 @@ export async function launch(): Promise<Browser> {
   });
 }
 
+/** 失败时保留焦点、输入和弹层现场；成功路径不额外查询页面。 */
+export async function withPageDiagnostics<T>(page: Page, where: string | (() => string), action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      path: location.pathname + location.search,
+      ready: document.readyState,
+      focus: document.activeElement?.outerHTML.slice(0, 600),
+      query: document.querySelector<HTMLInputElement>('#q')?.value,
+      layers: [...document.querySelectorAll('dialog,[role="dialog"],#searchMenu')].slice(0, 12).map(node => ({
+        tag: node.tagName, id: node.id, hidden: (node as HTMLElement).hidden,
+        expanded: node.getAttribute('aria-expanded'), text: node.textContent?.slice(0, 600),
+      })),
+      busy: [...document.querySelectorAll('[aria-busy="true"],[data-skeleton]')]
+        .slice(0, 12).map(node => ({ tag: node.tagName, id: node.id, label: node.getAttribute('aria-label') })),
+    })).catch(() => '未取得');
+    const tree = await page.locator('body').ariaSnapshot({ timeout: 2000 }).catch(() => '未取得');
+    throw new Error(`${typeof where === 'function' ? where() : where}：${String(error)}\n页面现场：${JSON.stringify(state)}\n无障碍树：\n${tree.slice(0, 4000)}`,
+      { cause: error });
+  }
+}
+
 /** 等待态以 `aria-busy="true"` 与 `data-skeleton` 为准；超时就是等待态卡住了。
  * 两个标记由页面自己写：island、遗留模板和 React 子树都得发出，这里才等得到。
  *

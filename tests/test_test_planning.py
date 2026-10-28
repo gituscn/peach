@@ -794,3 +794,19 @@ class GateAndFlakyRerunTests(unittest.TestCase):
         self.assertEqual([test.id() for test in suite], [test_focus.VITEST_SUITE])
         with self.assertRaises(ValueError):
             test_focus.selection(runner.ROOT, ['frontend/test/../../scripts/test_runner.py'])
+
+    def test_focus_accepts_comma_separated_file_arguments_without_losing_or_repeating_tests(self):
+        from scripts import test_focus
+        first = 'test_test_planning.TestPlanningTests'
+        second = 'test_test_planning.GateAndFlakyRerunTests'
+        expected, _, _ = test_focus.selection(runner.ROOT, [first, second])
+        actual, browsers, islands = test_focus.selection(runner.ROOT, [f'{first}, {second}', first])
+        self.assertEqual([test.id() for test in actual], [test.id() for test in expected])
+        self.assertEqual((browsers, islands), ((), ()))
+        _, browsers, islands = test_focus.selection(runner.ROOT, [
+            'frontend/e2e/search.test.ts,frontend/test/jav-card-title.test.ts'])
+        self.assertEqual(browsers, ('e2e/search.test.ts',))
+        self.assertEqual(islands, ('test/jav-card-title.test.ts',))
+        for invalid in (f'{first},', ', ', f'{first},../outside.py'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                test_focus.selection(runner.ROOT, [invalid])

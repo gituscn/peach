@@ -5,7 +5,7 @@ description: Peach 收集或汇总用户反馈、代码交付、issue 与 PR、�
 
 # 反馈、Issue 交付与验证
 
-最后复核：2026-10-28
+最后复核：2026-10-29
 证据来源：用户确认的维护者 PR 流程、issue 沟通与验收约定、用户指明「收集反馈汇总」须触发本技能并覆盖 Discussions、Codex 反馈汇总会话中用户对优先级与修复批次的要求、[issue #95](https://github.com/peach-mitao/peach/issues/95)、[PR #96](https://github.com/peach-mitao/peach/pull/96)、[项目看板状态判据](../../../scripts/project_board.py)。
 
 ## 反馈收集与汇总
@@ -39,6 +39,7 @@ description: Peach 收集或汇总用户反馈、代码交付、issue 与 PR、�
 ## 验证与关闭
 
 - 分别确认代码合并、CI 结果、修复产物发布和 issue 验收；每项结论只使用对应证据。
+- 汇总的发布状态绑定候选提交和实际制品；标签已打或版本段已改不能批量转为「已发布」。发布失败保留已合入状态，成功后只推进候选真正包含的修复。
 - 问题依赖特定硬件、部署环境或报告者确认时，通用测试、CI 通过和镜像发布不能代替该验证。必要验证未完成时保持 issue 开放；修复产物可供测试时使用 `status:needs-verification`。
 - 尚需验证的 issue，在 PR 正文中用独立的 `Refs #编号` 行关联，跨仓库使用 `Refs owner/repo#编号`。此格式也供项目看板识别实现关联。
 - 检查 PR 正文、提交消息以及合并时采用的消息，避免用 `Fixes`、`Closes`、`Resolves` 等关键词触发尚需验证的 issue 自动关闭。
