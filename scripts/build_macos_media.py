@@ -23,7 +23,8 @@ def run(args, cwd, env):
 
 def audit_binary(path: Path, architecture: str) -> None:
     """拒绝其他架构及开发机动态库，系统库由 macOS 提供。"""
-    subprocess.run(["lipo", "-verify_arch", architecture, str(path)], check=True)
+    # Xcode 16 的 lipo 要求输入文件写在操作之前，旧版两种顺序都接受。
+    subprocess.run(["lipo", str(path), "-verify_arch", architecture], check=True)
     output = subprocess.check_output(["otool", "-L", str(path)], text=True, encoding="utf-8")
     for line in output.splitlines()[1:]:
         dependency = line.strip().split(" (", 1)[0]
