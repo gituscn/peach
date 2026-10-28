@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Callable, Protocol
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from .follow_secrets import CredentialStore
 from .fsutil import atomic_write_text
@@ -90,11 +90,18 @@ FAILURE_KINDS: dict[str, FailureKind] = {kind.key: kind for kind in (
     FailureKind("rejected", "网盘拒绝下载该资源"),
     FailureKind("invalid_link", "链接无效"),
     FailureKind("no_source", "没有可用下载源或进度长时间未更新"),
+    FailureKind("not_accepted", "网盘没有收下任务"),
+    FailureKind("removed", "网盘任务被删除"),
     FailureKind("duplicate", "下载任务已存在"),
     FailureKind("not_landed", "目标目录中未找到下载文件"),
     FailureKind("mismatch", "下载内容与目标作品不符"),
     FailureKind("network", "网络暂时不可用", retryable=True),
 )}
+
+
+def never_seen(task: "DownloadTask") -> bool:
+    """提交后从没在网盘离线列表里见过：没有远端编号，也没读到过进度。名字不算，提交时就取自磁力。"""
+    return task.progress is None and not task.remote_id
 
 
 class DownloadError(RuntimeError):
@@ -164,6 +171,33 @@ def normalise_info_hash(raw: str) -> str:
     raise ValueError("磁力链接里的 infohash 不是 40 位十六进制或 32 位 base32")
 
 
+_TRACKER = re.compile(r"^(?:udp|https?|wss?)://[A-Za-z0-9.\-]+(?::\d{1,5})?(?:/[!-~]*)?$")
+
+
+def clean_magnet(text: str) -> str:
+    """去掉无法解析的 tracker 参数，其余原样保留。
+
+    有的来源给出的磁力里夹着一段打乱的 tracker（`exoduecnuonnaF2%9696A3%moc.cnysed.s`，
+    倒过来是 `exodus.desync.com`），115 开放平台把整条链接判为「错误的链接」（10004），
+    有时还不报错、只是不建任务。2026-10-28 对照实验：同一个 DASD-911 磁力原样提交被拒，
+    只去掉这一段后五秒内就出现在离线列表里。
+    """
+    split = urlsplit(text)
+    kept = []
+    for part in split.query.split("&"):
+        key, _, value = part.partition("=")
+        if key == "tr":
+            try:
+                decoded = unquote(value, errors="strict")
+            except UnicodeDecodeError:
+                continue
+            if not _TRACKER.match(decoded):
+                continue
+        if part:
+            kept.append(part)
+    return f"{split.scheme}:?{'&'.join(kept)}"
+
+
 def parse_magnet(raw: str) -> Magnet:
     """解析用户粘贴的磁力，或一个裸 infohash。只认 `urn:btih`，v2 的 `btmh` 不在幂等键口径内。"""
     text = str(raw or "").strip()
@@ -177,7 +211,7 @@ def parse_magnet(raw: str) -> Magnet:
         if value.casefold().startswith("urn:btih:"):
             info_hash = normalise_info_hash(value[len("urn:btih:"):])
             name = (query.get("dn") or [""])[0].strip()
-            return Magnet(info_hash, text, name[:300])
+            return Magnet(info_hash, clean_magnet(text), name[:300])
     raise ValueError("磁力链接里没有 urn:btih，Peach 只接受 BitTorrent 磁力")
 
 
@@ -245,6 +279,9 @@ LANDING_GRACE = 60.0
 LANDING_TIMEOUT = 6 * 3600.0
 #: 远端列表里找不到任务时，提交后这么久之内当作列表还没刷新，不判失败。
 MISSING_GRACE = 180.0
+#: 提交后从没在离线列表里出现过的任务多等一会儿：批量提交时 CloudDrive2 与 115 登记慢，
+#: 2026-10-16 一批 83 个提交里 25 个三到十分钟内被判失败，期间同一接口超时 17 次。
+UNSEEN_GRACE = 900.0
 DEFAULT_WAIT_HOURS = 168
 MAX_WAIT_HOURS = 24 * 60
 #: 已落地的目录最多登记这么多个文件；种子里成千上万个小文件交给全量扫描。
@@ -902,10 +939,15 @@ class DownloadService:
         if status.state == MISSING:
             if not provider.landed(task):
                 started = parse_iso(task.submitted_at) or now
-                if now - started < MISSING_GRACE:
+                # 磁力本身失败时 115 会把任务留在列表里标为离线失败；从没出现过说明网盘没有收下，
+                # 出现过又不见了说明任务在网盘一侧被删除或清理，两种都不是换磁力能解决的。
+                unseen = never_seen(task)
+                if now - started < (UNSEEN_GRACE if unseen else MISSING_GRACE):
                     self._reschedule(task, now)
                     return
-                raise DownloadError("no_source", "远端任务列表里找不到这个任务，目标目录里也没有文件")
+                if unseen:
+                    raise DownloadError("not_accepted", "网盘没有收下这个任务：提交后离线列表里始终没有它，目标目录里也没有文件")
+                raise DownloadError("removed", "网盘里的这个任务不见了：离线列表里找不到它，目标目录里也没有文件")
         task.remote_name = status.name or task.remote_name
         task.remote_id = status.remote_id or task.remote_id
         task.state = REMOTE_DONE

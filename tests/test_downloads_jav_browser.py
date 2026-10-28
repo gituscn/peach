@@ -1,7 +1,9 @@
 """JAV 用户脚本请求、持久队列与真实云下载服务的隔离回归。"""
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import json
 import shutil
 import subprocess
@@ -153,6 +155,37 @@ class BrowserTests(unittest.TestCase):
                                              headers=self.script_headers).status_code, 400)
         self.assertEqual(self.service.rows, {})
 
+    def test_people_avatar_is_framed_on_the_recorded_face(self):
+        from PIL import Image
+        from peach.entities import upsert_asset_entity
+        contract = self.app.state.web_contract
+        contract.avatar_root = self.root / 'avatars'
+        contract.cover_root = self.root / 'covers'
+        self.app.state.preview_service.avatar_root = contract.avatar_root
+        with contract.database.write_transaction() as connection:
+            asset_id = connection.execute(
+                'INSERT INTO asset(path,name,location,medium,code) VALUES(?,?,?,?,?)',
+                ('R:\Media\ABC-123.mp4', 'ABC-123.mp4', 'local', 'video', 'ABC-123')).lastrowid
+            person = upsert_asset_entity(connection, asset_id=asset_id, kind='performer', name='测试演员',
+                                         role='performer', source='user:test')
+        contract.avatar_root.mkdir(parents=True, exist_ok=True)
+        portrait = Image.new('RGB', (400, 800), 'white')
+        portrait.paste((220, 0, 0), (180, 100, 220, 140))
+        portrait.save(contract.avatar_root / f'performer-{person}.img', format='JPEG')
+
+        def centre():
+            response = self.client.get('/api/jav-browser/people', params={'codes': 'ABC-123'}, headers=self.script_headers)
+            data = response.json()['items']['ABC-123'][0]['avatar'].split(',', 1)[1]
+            with Image.open(io.BytesIO(base64.b64decode(data))) as avatar:
+                return avatar.convert('RGB').getpixel((32, 32))
+
+        self.assertGreater(centre()[1], 200)
+        (contract.avatar_root / f'performer-{person}.face.json').write_text(json.dumps({
+            'face': {'cx': 0.5, 'cy': 0.15, 'w': 0.1}, 'px': [400, 800], 'focus': {'axis': 'y', 'pct': 10}}), encoding='utf-8')
+        red, green, blue = centre()
+        self.assertGreater(red, 150)
+        self.assertLess(green, 90)
+
     def test_people_rejects_unpaired_or_invalid_queries_and_leaves_missing_avatar_empty(self):
         self.assertEqual(self.client.get('/api/jav-browser/people', params={'codes':'ABC-123'}).status_code, 401)
         for codes in ('bad code', ','.join(['ABC-123']*51)):
@@ -239,6 +272,7 @@ class BrowserTests(unittest.TestCase):
         self.remote.submit.side_effect = None
         self.assertEqual(self.add(switch=True).json()["state"], "queued")
         self.service.process_one()
+        self.assertEqual(self.service.search.call_args.args[1]["skip"], [HASH])
         switched = self.status().json()
         self.assertEqual(switched["state"], "submitted")
         self.assertNotEqual(switched["task_id"], failed["task_id"])
@@ -250,6 +284,20 @@ class BrowserTests(unittest.TestCase):
         self.service.process_one()
         exhausted = self.status().json()
         self.assertEqual((exhausted["state"], exhausted["message"]), ("no_match", "没有其他可用磁力，可在 Peach 手动选择资源"))
+
+    def test_tasks_the_cloud_never_listed_count_as_cloud_problems_including_legacy_rows(self):
+        self.add()
+        self.service.process_one()
+        task = self.downloads.store.get(self.status().json()["task_id"])
+        task.remote_id = task.remote_name = task.progress = None
+        for failure, detail in (("not_accepted", "网盘没有收下这个任务"),
+                                ("no_source", "远端任务列表里找不到这个任务，目标目录里也没有文件")):
+            task.state, task.failure, task.failure_detail = dl.FAILED, failure, detail
+            self.downloads.store.save(task)
+            self.assertEqual(self.status().json()["cause"], "cloud")
+        task.failure, task.failure_detail = "no_source", "没有可用下载源"
+        self.downloads.store.save(task)
+        self.assertEqual(self.status().json()["cause"], "magnet")
 
     def test_cloud_failure_is_visible_and_a_manual_retry_uses_existing_task(self):
         self.remote.submit.side_effect = dl.DownloadError("config", "请更新网盘账号")

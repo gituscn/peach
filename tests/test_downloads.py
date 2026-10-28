@@ -88,13 +88,20 @@ class MagnetTests(unittest.TestCase):
         magnet = dl.parse_magnet(MAGNET)
         self.assertEqual((magnet.info_hash, magnet.name, magnet.uri), (HASH, "ABC-123", MAGNET))
 
+    def test_scrambled_trackers_are_dropped_before_submission(self):
+        # DASD-911 的原始磁力：最后一个 tracker 被打乱，115 因此整条判为「错误的链接」。
+        good = "&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce"
+        raw = f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123{good}&tr=udp%3A%2F%2FexoduecnuonnaF2%9696A3%moc.cnysed.s"
+        self.assertEqual(dl.parse_magnet(raw).uri, f"magnet:?xt=urn:btih:{HASH}&dn=ABC-123{good}")
+        self.assertEqual(dl.parse_magnet(MAGNET).uri, MAGNET)
+
     def test_links_without_a_btih_are_refused(self):
         for bad in ("", "magnet:?dn=x", "magnet:?xt=urn:btmh:1220abcd", "https://example.com/a",
                     "abc"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 dl.parse_magnet(bad)
 
-    def test_remote_messages_are_sorted_into_the_nine_kinds(self):
+    def test_remote_messages_are_sorted_into_the_eleven_kinds(self):
         cases = {
             "errno 50038 涉嫌违规": ("rejected", True),
             "本月离线配额已用完": ("quota", False),
@@ -108,7 +115,7 @@ class MagnetTests(unittest.TestCase):
                 self.assertEqual((error.failure, error.block), (failure, block))
         self.assertEqual(set(dl.FAILURE_KINDS), {
             "config", "quota", "rejected", "invalid_link", "no_source", "duplicate",
-            "not_landed", "mismatch", "network"})
+            "not_landed", "mismatch", "network", "not_accepted", "removed"})
         self.assertEqual([key for key, kind in dl.FAILURE_KINDS.items() if kind.retryable],
                          ["network"])
 
@@ -267,13 +274,26 @@ class PollingTests(_Deployment):
         task = self.service.store.get(task_id)
         self.assertEqual((task.state, task.failure), (dl.STALLED, "no_source"))
 
-    def test_a_task_missing_from_the_list_waits_then_fails(self):
+    def test_a_task_the_cloud_never_listed_waits_longer_then_fails_as_not_accepted(self):
+        # 真实的 CloudDrive2 提交不回远端编号，编号要等离线列表里看见任务才有。
+        self.provider.submit_result = dl.RemoteStatus(dl.RUNNING, name="ABC-123")
         task_id = self.submit()["task"]["id"]
         self.provider.statuses = [dl.RemoteStatus(dl.MISSING)]
         self.tick(10)
-        self.assertEqual(self.service.store.get(task_id).state, dl.SUBMITTED)
         self.tick(dl.MISSING_GRACE)
-        self.assertEqual(self.service.store.get(task_id).failure, "no_source")
+        self.assertEqual(self.service.store.get(task_id).state, dl.SUBMITTED)
+        self.tick(dl.UNSEEN_GRACE)
+        task = self.service.store.get(task_id)
+        self.assertEqual((task.state, task.failure), (dl.FAILED, "not_accepted"))
+
+    def test_a_listed_task_that_disappears_fails_as_removed(self):
+        task_id = self.submit()["task"]["id"]
+        self.provider.statuses = [dl.RemoteStatus(dl.RUNNING, "r1", "ABC-123", 0.2), dl.RemoteStatus(dl.MISSING)]
+        self.tick(10)
+        self.assertEqual(self.service.store.get(task_id).state, dl.REMOTE_RUNNING)
+        self.tick(dl.MISSING_GRACE)
+        self.tick(dl.MISSING_GRACE)
+        self.assertEqual(self.service.store.get(task_id).failure, "removed")
 
     def test_a_task_missing_from_the_list_with_files_in_the_folder_counts_as_done(self):
         task_id = self.submit()["task"]["id"]
