@@ -103,6 +103,6 @@ Run `docker compose pull` and `docker compose up -d` again. Keep the `peach-data
 
 ## License
 
-[AGPL-3.0-or-later](https://github.com/peach-mitao/peach/blob/master/LICENSE). Third-party components, including the bundled amane runtime, retain their own licenses.
+[AGPL-3.0-or-later](https://github.com/peach-mitao/peach/blob/master/LICENSE). Third-party components, including the bundled amane runtime, retain their own licenses. Use of the Peach name and logo follows the [name and logo policy](https://github.com/peach-mitao/peach/blob/master/docs/TRADEMARKS.md).
 
 Manage only media you own or are authorized to use, subject to laws, copyright and source-platform access, age and regional restrictions. Peach does not provide video resources or access to paid content.

@@ -413,9 +413,9 @@ class PersonalLiteralTests(unittest.TestCase):
 
 
 class ReleaseFilesTests(unittest.TestCase):
-    """公开发布必须齐备的治理文件（ADR-0023 第 4 阶段）。
+    """公开发布必须齐备的治理文件（ADR-0023 第 4 阶段，名称与标识政策见 ADR-0129）。
 
-    仓库一旦公开，许可证、贡献说明、安全说明和 issue/PR 模板就是陌生人判断「能不能用、
+    仓库一旦公开，许可证、名称政策、贡献说明、安全说明和 issue/PR 模板就是陌生人判断「能不能用、
     怎么报问题」的唯一依据。缺一份的后果不是报错而是沉默：使用者无从判断授权范围，
     漏洞只能开成公开 issue。它们又都是「一次写好、之后没人再看」的文件，正是重构和
     路径调整时最容易被顺手删掉的那一类，所以在这里钉住存在性。
@@ -424,6 +424,7 @@ class ReleaseFilesTests(unittest.TestCase):
     #: 相对仓库根的路径。清单只增不减，删除任何一项都要先改 ADR-0023。
     REQUIRED = (
         "LICENSE",
+        "docs/TRADEMARKS.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
         "CHANGELOG.md",

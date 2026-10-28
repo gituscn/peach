@@ -86,6 +86,6 @@ Thanks to [amane](https://github.com/sqzw-x/amane), [Gfriends](https://github.co
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors. Third-party components retain their own licenses.
+[AGPL-3.0-or-later](LICENSE) · Copyright (C) 2026 The Peach contributors. Third-party components retain their own licenses. Use of the Peach name and logo follows the [name and logo policy](docs/TRADEMARKS.md).
 
 Manage only media you own or are authorized to use, subject to laws, copyright and source-platform access, age and regional restrictions. Peach does not provide video resources or access to paid content.
