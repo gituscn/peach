@@ -21,7 +21,7 @@ import { fitSkeleton, revealTexts } from '@peach/legacy/ui';
 
 import { detailSkeletonBody } from '../../board-skeleton';
 import { applyTheaterMode, closePlayerMenu, type PlayerResume } from '../../player';
-import { adoptToasts, overlayHost } from '../components/overlay-host';
+import { adoptToasts, overlayHost, topOverlay } from '../components/overlay-host';
 import { followItemKey, prefetchFollowDetail, type FollowDetailActions, type FollowDetailProps } from '../follow-detail/follow-detail';
 import { FollowDetailPage } from '../follow-detail/follow-detail-page';
 import { chooseItem, itemKey, prefetchItemDetail, queueKey, type DetailQueue, type ItemDetailActions, type ItemDetailProps } from '../item-detail/item-detail';
@@ -112,12 +112,21 @@ function outside(event: MouseEvent | PointerEvent): boolean {
 
 function StageDialog({ view: current }: { view: View }) {
   const ref = useRef<HTMLDialogElement>(null);
-  /* 原生 `cancel`（Escape 之外的关闭请求，例如安卓返回手势）与关闭键走同一条路。Escape 本身在
-     keydown 上就处理掉了：那里 `preventDefault` 之后浏览器不再派 `cancel`。 */
+  /* 原生 `cancel`（安卓返回手势，以及焦点不在浮窗里时的 Escape）与关闭键走同一条路。焦点在浮窗里的
+     Escape 在 keydown 上就处理掉了：那里 `preventDefault` 之后浏览器不再派 `cancel`。
+     里层下拉刚卸掉、焦点要等下一帧才回到触发框，这一帧里焦点在 `body`，Escape 直接变成浮窗的
+     `cancel`。里层弹层还开着时，把这次关闭请求交给最上面那层，只关它。 */
   useLayoutEffect(() => {
     const dialog = ref.current!;
     // 文件选择框的 cancel 会冒泡；详情只处理自己的关闭请求。
-    const cancel = (event: Event) => { if (event.target === dialog) { event.preventDefault(); requestClose() } };
+    const cancel = (event: Event) => {
+      if (event.target !== dialog) return;
+      event.preventDefault();
+      const layer = topOverlay(dialog);
+      if (!layer) { requestClose(); return }
+      layer.focus({ preventScroll: true });
+      layer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    };
     dialog.addEventListener('cancel', cancel);
     return () => dialog.removeEventListener('cancel', cancel);
   }, []);

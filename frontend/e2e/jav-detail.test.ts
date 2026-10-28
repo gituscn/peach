@@ -92,6 +92,13 @@ describe('库外 JAV 作品详情', () => {
       await withPageDiagnostics(page, 'Escape 只关掉里层弹层', async () => {
         assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');
       });
+      /* 下拉卸掉后焦点要等下一帧才回到触发框，这一帧里焦点在 body，Escape 变成浮窗的原生 cancel。 */
+      await page.locator('[data-jav-actions]').getByRole('button', { name: '查找资源', exact: true }).click();
+      await page.getByRole('heading', { name: '查找资源', exact: true }).waitFor();
+      await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+      await page.keyboard.press('Escape');
+      await page.locator('[data-modal-surface]').waitFor({ state: 'detached' });
+      assert.equal(await page.locator('#stage[open]').count(), 1, '焦点在 body 时 Escape 关掉了整个详情');
       await page.locator('[data-jav-actions]').getByRole('button', { name: '想要', exact: true }).click();
       await page.locator('#toasts [data-sonner-toast]').filter({ hasText: '已加入想要' }).waitFor();
       assert.deepEqual(await hit('#toasts [data-sonner-toast]'), { onTop: true, inStage: true }, '操作回执被详情浮窗盖住');
