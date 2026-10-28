@@ -6,7 +6,7 @@ on:
     - cron: '43 5 * * *'
   push:
     branches: [master]
-    paths: [.github/workflows/star-history.yml]
+    paths: [.github/workflows/star-history.yml, scripts/render_star_history.py]
 
 permissions:
   contents: read
@@ -20,41 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # 渲染器只有周粒度数据；列数多于整周数时出现空列，整条线会退成阶梯。
-      - name: 按仓库整周数取列数
-        id: columns
-        shell: bash
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: 按逐日记录生成蜜桃色累计图
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          created=$(gh api "repos/${{ github.repository }}" --jq .created_at)
-          weeks=$(( ($(date -u +%s) - $(date -u -d "$created" +%s)) / 604800 ))
-          echo "value=$(( weeks < 1 ? 1 : (weeks > 52 ? 52 : weeks) ))" >> "$GITHUB_OUTPUT"
-      - name: 生成蜜桃色绝对值图表
-        uses: leereilly/star-chart@e7fa78bdf8f78da6c3feeb3a97b528fd97d62727 # v0.3
-        with:
-          repository: ${{ github.repository }}
-          output: build/star-history.svg
-          style: neon-glow-stream
-          dual_theme: 'true'
-          scale: absolute
-          period: all
-          columns: ${{ steps.columns.outputs.value }}
-          width: '900'
-          animation: none
-          level_1_color: '#ffded4'
-          level_2_color: '#ffb099'
-          level_3_color: '#f68168'
-          level_4_color: '#df533b'
-      - name: 保留渲染器许可
-        run: curl --fail --location https://raw.githubusercontent.com/leereilly/star-chart/e7fa78bdf8f78da6c3feeb3a97b528fd97d62727/LICENSE --output build/star-chart-LICENSE.txt
+        run: python scripts/render_star_history.py --repo "${{ github.repository }}" --output-dir build
       - uses: actions/upload-artifact@v7
         with:
           name: star-history
           path: |
             build/star-history-light.svg
             build/star-history-dark.svg
-            build/star-chart-LICENSE.txt
           if-no-files-found: error
 
   publish:
@@ -83,8 +61,8 @@ jobs:
           fi
           cp ../incoming/star-history-light.svg star-history-light.svg
           cp ../incoming/star-history-dark.svg star-history-dark.svg
-          cp ../incoming/star-chart-LICENSE.txt star-chart-LICENSE.txt
-          git add -- star-history-light.svg star-history-dark.svg star-chart-LICENSE.txt
+          git rm --quiet --ignore-unmatch -- star-chart-LICENSE.txt
+          git add -- star-history-light.svg star-history-dark.svg
           if git diff --cached --quiet; then
             exit 0
           fi
