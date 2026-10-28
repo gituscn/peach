@@ -781,7 +781,7 @@ class ReadmeImpactTests(unittest.TestCase):
             key.assert_not_called()
 
 
-from scripts import co_author
+from scripts import check_commit_message, co_author
 
 
 class CoAuthorTests(unittest.TestCase):
@@ -836,6 +836,39 @@ class CoAuthorTests(unittest.TestCase):
 
     def test_human_coauthor_requires_an_agent_signature(self):
         self.assertTrue(self.signed("Co-Authored-By: Contributor <contributor@example.invalid>"))
+
+    def contributed(self, *trailers):
+        """采纳的社区补丁：作者是贡献者本人，不是本机提交者。"""
+        git(self.repo, "commit", "--allow-empty", "-m", "测试", "-m", "\n".join(trailers) or "说明",
+            "--author", "Contributor <contributor@example.invalid>")
+        return co_author.check(self.repo, "master")
+
+    def test_a_contributor_commit_is_not_given_an_agent_signature_it_never_had(self):
+        """外部贡献者是否用了 AI 由本人说明；门槛不能逼维护者替他补一行 AI 署名。"""
+        self.assertEqual(self.contributed(), [])
+
+    def test_a_contributor_may_name_a_tool_the_maintainer_has_not_registered(self):
+        """工具名单约束的是本机智能体，贡献者用什么工具是他自己的事。"""
+        self.assertEqual(self.contributed("Co-Authored-By: Qoder (Qwen 3) <noreply@qoder.com>"), [])
+
+    def test_a_contributor_signature_still_has_to_be_well_formed(self):
+        self.assertTrue(self.contributed("Co-Authored-By: Codex (GPT-6) <noreply@anthropic.com>"))
+        self.assertTrue(co_author.problems("测试", ["Codex <someone@example.invalid>"], own=False))
+
+    def test_the_local_committer_signs_even_beside_an_adopted_commit(self):
+        self.contributed()
+        self.assertEqual(len(self.signed()), 1)
+
+    def test_an_unknown_local_identity_is_treated_as_the_local_committer(self):
+        """取不到本机邮箱时无法判断作者是谁，按本机提交从严检查。"""
+        self.assertTrue(co_author.is_own("contributor@example.invalid", ""))
+        self.assertFalse(co_author.is_own("contributor@example.invalid", "test@example.invalid"))
+        self.assertTrue(co_author.is_own("Test@Example.invalid", "test@example.invalid"))
+
+    def test_the_commit_hook_reads_the_author_actually_used(self):
+        self.assertEqual(check_commit_message.author_mail(self.repo), "test@example.invalid")
+        self.assertEqual(check_commit_message.check(self.repo, "测试\n", own=False), [])
+        self.assertTrue(check_commit_message.check(self.repo, "测试\n", own=True))
 
     def test_human_coauthor_requires_a_name_and_email(self):
         agent = "Co-Authored-By: Codex (GPT-6) <noreply@openai.com>"
