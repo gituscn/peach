@@ -62,14 +62,33 @@ def initialize() -> None:
 
 def supervise(host: str, port: int, stopping: threading.Event) -> int:
     service = scanner = None
+
+    def serve() -> subprocess.Popen:
+        return launch("serve", "--host", host, "--port", str(port), "--no-mdns", "--no-ledger-sync")
+
+    def stop_all() -> None:
+        nonlocal service, scanner
+        stop_process(scanner)
+        stop_process(service)
+        service = scanner = None
+
+    def restart(environment: dict[str, str]) -> None:
+        # 看守进程之后读设置、拉起服务都按迁移后的位置；原位置留下的位置记录让以后的启动也跟过去。
+        nonlocal service
+        os.environ[settings_file.DATA_ROOT_ENV] = environment[settings_file.DATA_ROOT_ENV]
+        service = serve()
+
     try:
         while not stopping.is_set():
+            # 设置页「更改位置」写下的迁移请求：停服务、搬家、在新位置重新拉起，都在这一轮里做完。
+            from .data_storage import poll_headless
+            if poll_headless(stop_all, restart):
+                continue
             config = settings_file.load_config()
             reload_path = config.directory("state") / onboarding.RELOAD_NAME
             if service is None or reload_path.exists():
                 stop_process(service)
-                service = launch("serve", "--host", host, "--port", str(port),
-                                 "--no-mdns", "--no-ledger-sync")
+                service = serve()
                 reload_path.unlink(missing_ok=True)
             code = service.poll()
             if code is not None:

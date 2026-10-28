@@ -62,7 +62,7 @@ export interface UninstallState {
 
 /** 数据目录里的一类数据。`reclaimable` 是清理这一类能腾出的字节。 */
 export interface StorageCategory {
-  key: string; label: string; description: string; cleanable: boolean;
+  key: string; label: string; description: string; note: string; cleanable: boolean;
   bytes: number; files: number; reclaimable: number;
 }
 
@@ -74,8 +74,9 @@ export interface StorageState {
   total_bytes: number | null;
   system_drive: boolean;
   usage: { measured_at: number; total_bytes: number; total_files: number; categories: StorageCategory[] } | null;
-  job: { state: 'idle' | 'measuring' | 'cleaning'; category?: string; message: string; error?: boolean };
-  relocation: { available: boolean; message: string; last: StorageRelocation | null };
+  job: { state: 'idle' | 'measuring' | 'cleaning'; category?: string; categories?: string[]; message: string; error?: boolean;
+    files?: number; bytes?: number; expected_files?: number | null };
+  relocation: { available: boolean; message: string; steps?: { text: string; command: string }[]; last: StorageRelocation | null };
 }
 
 export interface PeachProxyState { mode: string; proxy_saved: boolean; needs_selection: boolean }

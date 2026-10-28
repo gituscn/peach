@@ -691,11 +691,13 @@ def clean_storage(request: Request, body: dict[str, Any] = Body(default_factory=
     local_only(request)
     same_origin(request)
     config = _storage_config()
-    category = body.get("category")
-    if category not in data_storage.CLEANABLE:
+    # 勾选几类一起清理时传 `categories`；单清一类的旧写法 `category` 照收。
+    raw = body.get("categories", [body.get("category")])
+    categories = raw if isinstance(raw, list) else []
+    if not categories or any(not isinstance(key, str) or key not in data_storage.CLEANABLE for key in categories):
         raise HTTPException(400, "这一类不能在这里清理")
     try:
-        data_storage.JOBS.start(config, category)
+        data_storage.JOBS.start(config, categories)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc)) from exc
     return data_storage.snapshot(config)

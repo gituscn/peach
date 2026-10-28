@@ -16,6 +16,17 @@ CloudDrive2 与 Peach 分别运行。NAS 已有 CloudDrive2 时直接复用；�
 
 仓库根的 `compose.yaml` 使用 `PEACH_MEDIA_ROOT` 指定宿主机已有媒体根；容器中固定为 `/media`。先完成 CloudDrive2 挂载，再启动 Peach。命名卷 `peach-data` 保存 `/data`，不要执行删除该卷的操作。需要绑定现有数据目录时，先做完整备份并确保 UID 1000 可写；不要让另一台 Peach 同时写这份 Peach 数据库。
 
+### 迁移数据目录
+
+`/data` 的位置由宿主机上的挂载决定，容器里改不了，所以配置页「存储空间」不提供「更改位置」，改为列出下面几步。在宿主机上执行：
+
+1. 查出数据卷的名字，以 `_peach-data` 结尾：`docker volume ls`。
+2. 在 `compose.yaml` 所在目录停止 Peach：`docker compose down`。
+3. 把数据卷复制到新文件夹，新文件夹要让 UID 1000 可写：`docker run --rm -v <数据卷名>:/from -v <新文件夹>:/to alpine cp -a /from/. /to/`。
+4. 把 `compose.yaml` 里的 `peach-data:/data` 改成 `<新文件夹>:/data`，再启动：`docker compose up -d`。
+
+确认新位置一切正常之前，不要删除旧数据卷。
+
 ## 首次运行与访问
 
 ### 飞牛、其他 NAS 与局域网访问

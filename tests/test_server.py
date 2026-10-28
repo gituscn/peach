@@ -93,6 +93,31 @@ class ServerTests(unittest.TestCase):
         finally:
             server.stop_process(process)
 
+    def test_relocation_restarts_the_service_on_the_new_data_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(root)})
+            process = subprocess.Popen([sys.executable, "-c", "raise SystemExit(17)"], stdin=subprocess.DEVNULL)
+            process.wait(timeout=15)
+            calls = []
+
+            def relocation(stop, restart):
+                if calls:
+                    return False
+                calls.append(True)
+                stop()
+                restart({"PEACH_DATA_ROOT": str(root / "moved")})
+                return True
+
+            with patch.dict(server.os.environ, {}), \
+                    patch.object(server.settings_file, "load_config", return_value=config), \
+                    patch("peach.data_storage.poll_headless", side_effect=relocation), \
+                    patch.object(server, "launch", return_value=process) as launch:
+                self.assertEqual(server.supervise("127.0.0.1", 8900, threading.Event()), 17)
+                # 迁移后看守进程自己也按新位置读设置，拉起的服务继承这个位置。
+                self.assertEqual(server.os.environ["PEACH_DATA_ROOT"], str(root / "moved"))
+            self.assertEqual(launch.call_count, 1)
+
     def test_service_failure_exits_supervisor(self):
         with tempfile.TemporaryDirectory() as directory:
             config = settings_file.load_config(environ={"PEACH_DATA_ROOT": str(Path(directory).resolve())})
