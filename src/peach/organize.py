@@ -86,7 +86,7 @@ def _location_of(raw: str) -> str | None:
     if location is None and not is_windows_path(raw):
         local = Path(raw)
         for name, mounts in location_mounts().items():
-            if any(within_root(local, mount) for mount in mounts):
+            if any(within_root(local, mount) for mount in mounts if isinstance(mount, Path)):
                 return name
     return location
 
@@ -201,7 +201,7 @@ def scope_path(location: str, path: str = '', roots=None) -> str:
         local = Path(text)
         if local.is_absolute():
             for index, mount in enumerate(location_mounts().get(location, ())):
-                if within_root(local, mount) and index < len(declared.get(location, ())):
+                if isinstance(mount, Path) and within_root(local, mount) and index < len(declared.get(location, ())):
                     tail = local.resolve().relative_to(mount.resolve())
                     text = str(PureWindowsPath(declared[location][index], *tail.parts))
                     break

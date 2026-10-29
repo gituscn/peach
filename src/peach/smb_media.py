@@ -46,6 +46,20 @@ def is_address(value) -> bool:
     return isinstance(value, str) and value.startswith('smb://')
 
 
+def is_remote_address(value) -> bool:
+    """已声明的远端媒体地址：SMB 或 WebDAV。"""
+    if is_address(value):
+        return True
+    from .webdav_media import is_address as is_webdav_address
+    return is_webdav_address(value)
+
+
+def remote_canonical(value) -> str:
+    """按地址协议生成规范化写法，供远端媒体目录去重与包含判断。"""
+    from .webdav_media import canonical as webdav_canonical, is_address as is_webdav_address
+    return webdav_canonical(value) if is_webdav_address(value) else canonical(value)
+
+
 def source_identity(value):
     """将本进程媒体工具的回环地址还原为账本路径。"""
     if _BRIDGE is None or not isinstance(value, str):
@@ -357,13 +371,14 @@ class _OwnedReader(io.IOBase):
 
 
 def resolve(raw, config=None):
-    """仅解析已声明的 SMB 根；普通本机文件返回 None。"""
+    """仅解析已声明的远端根；普通本机文件返回 None。"""
     if isinstance(raw, SmbResource):
         return raw
     from . import media_identity, settings_file
     from .platform import resolve_root
     config = config or settings_file.active()
-    if not any(value.get('transport') == 'smb' for value in getattr(config, 'storage_roots', {}).values()):
+    transports = {value.get('transport') for value in getattr(config, 'storage_roots', {}).values()}
+    if not transports & {'smb', 'webdav'}:
         return None
     location, index, tail = resolve_root(str(raw), config.locations)
     if location is None:
@@ -372,9 +387,13 @@ def resolve(raw, config=None):
     roots = media_identity.catalog(config)[1]
     found = next(((key, value) for key, value in roots.items()
                   if media_identity.path_key(value['root']) == media_identity.path_key(declared)), None)
-    if found is None or found[1].get('transport') != 'smb':
+    if found is None or found[1].get('transport') not in {'smb', 'webdav'}:
         return None
     key, value = found
+    if value['transport'] == 'webdav':
+        from .webdav_media import WebDavResource, connection_for as webdav_connection_for
+        return WebDavResource(key, declared, value['mount'], tail,
+                              webdav_connection_for(config, key, value['mount']))
     return SmbResource(key, declared, value['mount'], tail, connection_for(config, key, value['mount']))
 
 
