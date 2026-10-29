@@ -112,23 +112,29 @@ function outside(event: MouseEvent | PointerEvent): boolean {
 
 function StageDialog({ view: current }: { view: View }) {
   const ref = useRef<HTMLDialogElement>(null);
-  /* 原生 `cancel`（安卓返回手势，以及焦点不在浮窗里时的 Escape）与关闭键走同一条路。焦点在浮窗里的
-     Escape 在 keydown 上就处理掉了：那里 `preventDefault` 之后浏览器不再派 `cancel`。
-     里层下拉刚卸掉、焦点要等下一帧才回到触发框，这一帧里焦点在 `body`，Escape 直接变成浮窗的
-     `cancel`。里层弹层还开着时，把这次关闭请求交给最上面那层，只关它。 */
+  /* 关闭请求先交给浮窗里最上面那层弹层，没有才关详情。焦点在浮窗里的 Escape 由下面的 `onKeyDown`
+     处理；里层下拉刚卸掉、焦点要等下一帧才回到触发框，这一帧里焦点在 `body`，Escape 不经过浮窗，
+     由 document 上的 keydown 接住。两处都在 keydown 上 `preventDefault`，浏览器不再派 `cancel`：
+     `cancel` 只在窗口还有历史操作激活时才可取消，取消不了就会原生关掉整个浮窗。
+     原生 `cancel` 只剩 Escape 之外的关闭请求，例如安卓返回手势。 */
   useLayoutEffect(() => {
     const dialog = ref.current!;
-    // 文件选择框的 cancel 会冒泡；详情只处理自己的关闭请求。
-    const cancel = (event: Event) => {
-      if (event.target !== dialog) return;
-      event.preventDefault();
+    const dismiss = () => {
       const layer = topOverlay(dialog);
       if (!layer) { requestClose(); return }
       layer.focus({ preventScroll: true });
       layer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     };
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || !dialog.open || dialog.contains(event.target as Node)) return;
+      event.preventDefault();
+      dismiss();
+    };
+    // 文件选择框的 cancel 会冒泡；详情只处理自己的关闭请求。
+    const cancel = (event: Event) => { if (event.target === dialog) { event.preventDefault(); dismiss() } };
+    document.addEventListener('keydown', keydown);
     dialog.addEventListener('cancel', cancel);
-    return () => dialog.removeEventListener('cancel', cancel);
+    return () => { document.removeEventListener('keydown', keydown); dialog.removeEventListener('cancel', cancel) };
   }, []);
   const { phase, content } = current;
   /* 原地换条时关注详情按条目重建：选中的那份媒体、写操作的忙碌与失败都只属于上一条。作品详情

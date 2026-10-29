@@ -92,13 +92,20 @@ describe('库外 JAV 作品详情', () => {
       await withPageDiagnostics(page, 'Escape 只关掉里层弹层', async () => {
         assert.equal(await page.locator('#stage[open]').count(), 1, 'Escape 只关掉里层弹层');
       });
-      /* 下拉卸掉后焦点要等下一帧才回到触发框，这一帧里焦点在 body，Escape 变成浮窗的原生 cancel。 */
+      /* 下拉卸掉后焦点要等下一帧才回到触发框，这一帧里焦点在 body，Escape 不经过浮窗。弹层容器里
+         这时还留着焦点范围的哨兵，最后一个子元素不是弹层。 */
       await page.locator('[data-jav-actions]').getByRole('button', { name: '查找资源', exact: true }).click();
-      await page.getByRole('heading', { name: '查找资源', exact: true }).waitFor();
+      await goal.click();
+      await panel.getByRole('option', { name: '高清', exact: true }).click();
+      await panel.waitFor({ state: 'detached' });
       await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+      const layers = await page.evaluate(() => [...document.querySelectorAll('#stage > [data-react-overlays] > *')]
+        .map(node => `${node.tagName}${Object.keys((node as HTMLElement).dataset).map(key => `[${key}]`).join('')}`).join(' '));
       await page.keyboard.press('Escape');
       await page.locator('[data-modal-surface]').waitFor({ state: 'detached' });
-      assert.equal(await page.locator('#stage[open]').count(), 1, '焦点在 body 时 Escape 关掉了整个详情');
+      await withPageDiagnostics(page, `焦点在 body 时 Escape 关掉了整个详情；弹层容器：${layers}`, async () => {
+        assert.equal(await page.locator('#stage[open]').count(), 1);
+      });
       await page.locator('[data-jav-actions]').getByRole('button', { name: '想要', exact: true }).click();
       await page.locator('#toasts [data-sonner-toast]').filter({ hasText: '已加入想要' }).waitFor();
       assert.deepEqual(await hit('#toasts [data-sonner-toast]'), { onTop: true, inStage: true }, '操作回执被详情浮窗盖住');
