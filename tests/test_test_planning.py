@@ -683,6 +683,7 @@ class TestPlanningTests(unittest.TestCase):
             for test in (first, second):
                 result.startTest(test)
                 result.stopTest(test)
+            result.stopTestRun()
         self.assertEqual(result.files, {'test_alpha': 6.0, 'test_beta': 4.0})
         self.assertEqual([seconds for seconds, _ in result.timings], [1.0, 1.0])
         with tempfile.TemporaryDirectory() as directory:
@@ -692,6 +693,27 @@ class TestPlanningTests(unittest.TestCase):
             self.assertEqual(runner.load_file_seconds(table), {'test_alpha': 2.5, 'test_beta': 4.0})
             table.write_text('不是 JSON', encoding='utf-8')
             self.assertEqual(runner.load_file_seconds(table), {})
+
+    def test_background_thread_exceptions_fail_the_suite_and_restore_the_hook(self):
+        import threading
+        previous = threading.excepthook
+        def crash():
+            raise RuntimeError('background fixture failed')
+        class Case(unittest.TestCase):
+            def runTest(self):
+                thread = threading.Thread(target=crash, name='fixture-worker')
+                thread.start()
+                thread.join()
+        with patch.object(threading, 'excepthook') as original_hook:
+            result = unittest.TextTestRunner(stream=io.StringIO(), resultclass=runner.TimedResult).run(
+                unittest.TestSuite([Case()]))
+            self.assertIs(threading.excepthook, original_hook)
+            original_hook.assert_called_once()
+        self.assertIs(threading.excepthook, previous)
+        self.assertFalse(result.wasSuccessful())
+        self.assertEqual(len(result.errors), 1)
+        self.assertIn('background fixture failed', result.errors[0][1])
+        self.assertTrue(any(row['outcome'] == 'error' for row in result.results))
 
     def test_jobs_accepts_auto_or_a_positive_integer(self):
         self.assertEqual(runner.resolve_jobs('3'), 3)

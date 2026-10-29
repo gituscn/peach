@@ -108,6 +108,13 @@ class FeedWebFixture(unittest.TestCase):
         self._fetch_cover = feed_followup.fetch_cover
         feed_followup.fetch_cover = self._fake_cover
         self.addCleanup(lambda: setattr(feed_followup, "fetch_cover", self._fetch_cover))
+        self.addCleanup(self._finish_feed_job)
+
+    def _finish_feed_job(self):
+        thread = self.contract.feed_job.thread
+        self.contract.feed_job.stop(timeout=15)
+        if thread is not None:
+            self.assertFalse(thread.is_alive(), '检查线程未结束，不能还原替身或删除临时账本')
 
     def _fake_cover(self, contract, code, cover_url=None):
         self.cover_urls[code] = cover_url
