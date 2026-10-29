@@ -81,6 +81,20 @@ def legacy_sidecar(path: Path, rows: list[tuple[int, int, int]], *, version=0) -
     return header
 
 
+def tail_mp4(**options) -> bytes:
+    """把正常布局里的 moov 搬到媒体后，并把块偏移改到新的媒体起点。"""
+    blob = minimal_mp4(timescale=1000, sample_delta=400, samples=len(DECODE_TO_DISPLAY),
+                       keyframe_every=6, **options)
+    moov_span = next((body - 8, stop) for kind, body, stop in _iter_boxes(blob, 0, len(blob))
+                     if kind == b"moov")
+    start, stop = moov_span
+    moov = blob[start:stop]
+    tree = mp4repair._parse(moov, 8, len(moov))
+    root = mp4repair._Box(b"moov", None, tree)
+    mp4repair._shift_chunk_offsets(root, -len(moov))
+    return blob[:start] + blob[stop:] + root.serialize()
+
+
 class Mp4HeaderRepairTests(unittest.TestCase):
     def setUp(self) -> None:
         self._temporary = TemporaryDirectory()
@@ -131,6 +145,87 @@ class Mp4HeaderRepairTests(unittest.TestCase):
         self.assertEqual(after[0][0], len(header.prefix))
         self.assertEqual(after[-1][0],
                          header.size - SAMPLE_SIZE, "最后一个块没落在文件末尾那一段上")
+
+    def test_a_tail_moov_is_moved_ahead_of_the_media_without_rewriting_samples(self):
+        source = self.root / "tail.mp4"
+        source.write_bytes(tail_mp4())
+        header = self.repair(source)
+        blob = source.read_bytes()
+
+        self.assertEqual(blob[header.payload_start:header.payload_end],
+                         sample_bytes(len(DECODE_TO_DISPLAY)))
+        self.assertEqual(header.suffix, b"")
+        moov = moov_of(header.prefix)
+        self.assertEqual(next(_iter_boxes(moov, 0, len(moov)))[0], b"mvhd")
+
+    def test_tail_layout_chunk_offsets_point_into_the_spliced_media(self):
+        source = self.root / "tail.mp4"
+        source.write_bytes(tail_mp4())
+        header = self.repair(source)
+        after = entries(table(moov_of(header.prefix), b"stco"), ">I")
+
+        self.assertEqual(after[0][0], len(header.prefix))
+        self.assertEqual(after[-1][0], header.size - SAMPLE_SIZE)
+
+    def test_other_tail_boxes_stay_after_the_media_when_moov_moves(self):
+        source = self.root / "tail.mp4"
+        media = tail_mp4()
+        moov_start = media.rfind(b"moov") - 4
+        source.write_bytes(media[:moov_start] + b"\x00\x00\x00\x10freeABCDEFGH" + media[moov_start:])
+        header = self.repair(source)
+
+        self.assertEqual(header.suffix, b"\x00\x00\x00\x10freeABCDEFGH")
+
+    def test_tail_layout_moves_64_bit_chunk_offsets_with_the_media(self):
+        blob = tail_mp4()
+        start = blob.rfind(b'moov') - 4
+        root = mp4repair._Box(b'moov', None, mp4repair._parse(blob[start:], 8, len(blob) - start))
+        video = next(child for child in root.children if child.kind == b'trak')
+        stco = mp4repair._sample_table(video).find(b'stco')
+        offsets = entries(stco.payload, '>I')
+        stco.kind = b'co64'
+        stco.payload = stco.payload[:8] + b''.join(struct.pack('>Q', value) for value, in offsets)
+        source = self.root / 'co64.mp4'
+        source.write_bytes(blob[:start] + root.serialize())
+
+        header = self.repair(source)
+
+        self.assertEqual(entries(table(moov_of(header.prefix), b'co64'), '>Q'),
+                         [(len(header.prefix) + index * SAMPLE_SIZE,)
+                          for index in range(len(DECODE_TO_DISPLAY))])
+
+    def test_extended_size_tail_moov_uses_its_actual_payload_start(self):
+        blob = tail_mp4()
+        start = blob.rfind(b'moov') - 4
+        moov = blob[start:]
+        source = self.root / 'extended.mp4'
+        source.write_bytes(blob[:start] + struct.pack('>I4sQ', 1, b'moov', len(moov) + 8) + moov[8:])
+        header = self.repair(source)
+        self.assertEqual(entries(table(moov_of(header.prefix), b'stco'), '>I')[0][0], len(header.prefix))
+        normal = self.broken_mp4(self.root / 'normal.mp4')
+        self.assertEqual(composition_times(moov_of(header.prefix), 400),
+                         composition_times(moov_of(self.repair(normal).prefix), 400))
+
+    def test_tail_layout_requires_one_media_box_and_bounded_metadata(self):
+        source = self.root / 'tail.mp4'
+        source.write_bytes(tail_mp4() + b'\x00\x00\x00\x0cmdatDATA')
+        with self.assertRaisesRegex(RepairUnavailable, '各有一个'):
+            self.repair(source)
+        source.write_bytes(tail_mp4())
+        with patch.object(mp4repair, 'HEADER_LIMIT', 24):
+            with self.assertRaises(RepairUnavailable):
+                self.repair(source)
+
+    def test_ambiguous_tail_edit_start_keeps_the_transcode_fallback(self):
+        source = self.root / 'tail.mp4'
+        source.write_bytes(tail_mp4(edit_list=(5200, 800)))
+        with self.assertRaisesRegex(RepairUnavailable, '预卷与裁剪'):
+            self.repair(source)
+        for start in (0, 400):
+            with self.subTest(start=start):
+                source.write_bytes(tail_mp4(edit_list=(5200, start)))
+                self.assertEqual(entries(edit_list_of(self.repair(source)), '>IiI'),
+                                 [(5200, 400, 1 << 16)])
 
     def test_an_edit_list_that_already_compensates_the_shift_is_left_alone(self):
         """封装器为 ctts 补过的那一刀要原样留着，再补一次会真的切掉开头那两帧。"""

@@ -4,6 +4,7 @@
 修好之后文件和账本落成什么样。重建头的算术在 `test_mp4repair` 里，重建索引的判据在
 `test_mp4recover` 里。
 """
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -18,6 +19,7 @@ from peach.mp4repair import RepairUnavailable
 from peach import mp4repair
 
 from support.ledger import fresh_ledger
+from test_mp4repair import tail_mp4
 
 SEP = chr(92)
 #: 顶层只有 `ftyp` 和写到文件末尾的 `mdat`：下载没写完、缺整个索引的那一类。
@@ -263,6 +265,40 @@ class MediaRepairRunTests(unittest.TestCase):
         self.assertEqual(self.transcodes.asked, [])
         saved = rm_repair._load_cache(self.contract)
         self.assertEqual(saved[rm_repair._key(3, self.media / 'fine.mp4')], rm_repair.CLEAN)
+
+    def test_old_failed_tail_layout_is_rechecked_without_rescanning_other_files(self):
+        (self.media / 'favourite.mp4').write_bytes(tail_mp4())
+        entries = {rm_repair._key(asset_id, self.media / name): verdict
+                   for asset_id, name, verdict in (
+                       (1, 'seldom.mp4', rm_repair.UNAVAILABLE),
+                       (2, 'favourite.mp4', rm_repair.UNAVAILABLE),
+                       (3, 'fine.mp4', rm_repair.CLEAN),
+                       (6, 'cut.mp4', rm_repair.UNAVAILABLE))}
+        path = rm_repair._cache_path(self.contract)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({'version': 1, 'entries': entries}), encoding='utf-8')
+
+        state = self.run_once()
+
+        self.assertEqual(self.transcodes.asked, ['favourite.mp4'])
+        self.assertEqual(self.store.repaired, [2])
+        self.assertEqual((state['repaired'], state['failed']), (1, 0))
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual(saved['version'], 2)
+        self.assertEqual(saved['entries'][rm_repair._key(1, self.media / 'seldom.mp4')],
+                         rm_repair.UNAVAILABLE)
+
+    def test_a_current_failed_tail_layout_stays_cached(self):
+        (self.media / 'favourite.mp4').write_bytes(tail_mp4())
+        cache = {rm_repair._key(asset_id, self.media / name): rm_repair.UNAVAILABLE
+                 for asset_id, name in ((1, 'seldom.mp4'), (2, 'favourite.mp4'),
+                                        (3, 'fine.mp4'), (6, 'cut.mp4'))}
+        rm_repair._save_cache(self.contract, cache)
+
+        self.run_once()
+
+        self.assertEqual(self.transcodes.asked, [])
+        self.assertEqual(self.store.repaired, [])
 
     def test_a_changed_file_is_judged_again(self):
         """结论跟着文件的大小和改动时间走：换了内容，上一轮的结论就不作数。"""

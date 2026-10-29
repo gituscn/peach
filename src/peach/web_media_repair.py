@@ -24,7 +24,7 @@ import subprocess
 import time
 from pathlib import Path, PureWindowsPath
 
-from . import media_libraries, media_probe, mp4recover, settings_file
+from . import media_libraries, media_probe, mp4recover, mp4repair, settings_file
 from .mp4repair import RepairUnavailable
 from .platform import translate_ledger_path
 
@@ -34,6 +34,7 @@ SCAN_CACHE_NAME = "mp4-repair-scan.json"
 #: 文件身份对应的判定缓存；修复产物由边车或新文件核验。
 CLEAN = "clean"
 UNAVAILABLE = "unavailable"
+LEGACY_UNAVAILABLE = "unavailable-layout-v1"
 
 #: 缺时间戳表，修的是边车。
 HEADER = "header"
@@ -53,7 +54,10 @@ def _load_cache(contract) -> dict[str, str]:
     except (OSError, ValueError):
         return {}
     entries = payload.get("entries") if isinstance(payload, dict) else None
-    return {str(key): str(value) for key, value in entries.items()} if isinstance(entries, dict) else {}
+    if not isinstance(entries, dict):
+        return {}
+    return {str(key): LEGACY_UNAVAILABLE if value == UNAVAILABLE and payload.get('version', 1) == 1
+            else str(value) for key, value in entries.items()}
 
 
 def _save_cache(contract, entries: dict[str, str]) -> None:
@@ -61,7 +65,7 @@ def _save_cache(contract, entries: dict[str, str]) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(json.dumps({"version": 1, "entries": entries}), encoding="utf-8")
+        temporary.write_text(json.dumps({"version": 2, "entries": entries}), encoding="utf-8")
         temporary.replace(path)
     except OSError:
         # 结论缓存丢了只是下次重扫一遍，不该让整轮任务失败。
@@ -117,6 +121,15 @@ def _survey(contract, job, job_id: str, rows, cache: dict[str, str]) -> list[tup
             _advance(job, job_id, index, skipped=True)
             continue
         kind = cache.get(key)
+        if kind == LEGACY_UNAVAILABLE:
+            try:
+                kind = None if mp4repair.has_tail_moov(source) else UNAVAILABLE
+            except OSError:
+                _advance(job, job_id, index, skipped=True)
+                continue
+            if kind == UNAVAILABLE:
+                cache[key] = kind
+                _save_cache(contract, cache)
         if kind == UNAVAILABLE and store.has_invalid_sidecar(asset_id, source):
             kind = HEADER
         if kind in (CLEAN, UNAVAILABLE):
