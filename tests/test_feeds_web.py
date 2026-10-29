@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from datetime import timedelta
@@ -149,12 +150,48 @@ class FeedWebFixture(unittest.TestCase):
         original = web_feeds._transport
         web_feeds._transport = lambda contract: self.transport
         try:
-            return dispatch_api_post(self.contract, "/api/feeds/check", {"all": True, **body})
+            result = dispatch_api_post(self.contract, "/api/feeds/check", {"all": True, **body})
+            if not body.get('background'):
+                thread = self.contract.feed_job.thread
+                if thread is not None:
+                    thread.join(15)
+                    self.assertFalse(thread.is_alive(), '本轮结算未退出，不能启动下一轮或还原传输替身')
+            return result
         finally:
             web_feeds._transport = original
 
 
 class FeedWebTest(FeedWebFixture):
+    def test_synchronous_checks_wait_for_settlement_before_returning(self):
+        self._add()
+        settling, release, returned = threading.Event(), threading.Event(), threading.Event()
+        errors = []
+        original = self.contract.feed_job._finish_execution
+        def finish(job_id):
+            settling.set()
+            if not release.wait(5):
+                raise TimeoutError('未释放测试结算')
+            original(job_id)
+        def check():
+            try:
+                self._check()
+            except Exception as error:
+                errors.append(error)
+            finally:
+                returned.set()
+        with patch.object(self.contract.feed_job, '_finish_execution', side_effect=finish):
+            caller = threading.Thread(target=check)
+            caller.start()
+            try:
+                self.assertTrue(settling.wait(5))
+                self.assertFalse(returned.wait(0.05), '同步夹具在后台结算完成前返回')
+            finally:
+                release.set()
+                caller.join(5)
+        self.assertTrue(returned.is_set())
+        self.assertEqual(errors, [])
+        self.assertFalse(self.contract.feed_job.thread.is_alive())
+
     def test_schedule_route_reports_feed_scheduler_failures(self):
         from peach.follow_scheduler import FEED_JOB_ID, FollowScheduleConfig, FollowUpdateScheduler
         idle = dispatch_api_get(self.contract, "/api/feeds/schedule", {})
