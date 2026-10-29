@@ -203,6 +203,26 @@ macOS 按影响域验证：
 ffmpeg 起不来是事实，但它不该挡住一次只改文档的 `checks`。域由选中的测试源码推出来。
 确认本次无关时用 `PEACH_SKIP_PREFLIGHT=1` 整体跳过预检；分片子进程不重复预检。
 
+### 交付预检与 PR 绑定
+
+最后交付提交完成后，先在当前隔离工作树根目录运行元数据预检，再开始耗时验证或推送。预检核对工作树干净、目标分支已纳入，以及提交主题、署名和 README 声明。
+
+Windows（PowerShell 7）运行预检：
+
+```powershell
+& .\.venv\Scripts\python.exe -X utf8 .\scripts\agent_worktree.py preflight
+```
+
+macOS/Linux（zsh）运行同一预检：
+
+```zsh
+./.venv/bin/python -X utf8 scripts/agent_worktree.py preflight
+```
+
+`preflight` 不安装依赖、不计算测试环境身份、不读取或签发测试证明，也不访问远端 PR。退出码为 `0` 只表示元数据通过；`tests` 与 `pull_request` 仍是 `not_checked`。`ready` 和 `integrate` 继续使用相同元数据判据，并核对当前内容对应的正式测试记录。
+
+`integrate` 在合并前通过工作树的 GitHub CLI 仓库上下文取得 PR。PR 必须开放，`headRefOid` 等于工作者当前提交，`baseRefName` 等于集成目标分支；成功回执保留 PR 链接及这两个身份。未取得 PR、字段无效或身份不匹配时停止，不改变主线内容。此核对不替代 PR 审阅、对应提交的 CI 与既有预览确认。
+
 ## 定向调试与局部记录
 
 Windows 的 `-Focus` 接受 Python 模块、类、方法或仓库相对路径，可传数组；通过 `pwsh -File` 调用时也接受一个逗号分隔参数。macOS/Linux 对每个选择器重复传 `--focus`。入口统一去重，拒绝空项并核对源码及隔离依赖。选择器不存在、浏览器路径超出 `frontend/e2e` 或与分片混用时拒绝执行。浏览器用例只收单个 `frontend/e2e/*.test.ts` 文件，不收目录；要跑全部 e2e 时把文件逐个列进数组。
