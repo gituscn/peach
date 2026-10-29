@@ -113,10 +113,15 @@ def _survey(contract, job, job_id: str, rows, cache: dict[str, str]) -> list[tup
             key = _key(asset_id, source)
         except OSError:
             continue
-        if store.lookup(asset_id, source) is not None or cache.get(key) in (CLEAN, UNAVAILABLE):
+        if store.lookup(asset_id, source) is not None:
             _advance(job, job_id, index, skipped=True)
             continue
         kind = cache.get(key)
+        if kind == UNAVAILABLE and store.has_invalid_sidecar(asset_id, source):
+            kind = HEADER
+        if kind in (CLEAN, UNAVAILABLE):
+            _advance(job, job_id, index, skipped=True)
+            continue
         if kind not in (HEADER, INDEX):
             try:
                 kind = _diagnose(contract, source, duration)
