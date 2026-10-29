@@ -14,7 +14,7 @@ from peach import minnano_av, performer_header
 from peach import web_contract as rm_web
 from peach.entities import normalize_entity_name
 from peach.genre_decisions import record_genre_decision
-from peach.performer_profiles import write_profile
+from peach.performer_profiles import read_profile, write_profile
 from peach.web_entity import q_entity_shapes
 from support.ledger import fresh_ledger
 
@@ -58,6 +58,12 @@ ALICE = """<!doctype html><html lang="ja"><head>
 
 
 class NameEntryTests(unittest.TestCase):
+    def test_alias_annotation_cells_have_no_names(self):
+        for marker in ("(注)", "（注）", "【注】"):
+            with self.subTest(marker=marker):
+                self.assertEqual(minnano_av.name_entries(
+                    f"<p>{marker}現在は”楓カレン”が正式女優名です。…復活！！ （ / ）</p>"), [])
+
     def test_alias_cells_split_names_and_carry_their_channel_note(self):
         self.assertEqual(
             [(entry["name"], entry["note"], entry["reading"]) for entry in
@@ -107,6 +113,28 @@ class Case(unittest.TestCase):
 
 
 class HeaderTests(Case):
+    def test_cached_alias_annotations_stay_in_raw_profile_only(self):
+        entity_id = self.entity("枫花恋", ("楓カレン", "avdb"),
+                                ("田中レモン", "auto:performer-alias@1"))
+        annotation = '(注)現在は”楓カレン”が正式女優名です。…復活！！ （ / ）'
+        profile = {
+            "kana": "かえでかれん", "raw": {
+                "名前": "楓カレン", "別名": [
+                    "楓カレン （かえでかれん / Kaede Karen）",
+                    "田中レモン(旧名) （たなかれもん / Tanaka Remon）", annotation]}}
+        with self.connection:
+            write_profile(self.connection, entity_id, profile,
+                          source="auto:performer-profile@1", source_url="https://example.invalid/",
+                          fetched_at=STAMP)
+        groups = self.header(entity_id, "枫花恋")["name_groups"]
+        self.assertEqual(groups["shown"], ["楓カレン", "田中レモン"])
+        self.assertEqual(groups["total"], 2)
+        self.assertEqual([(group["label"], [entry["name"] for entry in group["names"]])
+                          for group in groups["groups"]],
+                         [("现名", ["楓カレン"]), ("旧名义", ["田中レモン"])])
+        raw = read_profile(self.connection, entity_id)["raw"]
+        self.assertIn(annotation, raw["別名"])
+
     def test_five_facts_and_the_name_groups_of_the_header(self):
         shinoda = self.entity(
             "篠田优", ("篠田ゆう", "avdb"), ("Yu Shinoda", "r18:performer"),
