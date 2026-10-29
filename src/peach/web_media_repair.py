@@ -144,7 +144,7 @@ def _survey(contract, job, job_id: str, rows, cache: dict[str, str]) -> list[tup
             found.append((asset_id, raw, kind))
         cache[key] = kind or CLEAN
         _save_cache(contract, cache)
-        if not job.checkpoint(job_id, survey_checked=index, survey_cache=dict(cache)):
+        if not job.checkpoint(job_id, survey_checked=index, survey_cache=dict(cache), survey_cache_version=2):
             raise InterruptedError('媒体检查已停止')
         _advance(job, job_id, index, skipped=False)
     return found
@@ -268,9 +268,13 @@ def run_media_repair(contract, job_id: str, scope: tuple[str, list]) -> None:
     """一轮完整的批量修复。异常由 `BackgroundJob` 变成可轮询的失败状态。"""
     job = contract.media_repair_job
     cache = _load_cache(contract)
-    cache.update((job.snapshot() or {}).get('survey_cache') or {})
-    rows = _candidates(contract, scope)
     previous = job.snapshot() or {}
+    resumed_cache = previous.get('survey_cache') or {}
+    if previous.get('survey_cache_version', 1) == 1:
+        resumed_cache = {key: LEGACY_UNAVAILABLE if value == UNAVAILABLE else value
+                         for key, value in resumed_cache.items()}
+    cache.update(resumed_cache)
+    rows = _candidates(contract, scope)
     job.update(job_id, stage="扫描", total=len(rows), checked=previous.get('survey_checked', 0))
     found = _survey(contract, job, job_id, rows, cache)
     _save_cache(contract, cache)

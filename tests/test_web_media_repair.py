@@ -300,6 +300,26 @@ class MediaRepairRunTests(unittest.TestCase):
         self.assertEqual(self.transcodes.asked, [])
         self.assertEqual(self.store.repaired, [])
 
+    def test_a_resumed_old_checkpoint_rechecks_failed_tail_layouts(self):
+        (self.media / 'favourite.mp4').write_bytes(tail_mp4())
+        cache = {rm_repair._key(asset_id, self.media / name): rm_repair.CLEAN
+                 for asset_id, name in ((1, 'seldom.mp4'), (2, 'favourite.mp4'),
+                                        (3, 'fine.mp4'), (6, 'cut.mp4'))}
+        cache[rm_repair._key(2, self.media / 'favourite.mp4')] = rm_repair.UNAVAILABLE
+        original = rm_repair.run_media_repair
+
+        def resumed(contract, job_id, scope):
+            contract.media_repair_job.update(job_id, survey_cache=cache)
+            original(contract, job_id, scope)
+
+        with mock.patch.object(rm_repair, 'run_media_repair', resumed):
+            state = self.run_once()
+
+        self.assertEqual(state['repaired'], 1)
+        self.assertEqual(self.transcodes.asked, ['favourite.mp4'])
+        self.assertEqual(self.store.repaired, [2])
+        self.assertEqual(self.contract.media_repair_job.snapshot()['survey_cache_version'], 2)
+
     def test_a_changed_file_is_judged_again(self):
         """结论跟着文件的大小和改动时间走：换了内容，上一轮的结论就不作数。"""
         self.run_once()
