@@ -110,22 +110,25 @@ function outside(event: MouseEvent | PointerEvent): boolean {
   return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
 }
 
+function requestEscape(): void {
+  const dialog = stageDialog();
+  const layer = dialog && topOverlay(dialog);
+  if (!layer) { requestClose(); return }
+  layer.focus({ preventScroll: true });
+  layer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+}
+
 function StageDialog({ view: current }: { view: View }) {
   const ref = useRef<HTMLDialogElement>(null);
-  /* 原生 `cancel`（安卓返回手势，以及焦点不在浮窗里时的 Escape）与关闭键走同一条路。焦点在浮窗里的
-     Escape 在 keydown 上就处理掉了：那里 `preventDefault` 之后浏览器不再派 `cancel`。
-     里层下拉刚卸掉、焦点要等下一帧才回到触发框，这一帧里焦点在 `body`，Escape 直接变成浮窗的
-     `cancel`。里层弹层还开着时，把这次关闭请求交给最上面那层，只关它。 */
+  /* 全局键盘入口与浮窗共用 requestEscape，在 keydown 上 preventDefault，避免焦点在 body 时
+     绕过弹层判断。原生 cancel 保留给其他关闭请求；不可取消的事件不能阻止浏览器关闭浮窗。 */
   useLayoutEffect(() => {
     const dialog = ref.current!;
     // 文件选择框的 cancel 会冒泡；详情只处理自己的关闭请求。
     const cancel = (event: Event) => {
       if (event.target !== dialog) return;
       event.preventDefault();
-      const layer = topOverlay(dialog);
-      if (!layer) { requestClose(); return }
-      layer.focus({ preventScroll: true });
-      layer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+      requestEscape();
     };
     dialog.addEventListener('cancel', cancel);
     return () => dialog.removeEventListener('cancel', cancel);
@@ -143,7 +146,7 @@ function StageDialog({ view: current }: { view: View }) {
         /* 里层弹层（标签搜索框、右键菜单）先处理 Escape 并 `preventDefault`，这一下就不再关浮窗。 */
         if (event.key !== 'Escape' || event.defaultPrevented) return;
         event.preventDefault();
-        requestClose();
+        requestEscape();
       }}
       onPointerDown={(event) => { dismissArmed = outside(event) }}
       onClick={(event) => { if (dismissArmed && outside(event)) requestClose() }}>
@@ -420,7 +423,7 @@ function repaintPoster(): void {
 }
 
 const api: StageApi = {
-  open, update, exit, dispose, requestClose, repaintPoster,
+  open, update, exit, dispose, requestClose, requestEscape, repaintPoster,
   isOpen: () => !!view,
   showing: () => (view && swappable(view.content.kind) ? view.content.kind : null),
   activeVideo: () => player.activeStageVideo(),
