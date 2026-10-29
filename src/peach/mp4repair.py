@@ -297,11 +297,22 @@ def _shift_chunk_offsets(box: _Box, delta: int) -> None:
 _Span = tuple[bytes, int, int, int]
 
 
-def _layout(source: Path) -> tuple[bytes, _Span, _Span]:
-    """读出 `mdat` 之前那一整段，并确认这个布局拼得回去。
+@dataclass(frozen=True)
+class _Layout:
+    before: bytes
+    mdat_header: bytes
+    suffix: bytes
+    mdat: _Span
+    moov_box: bytes
+    moov_body: int
+    moov_before_start: int | None
 
-    拼接只换头、原样接上 `mdat`，所以 `mdat` 必须是最后一个盒子，前面的东西也得
-    一次读得完。不满足就抛 `RepairUnavailable`，让调用方回到转码那条路。
+
+def _layout(source: Path) -> _Layout:
+    """读出 `mdat` 和 `moov`，返回拼回虚拟文件所需的几段。
+
+    faststart 文件把 `moov` 放在媒体前面，尾部只允许没有盒子；下载器常见的布局则把
+    `moov` 放在末尾。后一种只多读媒体之后的索引段，媒体仍按原字节流发送，不复制原片。
     """
     from .smb_media import SmbResource
     with (source.open() if isinstance(source, SmbResource) else open(source, 'rb')) as handle:
@@ -309,22 +320,44 @@ def _layout(source: Path) -> tuple[bytes, _Span, _Span]:
         kinds = {kind for kind, *_ in boxes}
         if not {b"moov", b"mdat"} <= kinds:
             raise RepairUnavailable("顶层缺 moov 或 mdat")
+        if any(sum(box[0] == kind for box in boxes) != 1 for kind in (b"moov", b"mdat")):
+            raise RepairUnavailable("顶层必须各有一个 moov 和 mdat")
         mdat = next(box for box in boxes if box[0] == b"mdat")
         moov = next(box for box in boxes if box[0] == b"moov")
-        if moov[1] > mdat[1]:
-            raise RepairUnavailable("moov 在 mdat 之后，这个布局还没支持")
-        if any(box[1] > mdat[1] for box in boxes):
-            raise RepairUnavailable("mdat 后面还有盒子，这个布局还没支持")
         if mdat[3] - mdat[2] <= 0 or moov[3] - moov[1] > HEADER_LIMIT:
             raise RepairUnavailable("moov 太大或 mdat 是空的")
+        if mdat[2] > HEADER_LIMIT:
+            raise RepairUnavailable("媒体前的索引段太大")
+        if moov[1] < mdat[1]:
+            if any(box[1] > mdat[1] for box in boxes):
+                raise RepairUnavailable("mdat 后面还有盒子，这个布局还没支持")
+            handle.seek(moov[1])
+            moov_box = handle.read(moov[3] - moov[1])
+            handle.seek(0)
+            before = handle.read(mdat[1])
+            handle.seek(mdat[1])
+            mdat_header = handle.read(mdat[2] - mdat[1])
+            return _Layout(before, mdat_header, b"", mdat, moov_box, moov[2] - moov[1], moov[1])
+        after_size = handle.seek(0, 2) - mdat[3]
+        if after_size > HEADER_LIMIT - mdat[2]:
+            raise RepairUnavailable("媒体后的索引段太大")
         handle.seek(0)
-        return handle.read(mdat[2]), moov, mdat
+        before = handle.read(mdat[1])
+        handle.seek(mdat[1])
+        mdat_header = handle.read(mdat[2] - mdat[1])
+        handle.seek(mdat[3])
+        after = handle.read(after_size)
+        start = moov[1] - mdat[3]
+        stop = moov[3] - mdat[3]
+        return _Layout(before, mdat_header, after[:start] + after[stop:], mdat,
+                       after[start:stop], moov[2] - moov[1], None)
 
 
 def repaired_header(source: Path, ffprobe: Path) -> RepairedHeader:
     """算出修好的头。修不了就抛 `RepairUnavailable`。"""
-    head, moov, mdat = _layout(source)
-    tree = _parse(head, moov[2], moov[3])
+    layout = _layout(source)
+    mdat = layout.mdat
+    tree = _parse(layout.moov_box, layout.moov_body, len(layout.moov_box))
     root = _Box(b"moov", None, tree)
     traks = [child for child in root.children if child.kind == b"trak"]
     video = next((trak for trak in traks if _is_video(trak)), None)
@@ -346,6 +379,13 @@ def repaired_header(source: Path, ffprobe: Path) -> RepairedHeader:
     stbl.children.insert(stbl.children.index(stts) + 1, _Box(b"ctts", _ctts(offsets), []))
     edts = video.find(b"edts")
     elst = edts.find(b"elst") if edts else None
+    if layout.moov_before_start is None and elst and elst.payload:
+        def checked_start(value: int) -> int:
+            if value > shift + _half_frame(decode_times):
+                raise RepairUnavailable("尾部索引的编辑起点无法区分预卷与裁剪")
+            return value
+
+        _edit_times(elst.payload, checked_start)
     payload = _retimed_edit_list(
         elst.payload if elst and elst.payload else None, shift, _track_duration(root, video),
         _half_frame(decode_times))
@@ -356,14 +396,31 @@ def repaired_header(source: Path, ffprobe: Path) -> RepairedHeader:
     else:
         video.children.insert(1, _Box(b"edts", None, [_Box(b"elst", payload, [])]))
 
+    def assemble(rebuilt: bytes) -> bytes:
+        if layout.moov_before_start is not None:
+            stop = layout.moov_before_start + len(layout.moov_box)
+            return (layout.before[:layout.moov_before_start] + rebuilt
+                    + layout.before[stop:] + layout.mdat_header)
+        return layout.before + rebuilt + layout.mdat_header
+
     rebuilt = root.serialize()
-    delta = len(rebuilt) - (moov[3] - moov[1])
+    delta = len(assemble(rebuilt)) - mdat[2]
     _shift_chunk_offsets(root, delta)
     rebuilt = root.serialize()
-    prefix = head[:moov[1]] + rebuilt + head[moov[3]:]
+    prefix = assemble(rebuilt)
     if len(prefix) - mdat[2] != delta:
         raise RepairUnavailable("重建后的头长度对不上")
-    return RepairedHeader(prefix=prefix, payload_start=mdat[2], payload_end=mdat[3])
+    return RepairedHeader(prefix=prefix, payload_start=mdat[2], payload_end=mdat[3], suffix=layout.suffix)
+
+
+def has_tail_moov(source: Path) -> bool:
+    """只读顶层盒子位置，识别旧布局判据会跳过的尾部索引。"""
+    from .smb_media import SmbResource
+    with (source.open() if isinstance(source, SmbResource) else open(source, 'rb')) as handle:
+        boxes = _top_level(handle)
+    moovs = [box for box in boxes if box[0] == b'moov']
+    mdats = [box for box in boxes if box[0] == b'mdat']
+    return len(moovs) == len(mdats) == 1 and moovs[0][1] > mdats[0][1]
 
 
 def write_sidecar(path: Path, header: RepairedHeader) -> None:

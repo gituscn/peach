@@ -15,7 +15,7 @@ from peach.streaming import CancellableFileResponse, StreamSessionRegistry
 from peach.mp4index import segment_plan
 from peach.routes_media import hls_segment
 from peach.segments import HlsSegmentService, build_hls_playlist
-from test_mp4repair import edit_list_of, entries, legacy_sidecar
+from test_mp4repair import DECODE_TO_DISPLAY, edit_list_of, entries, legacy_sidecar, tail_mp4
 
 
 async def _collect(response, requested: bytes | None, method: str = "GET"):
@@ -328,6 +328,28 @@ class StreamSessionRegistryTests(unittest.IsolatedAsyncioTestCase):
                 SplicedMp4Response(path, header), b"bytes=999-")
             self.assertEqual(status_code, 416)
             self.assertEqual(headers["content-range"], f"bytes */{len(whole)}")
+
+    async def test_tail_moov_repair_serves_both_seams_and_the_saved_suffix(self):
+        from peach import mp4repair
+        from peach.streaming import SplicedMp4Response
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'tail.mp4'
+            path.write_bytes(tail_mp4() + b'\x00\x00\x00\x10freeABCDEFGH')
+            original = path.read_bytes()
+            with patch.object(mp4repair, '_display_order', return_value=list(DECODE_TO_DISPLAY)):
+                header = mp4repair.repaired_header(path, Path('ffprobe'))
+            sidecar = Path(tmp) / 'repair.mp4hdr'
+            mp4repair.write_sidecar(sidecar, header)
+            header = mp4repair.read_sidecar(sidecar)
+            whole = header.prefix + original[header.payload_start:header.payload_end] + header.suffix
+            for seam in (len(header.prefix), len(whole) - len(header.suffix)):
+                status, headers, body = await _collect(
+                    SplicedMp4Response(path, header), f'bytes={seam - 4}-{seam + 4}'.encode())
+                self.assertEqual(status, 206)
+                self.assertEqual(body, whole[seam - 4:seam + 5])
+                self.assertEqual(headers['content-length'], '9')
+            self.assertEqual(path.read_bytes(), original)
 
     async def test_a_spliced_head_request_reports_the_size_without_a_body(self):
         import tempfile
