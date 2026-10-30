@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "e0055ad0-274c-46a6-a955-4d9fcf067df8", e._sentryDebugIdIdentifier = "sentry-dbid-e0055ad0-274c-46a6-a955-4d9fcf067df8");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "58769f76-f056-419a-9a42-1261d7ba6f60", e._sentryDebugIdIdentifier = "sentry-dbid-58769f76-f056-419a-9a42-1261d7ba6f60");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t, t.exports), e = null), t.exports), s = (e, i, o, s) => {
@@ -19426,7 +19426,8 @@ var Fm = Mm.filter((e) => e.cloud).map((e) => e.id), Im = Object.fromEntries(Mm.
 }, Rm = {
 	...Object.fromEntries(Nm.map((e) => [e.id, Lm[e.id] || e.icon])),
 	online: "rss",
-	smb: "network"
+	smb: "network",
+	webdav: "globe"
 };
 // src/react/boardui/components/application/settings/settings-rows.tsx
 function zm({ label: e, description: t, children: n }) {
@@ -22655,4 +22656,4 @@ E();
 var cv = document.getElementById("peach-page"), lv = cv ? sv[cv.dataset.page ?? ""] : void 0;
 cv && lv && (0, M.createRoot)(cv).render(/* @__PURE__ */ (0, z.jsx)(lv, { data: { ...cv.dataset } }));
 
-//# debugId=e0055ad0-274c-46a6-a955-4d9fcf067df8
+//# debugId=58769f76-f056-419a-9a42-1261d7ba6f60

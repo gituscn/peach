@@ -78,7 +78,7 @@ class ProcessingTraffic:
         routes = connections(config)
         for location, roots in config.locations.items():
             for root in roots:
-                remote = any(value.get('transport') == 'smb' and _key(value['root']) == _key(root)
+                remote = any(value.get('transport') in {'smb', 'webdav'} and _key(value['root']) == _key(root)
                              for value in config.storage_roots.values())
                 network = remote or location in CLOUD_LOCATIONS or cost_for(location, root, config) == 'metered'
                 connection = routes.get(_key(root), 'unknown') if network and not remote else 'direct'
