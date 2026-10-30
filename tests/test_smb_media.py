@@ -242,6 +242,7 @@ class SmbMediaTests(unittest.TestCase):
         resource = _Resource(b'0123456789')
         bridge = smb_media._bridge()
         url = bridge.register(resource)
+        self.assertTrue(url.endswith('/sample.mp4'))
         with httpx.Client(trust_env=False) as client:
             response = client.get(url, headers={'Range': 'bytes=3-5'})
             self.assertEqual((response.status_code, response.content), (206, b'345'))

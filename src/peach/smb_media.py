@@ -67,8 +67,9 @@ def source_identity(value):
     prefix = f'http://127.0.0.1:{_BRIDGE.server.server_port}/{_BRIDGE.secret}/'
     if not value.startswith(prefix):
         return value
+    key = value[len(prefix):].split('/', 1)[0]
     with _BRIDGE.lock:
-        resource = _BRIDGE.resources.get(value[len(prefix):])
+        resource = _BRIDGE.resources.get(key)
     return str(resource) if resource is not None else value
 
 
@@ -398,7 +399,7 @@ def resolve(raw, config=None):
 
 
 def input_url(source):
-    """本机路径原样交给工具；SMB 资源生成进程内有效的回环地址。"""
+    """本机路径原样交给工具；SMB/WebDAV 资源生成带文件名的进程内回环地址。"""
     resource = resolve(source)
     return _bridge().register(resource) if resource else str(source)
 
@@ -439,7 +440,7 @@ class _Bridge:
 
             def do_GET(self):
                 pieces = self.path.split('/')
-                if len(pieces) != 3 or not hmac.compare_digest(pieces[1], owner.secret):
+                if len(pieces) not in {3, 4} or not hmac.compare_digest(pieces[1], owner.secret):
                     self.send_error(404)
                     return
                 with owner.lock:
@@ -494,7 +495,9 @@ class _Bridge:
             if len(self.resources) >= 2048 and key not in self.resources:
                 self.resources.pop(next(iter(self.resources)))
             self.resources[key] = resource
-        return f'http://127.0.0.1:{self.server.server_port}/{self.secret}/{key}'
+        # 末尾保留文件名：播放器用 URL 最后一段当标题，纯哈希只能显示一串十六进制。
+        return (f'http://127.0.0.1:{self.server.server_port}/{self.secret}/{key}/'
+                f'{quote(resource.name, safe="")}')
 
     def invalidate(self, root_id):
         with self.lock:
