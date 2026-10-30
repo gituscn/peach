@@ -103,14 +103,14 @@ class RuntimeConsistencyTests(unittest.TestCase):
             config = settings_file.load_config(
                 project_root=root / "app", environ={"PEACH_DATA_ROOT": str(root / "data")})
             config = replace(config, server=replace(
-                config.server, host="0.0.0.0", mdns_name="peach-test"))
+                config.server, host="0.0.0.0", mdns_name="peach-writer"))
             tls = config.directory("secrets") / "tls"
             tls.mkdir(parents=True)
             (tls / "peach.crt").write_text("test-only", encoding="utf-8")
             with patch("peach.distribution.standalone", return_value=False):
                 self.assertEqual(
                     _normal_url(config),
-                    "https://peach-test.local" + (":8443" if sys.platform == "darwin" else "") + "/")
+                    "https://peach-writer.local" + (":8443" if sys.platform == "darwin" else "") + "/")
 
     def test_mutable_image_revalidates_after_replacement(self):
         with tempfile.TemporaryDirectory() as directory:
