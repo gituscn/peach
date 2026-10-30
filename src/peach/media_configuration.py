@@ -62,14 +62,20 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
                              if media_identity.path_key(value["root"]) == media_identity.path_key(root)), None)
             root_id, value = identity
             library = libraries[value["library_id"]]
-            smb_fields = {}
+            remote_fields = {}
             if value.get('transport') == 'smb':
                 from .smb_media import credential_store
                 credential = credential_store(config).load('smb-' + root_id)
                 secrets = credential.values if credential else {}
-                smb_fields = dict(smb_username=secrets.get('username', ''),
-                                  smb_password_saved=bool(secrets.get('password')),
-                                  smb_encrypt=secrets.get('encrypt') == 'true')
+                remote_fields = dict(smb_username=secrets.get('username', ''),
+                                     smb_password_saved=bool(secrets.get('password')),
+                                     smb_encrypt=secrets.get('encrypt') == 'true')
+            elif value.get('transport') == 'webdav':
+                from .webdav_media import credential_store
+                credential = credential_store(config).load('webdav-' + root_id)
+                secrets = credential.values if credential else {}
+                remote_fields = dict(webdav_username=secrets.get('username', ''),
+                                     webdav_password_saved=bool(secrets.get('password')))
             result.append({"location": location, "root": root, "path": mount,
                            "root_id": root_id, "library_id": value["library_id"],
                            "library": library["name"], "library_icon": library.get("icon", ""),
@@ -78,7 +84,7 @@ def rows(config, *, windows: bool, probe: bool = False) -> list[dict[str, Any]]:
                            "library_stages": library.get("stages", ""),
                            "cost": cost_for(location, root, config),
                            "transport": value.get('transport', 'filesystem'),
-                           "online": _online(root, mount, probe, config), **smb_fields})
+                           "online": _online(root, mount, probe, config), **remote_fields})
     return result
 
 
@@ -129,8 +135,8 @@ def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
     for row in result:
         if not isinstance(row, dict) or str(row.get("root", "")).strip():
             continue
-        from .smb_media import is_address
-        if windows and not is_address(row.get('path')):
+        from .smb_media import is_remote_address
+        if windows and not is_remote_address(row.get('path')):
             continue
         _prepare_source(row, existing, used)
     return result
@@ -139,20 +145,14 @@ def prepare_sources(raws: object, *, windows: bool, config=None) -> object:
 def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, PurePath]:
     """取得数据库路径前缀与本机实际目录，用于检查重复和包含关系。"""
     text = str(row.get("path", "")).strip()
-    from .smb_media import is_address, canonical
+    from .smb_media import is_address, is_remote_address, remote_canonical
+    from .webdav_media import is_address as is_webdav_address
     if row.get('transport') == 'smb' and not is_address(text):
         raise ValueError('请填写 smb://服务器/共享/目录')
-    if is_address(text):
-        text = canonical(text)
-        row['path'] = text
-        if any(not isinstance(row.get(key, ''), str) for key in ('smb_username', 'smb_password')):
-            raise ValueError('SMB 账号和密码必须是文字')
-        if any(key in row and not isinstance(row[key], bool) for key in ('smb_encrypt', 'smb_clear')):
-            raise ValueError('SMB 连接选项无效')
-        root = str(row.get('root', ''))
-        if not platform.is_windows_path(root) or '..' in PureWindowsPath(root).parts:
-            raise ValueError('SMB 目录的内部路径无效')
-        return PureWindowsPath(root), PurePosixPath(text)
+    if row.get('transport') == 'webdav' and not is_webdav_address(text):
+        raise ValueError('请填写 http:// 或 https:// 开头的 WebDAV 地址')
+    if is_remote_address(text):
+        return _remote_paths(row, remote_canonical(text))
     root = str(row.get("root") or text).strip() if windows else str(row.get("root", "")).strip()
     if any(ord(char) < 32 for char in text + root):
         raise ValueError("路径不能包含控制字符")
@@ -168,6 +168,28 @@ def _validated_paths(row: dict, *, windows: bool) -> tuple[PureWindowsPath, Pure
     if ".." in path.parts:
         raise ValueError("媒体目录路径不能包含上级目录 ..")
     return PureWindowsPath(root), path
+
+
+def _remote_paths(row: dict, text: str) -> tuple[PureWindowsPath, PurePosixPath]:
+    """规范化远端地址并校验连接字段；远端目录不参与本机路径存在性判断。"""
+    from .webdav_media import is_address as is_webdav_address
+    row['path'] = text
+    webdav = is_webdav_address(text)
+    if webdav:
+        _remote_credentials(row, 'webdav', 'WebDAV', ())
+    else:
+        _remote_credentials(row, 'smb', 'SMB', ('smb_encrypt',))
+    root = str(row.get('root', ''))
+    if not platform.is_windows_path(root) or '..' in PureWindowsPath(root).parts:
+        raise ValueError(f'{"WebDAV" if webdav else "SMB"} 目录的内部路径无效')
+    return PureWindowsPath(root), PurePosixPath(text)
+
+
+def _remote_credentials(row: dict, prefix: str, label: str, flags: tuple[str, ...]) -> None:
+    if any(not isinstance(row.get(key, ''), str) for key in (f'{prefix}_username', f'{prefix}_password')):
+        raise ValueError(f'{label} 账号和密码必须是文字')
+    if any(key in row and not isinstance(row[key], bool) for key in (f'{prefix}_clear', *flags)):
+        raise ValueError(f'{label} 连接选项无效')
 
 
 def validate(raws: object, *, windows: bool, config=None) -> tuple[dict, dict, list[str]]:
@@ -198,8 +220,8 @@ def validate(raws: object, *, windows: bool, config=None) -> tuple[dict, dict, l
                     raise ValueError("媒体目录与另一行重复或互相包含")
             seen.append((declared, path))
             locations.setdefault(location, []).append(str(declared))
-            from .smb_media import is_address
-            mounts.setdefault(location, []).append(row['path'] if is_address(row['path'])
+            from .smb_media import is_remote_address
+            mounts.setdefault(location, []).append(row['path'] if is_remote_address(row['path'])
                                                     else str(path) if not windows or declared != path else "")
         except ValueError as exc:
             errors[index] = str(exc)

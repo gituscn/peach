@@ -48,21 +48,24 @@ def _parse_override(raw: str) -> tuple[tuple[str, str], ...]:
 Roots = Mapping[str, Sequence[str]]
 
 
-def location_mounts() -> dict[str, tuple[Path, ...]]:
+def location_mounts() -> dict[str, tuple[Path | str, ...]]:
     """读取各媒体来源的本机实际目录，与 [media.locations] 中的目录前缀按顺序对应。
 
     基础映射来自设置文件的 [media.mounts]，默认没有条目。Linux 和 macOS 缺少条目时无法
-    读取该来源的媒体文件；Windows 直接使用数据库路径，不需要本表。MOUNTS_ENV 每次现读——测试和临时诊断
+    读取该来源的媒体文件；Windows 直接使用数据库路径，不需要本表。远端媒体地址按原样
+    返回，交给扫描与读取端的资源解析。MOUNTS_ENV 每次现读——测试和临时诊断
     会在运行期改它，缓存住就看不到变化；覆盖值只给一个目录，对应该来源的第一个数据库目录前缀。
     """
     merged: dict[str, tuple[str, ...]] = dict(settings_file.active().mounts)
     for location, mount in _parse_override(os.environ.get(MOUNTS_ENV, "")):
         merged[location] = (mount,) if mount else ()
     declared = settings_file.active().locations
-    return {location: tuple(Path(mount) if mount else (
-                Path(declared[location][index]) if os.name == "nt" and index < len(declared.get(location, ()))
-                else UNMAPPED_ROOT / location / str(index))
-            for index, mount in enumerate(mounts)) for location, mounts in merged.items() if mounts}
+    from .smb_media import is_remote_address
+    return {location: tuple(
+                mount if is_remote_address(mount) else Path(mount) if mount else (
+                    Path(declared[location][index]) if os.name == "nt" and index < len(declared.get(location, ()))
+                    else UNMAPPED_ROOT / location / str(index))
+                for index, mount in enumerate(mounts)) for location, mounts in merged.items() if mounts}
 
 
 def location_roots() -> dict[str, tuple[str, ...]]:
@@ -194,7 +197,7 @@ def translate_ledger_path(raw: str | os.PathLike[str]) -> Path:
     location, index, tail = resolve_root(text)
     if location is not None:
         mounts = location_mounts().get(location, ())
-        if index < len(mounts) and str(mounts[index]) not in ("", "."):
+        if index < len(mounts) and isinstance(mounts[index], Path) and str(mounts[index]) not in ("", "."):
             return mounts[index].joinpath(*tail)
     if os.name == "nt":
         return Path(text)

@@ -255,7 +255,8 @@ export interface UpdateJob {
 }
 
 export interface MediaSource {
-  transport?: 'filesystem' | 'smb'; smb_username?: string; smb_password_saved?: boolean; smb_encrypt?: boolean;
+  transport?: 'filesystem' | 'smb' | 'webdav'; smb_username?: string; smb_password_saved?: boolean; smb_encrypt?: boolean;
+  webdav_username?: string; webdav_password_saved?: boolean;
   root_id?: string; library_id?: string;
   location: string; root: string; path: string; online?: boolean; library?: string; library_icon?: string; cost?: 'free' | 'metered';
   /** 媒体库来源色（强调色键名，空串不上色）与处理方式；`library_stages` 是自定义时所选步骤，逗号分隔。 */

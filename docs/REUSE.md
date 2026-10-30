@@ -136,6 +136,12 @@ Windows 系统卷通过系统原生 `GetWindowsDirectoryW` 获取，其他平台
 
 未采用 fsspec，其 SMB 底层仍是 smbprotocol，无法替代媒体工具输入和取消；pysmb 的 SMB1/2 能力不覆盖同等 SMB3 需求。FFmpeg 原生 SMB 依赖二进制构建，本机工具没有列出该协议，因此使用 HTTP Range 回环桥。隔离回归覆盖认证、读取、并发偏移、配置与扫描配对；实际 FFmpeg 通过合成视频的尾部索引和 seek 抽帧。真实 NAS 吞吐和兼容性未取得，无真实 ledger 写入。
 
+## WebDAV 媒体只读访问
+
+采用 Python 标准库 `urllib.request`、`xml.etree.ElementTree` 与 `email.utils`：`ProxyHandler({})` 禁用环境代理，Basic 认证头按根目录凭据生成，`PROPFIND` 请求 `resourcetype`、`getcontentlength`、`getlastmodified`，`GET` 使用 `Range`。解析按本地名忽略 XML 前缀，地址规范化复用百分号解码后的路径分量。未引入 `httpx` 以外的 WebDAV 客户端、`fsspec` 或第三方解析器，读取子集与取消语义由 Peach 保持。
+
+远端身份复用 `SmbResource` 的账本路径前缀与相对层级；`WebDavResource` 只覆盖名字、传输构造与写方法拒绝，扫描、`media_io`、播放响应和回环桥沿用既有入口。凭据按 `webdav-<root_id>` 存入 CredentialStore，配置文件替换失败时回滚。读取句柄按 4 MiB 预取范围，忽略 `Range` 的服务器报告读取错误而不是整文件下载。隔离回归覆盖地址、凭据、只读拒绝、嵌套目录、范围读取、扫描和回环桥；真实服务的认证策略与吞吐未取得，无真实 ledger 写入。
+
 ## 第三方标识的发行边界
 
 `resources/marks/` 保存用于实体身份展示的内置标识，来源记录与文件哈希见同目录 `manifest.json`。来源可追溯不等于取得图片版权或商标授权，图片也不因与应用同仓库就自动适用 AGPL。
