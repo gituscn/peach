@@ -2,7 +2,7 @@
 # 让 http(s)://peach.local/ 不带端口也能打开。
 #
 # macOS 和其他 Unix 一样，1024 以下的端口只有 root 能监听。Peach 在 macOS 上跑在
-# 非特权的 8900（见 peach.tray.MACOS_PORT），所以 `peach.local:8900` 通、
+# 非特权的 8900（见 peach.appid.MACOS_PORT），所以 `peach.local:8900` 通、
 # `peach.local` 不通。
 #
 # 与其让整个服务以 root 跑，不如让内核把 80 转到 8900：pf 的 rdr 规则，服务本身
