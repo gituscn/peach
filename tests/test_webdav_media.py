@@ -417,6 +417,7 @@ class ScanTests(WebDavFixture):
         resource = smb_media.resolve(r'R:\WebDAV\ABC-123.mp4', config)
         with patch('peach.settings_file.active', return_value=config):
             url = smb_media.input_url(str(resource))
+        self.assertTrue(url.endswith('/ABC-123.mp4'))
         with httpx.Client(trust_env=False) as client:
             response = client.get(url, headers={'Range': 'bytes=3-5'})
             self.assertEqual((response.status_code, response.content), (206, b'345'))
