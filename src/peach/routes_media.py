@@ -250,8 +250,12 @@ def local_playback(request: Request, id: int, player: str = 'default', args=Depe
         raise HTTPException(403, '请使用网络播放地址或 M3U 播放列表在此设备打开')
     asset = request.app.state.media_engine.asset(id)
     path = request.app.state.media_engine.filesystem.file_for(asset, thumbnail=False)
+    from .smb_media import SmbResource, input_url
     try:
-        launcher.open_media(path, player)
+        if isinstance(path, SmbResource):
+            launcher.open_url(input_url(path), player)
+        else:
+            launcher.open_media(path, player)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from None
     except (OSError, subprocess.SubprocessError) as exc:
