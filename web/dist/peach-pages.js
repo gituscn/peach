@@ -2,7 +2,7 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "58769f76-f056-419a-9a42-1261d7ba6f60", e._sentryDebugIdIdentifier = "sentry-dbid-58769f76-f056-419a-9a42-1261d7ba6f60");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "ff8e1fa9-7231-4bbe-b237-5c602a35a642", e._sentryDebugIdIdentifier = "sentry-dbid-ff8e1fa9-7231-4bbe-b237-5c602a35a642");
 	} catch {}
 })();
 var e = Object.create, t = Object.defineProperty, n = Object.getOwnPropertyDescriptor, r = Object.getOwnPropertyNames, i = Object.getPrototypeOf, a = Object.prototype.hasOwnProperty, o = (e, t) => () => (t || (e((t = { exports: {} }).exports, t, t.exports), e = null), t.exports), s = (e, i, o, s) => {
@@ -20986,12 +20986,12 @@ function v_({ label: e, path: t, onPath: n, error: r, inputRef: i, picking: a, o
 					className: "flex h-9 shrink-0 items-center",
 					children: c
 				}) : null,
-				/* @__PURE__ */ (0, z.jsx)(oh, {
+				o ? /* @__PURE__ */ (0, z.jsx)(oh, {
 					icon: l_,
 					"aria-label": "选择文件夹",
 					onClick: o,
-					...c_(a)
-				}),
+					...c_(!!a)
+				}) : null,
 				s ? /* @__PURE__ */ (0, z.jsx)(Rt, {
 					variant: "danger",
 					iconOnly: !0,
@@ -22656,4 +22656,4 @@ E();
 var cv = document.getElementById("peach-page"), lv = cv ? sv[cv.dataset.page ?? ""] : void 0;
 cv && lv && (0, M.createRoot)(cv).render(/* @__PURE__ */ (0, z.jsx)(lv, { data: { ...cv.dataset } }));
 
-//# debugId=58769f76-f056-419a-9a42-1261d7ba6f60
+//# debugId=ff8e1fa9-7231-4bbe-b237-5c602a35a642
