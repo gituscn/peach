@@ -19,6 +19,10 @@ BUNDLE_PREFIX = "io.github.longmeidao.peach"
 
 #: 双击 `.app` 时的 `CFBundleIdentifier`。
 MACOS_BUNDLE_ID = f"{BUNDLE_PREFIX}.app"
+#: 菜单栏实例的两个非特权端口。80/443 要 root，明文口和 HTTPS 都放在高位端口上；
+#: `scripts/setup_macos_port80.sh` 的转发目标也是这两个值。
+MACOS_PORT = 8900
+MACOS_TLS_PORT = 8443
 #: 菜单栏项 LaunchAgent 的 `Label`，同时是它 plist 的文件名主干。
 MACOS_LAUNCH_AGENT_LABEL = f"{BUNDLE_PREFIX}.tray"
 #: pf 的 anchor 名，同时是 `/etc/pf.anchors` 下的文件名与 80/443 转发那个
