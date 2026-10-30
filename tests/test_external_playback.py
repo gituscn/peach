@@ -64,6 +64,24 @@ class ExternalPlaybackTests(unittest.TestCase):
                 local_playback.open_media(media, 'potplayer')
                 self.assertEqual(selected.call_args.args[0], ['player.exe', str(media)])
 
+    def test_remote_media_url_opens_in_the_selected_player(self):
+        url = 'http://127.0.0.1:54321/bridge/asset'
+        with patch.object(local_playback.sys, 'platform', 'darwin'), \
+                patch.dict(os.environ, {'PEACH_HEADLESS_MANAGED': '0'}), \
+                patch.object(local_playback, 'installed', return_value={'iina': ('IINA', '/Applications/IINA.app')}), \
+                patch.object(local_playback.subprocess, 'run') as launch:
+            local_playback.open_url(url, 'iina')
+            self.assertEqual(launch.call_args.args[0],
+                             ['/usr/bin/open', '-a', '/Applications/IINA.app', url])
+            local_playback.open_url(url)
+            self.assertEqual(launch.call_args.args[0], ['/usr/bin/open', url])
+            with self.assertRaises(ValueError):
+                local_playback.open_url('file:///etc/passwd')
+        with patch.object(local_playback, 'available', return_value=True), \
+                patch.object(local_playback, 'installed', return_value={}):
+            with self.assertRaises(ValueError):
+                local_playback.open_url(url, 'iina')
+
     def test_headless_deployment_and_unknown_player_cannot_launch(self):
         with patch.dict(os.environ, {'PEACH_HEADLESS_MANAGED': '1'}):
             self.assertFalse(local_playback.available())

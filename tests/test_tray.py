@@ -607,7 +607,8 @@ class SetupGateTests(unittest.TestCase):
         self.assertEqual(manager.log_dir, self.data_root / "logs")
         self.assertEqual(manager.child_environment()["PEACH_DATA_ROOT"], str(self.data_root))
         self.assertEqual(gate.open_label(), "打开 Peach")
-        self.assertEqual(gate.open_url(), "https://peach-writer.local/")
+        self.assertEqual(gate.open_url(), "https://peach-writer.local" +
+                         (":8443" if sys.platform == "darwin" else "") + "/")
 
         scan = scan_popen.call_args
         self.assertEqual(list(scan.args[0][1:]), ["process", "local"])
@@ -643,7 +644,8 @@ class SetupGateTests(unittest.TestCase):
         for spec in redirecting:
             command = spec.command
             self.assertEqual(command[command.index("--redirect-origin") + 1],
-                             "https://peach-writer.local")
+                             "https://peach-writer.local" +
+                             (":8443" if sys.platform == "darwin" else ""))
 
     def test_missing_tls_material_keeps_the_gate_waiting(self):
         """没有 openssl 的机器上 CA 生成会失败；那时不能拿一组缺文件的规格去启动。
