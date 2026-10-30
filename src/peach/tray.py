@@ -707,9 +707,15 @@ def build_macos_service_specs(
     `mdns_hostname` 是明文口跳转的目标主机名，缺省取 `MDNS_HOSTNAME`；首次设置之后
     必须由调用方传入新鲜读到的名字，理由见 `build_service_specs`。跳转目标带上
     `MACOS_TLS_PORT`：不带端口的那条地址只在装过 pf 转发的机器上成立。
+
+    `PEACH_LAN_ADDRESS` 可选地钉住 mDNS 广播的 IPv4。双网卡同网段时默认路由可能落在
+    某张网卡上，而手机等设备从另一张网卡的路径根本连不过来；这时由启动脚本显式指定
+    可达的那张。不设时仍按路由表每次重新选择，换网络照旧自动跟进。
     """
     peach = str(_peach_executable())
     redirect_origin = f"https://{mdns_hostname or MDNS_HOSTNAME}:{MACOS_TLS_PORT}"
+    pinned = os.environ.get("PEACH_LAN_ADDRESS", "").strip()
+    mdns_address = ("--mdns-address", pinned) if pinned else ()
     specs = [
         ServiceSpec(
             "http",
@@ -739,7 +745,7 @@ def build_macos_service_specs(
             f"https://127.0.0.1:{MACOS_TLS_PORT}/healthz",
             (
                 peach, "serve", "--host", "0.0.0.0", "--port", str(MACOS_TLS_PORT),
-                "--no-ledger-sync",
+                "--no-ledger-sync", *mdns_address,
                 "--ssl-certfile", str(cert), "--ssl-keyfile", str(key),
             ),
             str(ca),
