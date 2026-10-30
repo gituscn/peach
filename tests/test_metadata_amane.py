@@ -125,6 +125,17 @@ class ManifestTests(unittest.TestCase):
 
 
 class RebuildTests(unittest.TestCase):
+    def test_uv_is_found_in_the_user_local_bin_when_path_is_minimal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            uv = home / ".local" / "bin" / "uv"
+            uv.parent.mkdir(parents=True)
+            uv.write_text("", encoding="utf-8")
+            with patch.dict(os.environ, {"PEACH_UV": ""}), \
+                    patch.object(metadata_amane.shutil, "which", return_value=None), \
+                    patch.object(metadata_amane.Path, "home", return_value=home):
+                self.assertEqual(metadata_amane.find_uv(), uv)
+
     def test_the_rebuild_command_syncs_the_lock_into_the_tools_root(self):
         command, env = metadata_amane.rebuild_command(Path("T:/tools"), uv=Path("uv.exe"))
         self.assertEqual(command[:4], ["uv.exe", "sync", "--locked", "--no-dev"])
