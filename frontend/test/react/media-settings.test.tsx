@@ -291,6 +291,18 @@ describe('选择文件夹', () => {
     expect(rows(host)[0]?.textContent).toContain('没有可用的文件夹对话框');
     expect(paths(host)[0]?.getAttribute('aria-invalid')).toBe('true');
   });
+
+  it('远程目录不弹本机对话框，切回本地磁盘再出现', async () => {
+    const host = await open();
+    const source = () => host.querySelector('[aria-label="媒体来源 1"]');
+    expect(host.querySelector('[aria-label="选择文件夹"]')).not.toBeNull();
+    await choose(source(), 'WebDAV');
+    expect(host.querySelector('[aria-label="选择文件夹"]')).toBeNull();
+    await choose(source(), 'SMB 共享');
+    expect(host.querySelector('[aria-label="选择文件夹"]')).toBeNull();
+    await choose(source(), '本地磁盘');
+    expect(host.querySelector('[aria-label="选择文件夹"]')).not.toBeNull();
+  });
 });
 
 describe('保存', () => {

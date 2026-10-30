@@ -148,8 +148,8 @@ export function FolderRow({ label, path, onPath, error, inputRef, picking, onPic
   onPath: (path: string) => void;
   error?: ReactNode;
   inputRef: (element: HTMLInputElement | null) => void;
-  picking: boolean;
-  onPick: () => void;
+  picking?: boolean;
+  onPick?: () => void;
   onRemove?: () => void;
   status?: ReactNode;
   children: ReactNode;
@@ -177,7 +177,7 @@ export function FolderRow({ label, path, onPath, error, inputRef, picking, onPic
           onBlur={() => requestAnimationFrame(showTail)}
           validationBehavior="aria" isInvalid={Boolean(error)} hint={error || undefined} />
         {status ? <div className="flex h-9 shrink-0 items-center">{status}</div> : null}
-        <IconButton icon={FolderSearchIcon} aria-label="选择文件夹" onClick={onPick} {...busyProps(picking)} />
+        {onPick ? <IconButton icon={FolderSearchIcon} aria-label="选择文件夹" onClick={onPick} {...busyProps(Boolean(picking))} /> : null}
         {onRemove ? <Button variant="danger" iconOnly leadingIcon={RiDeleteBinLine} aria-label="移除这个文件夹" onClick={onRemove} /> : null}
       </div>
       <div className="flex flex-wrap items-end gap-2">

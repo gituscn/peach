@@ -49,6 +49,7 @@ const sourceOptions = [...MEDIA_SOURCES, ['smb', 'SMB 共享'] as const, ['webda
 const remoteKind = (path: string): 'smb' | 'webdav' | '' =>
   path.startsWith('smb://') ? 'smb' : /^https?:\/\//i.test(path) ? 'webdav' : '';
 const remoteEmptyPath = (kind: string) => kind === 'smb' ? 'smb://' : 'http://';
+const isRemoteRow = (row: { transport?: string }) => row.transport === 'smb' || row.transport === 'webdav';
 /** 媒体库在下拉里的图标：选过就用选的，否则按来源自动识别，和标题行的图标键一致。 */
 const libraryMark = (row: { library_icon: string; location: string; transport?: string }) =>
   row.library_icon || libraryAutoChoice(row.transport === 'smb' || row.transport === 'webdav' ? row.transport : row.location)[0];
@@ -258,11 +259,11 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 {members.map(({ row, index }) => (
                   <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
                     onPath={(path) => edit(index, { path, transport: remoteKind(path) || row.transport })} error={rowErrors[index]} inputRef={inputRef(index)}
-                    picking={picking === index} onPick={() => void pick(index)}
+                    picking={picking === index} onPick={isRemoteRow(row) ? undefined : () => void pick(index)}
                     onRemove={rows.length > 1 ? () => remove(index) : undefined}
                     status={mountOf(row) ? <MountBadge online={mountOf(row)?.online} /> : null}>
                     <FolderFieldLine>
-                    <SourceSelect index={index} value={row.transport === 'smb' || row.transport === 'webdav' ? row.transport : row.location} options={sourceOptions}
+                    <SourceSelect index={index} value={isRemoteRow(row) ? row.transport : row.location} options={sourceOptions}
                       onChange={(source) => {
                         const remote = source === 'smb' || source === 'webdav';
                         const kind = remoteKind(row.path);
