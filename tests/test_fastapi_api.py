@@ -3098,6 +3098,25 @@ class FastApiContractTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(failed.status_code, 503)
                 self.assertNotIn('private path', failed.text)
 
+    async def test_remote_media_opens_through_the_loopback_stream(self):
+        from peach import local_playback
+        from peach.smb_media import SmbResource
+        headers = {'X-Token': 'secret'}
+        resource = SmbResource('webdav-one', 'R:/Media', 'http://files.invalid/media',
+                               ('movie.m2ts',), None)
+        with patch.object(local_playback, 'available', return_value=True), \
+                patch.object(local_playback, 'installed', return_value={'iina': ('IINA', '/Applications/IINA.app')}), \
+                patch('peach.web_local_access.local_client', return_value=True), \
+                patch.object(self.app.state.media_engine.filesystem, 'file_for', return_value=resource), \
+                patch('peach.smb_media.input_url', return_value='http://127.0.0.1:54321/secret/key') as bridge, \
+                patch.object(local_playback, 'open_url') as launch, \
+                patch.object(local_playback, 'open_media') as file_launch:
+            result = await self.client.post('/api/local-playback?id=1&player=iina', json={}, headers=headers)
+            self.assertEqual(result.status_code, 200, result.text)
+            bridge.assert_called_once_with(resource)
+            launch.assert_called_once_with('http://127.0.0.1:54321/secret/key', 'iina')
+            file_launch.assert_not_called()
+
     async def test_external_player_links_authorize_only_one_asset_and_support_ranges(self):
         denied = await self.client.post('/api/external-playback?id=1', json={})
         self.assertEqual(denied.status_code, 401)

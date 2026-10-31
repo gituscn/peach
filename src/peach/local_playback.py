@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .media import normalized_path
 
@@ -65,3 +66,30 @@ def open_media(path: Path, player: str = 'default') -> None:
                          cwd=str(Path(chosen[1]).parent))
     else:
         os.startfile(str(path), 'open')
+
+
+def open_url(url: str, player: str = 'default') -> None:
+    """把远端媒体的回环流地址交给本机播放器。
+
+    WebDAV／SMB 的资源没有本机路径，账本里那条 Windows 盘符路径交给 IINA 只会打不开。
+    地址来自进程内的回环桥，播放器按 Range 直接向 Peach 取字节。
+    """
+    if not available():
+        raise ValueError('此部署请使用网络播放地址或 M3U 播放列表')
+    parsed = urlsplit(url)
+    if parsed.scheme not in {'http', 'https'} or not parsed.hostname:
+        raise ValueError('播放地址无效')
+    chosen = installed().get(player) if player != 'default' else None
+    if player != 'default' and chosen is None:
+        raise ValueError('播放器未安装，请重新选择')
+    if sys.platform == 'darwin':
+        command = ['/usr/bin/open']
+        if chosen:
+            command.extend(['-a', chosen[1]])
+        subprocess.run([*command, url], check=True, timeout=10, capture_output=True)
+    elif chosen:
+        subprocess.Popen([chosen[1], url], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         cwd=str(Path(chosen[1]).parent))
+    else:
+        os.startfile(url)

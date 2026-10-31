@@ -46,6 +46,20 @@ def is_address(value) -> bool:
     return isinstance(value, str) and value.startswith('smb://')
 
 
+def is_remote_address(value) -> bool:
+    """已声明的远端媒体地址：SMB 或 WebDAV。"""
+    if is_address(value):
+        return True
+    from .webdav_media import is_address as is_webdav_address
+    return is_webdav_address(value)
+
+
+def remote_canonical(value) -> str:
+    """按地址协议生成规范化写法，供远端媒体目录去重与包含判断。"""
+    from .webdav_media import canonical as webdav_canonical, is_address as is_webdav_address
+    return webdav_canonical(value) if is_webdav_address(value) else canonical(value)
+
+
 def source_identity(value):
     """将本进程媒体工具的回环地址还原为账本路径。"""
     if _BRIDGE is None or not isinstance(value, str):
@@ -53,8 +67,9 @@ def source_identity(value):
     prefix = f'http://127.0.0.1:{_BRIDGE.server.server_port}/{_BRIDGE.secret}/'
     if not value.startswith(prefix):
         return value
+    key = value[len(prefix):].split('/', 1)[0]
     with _BRIDGE.lock:
-        resource = _BRIDGE.resources.get(value[len(prefix):])
+        resource = _BRIDGE.resources.get(key)
     return str(resource) if resource is not None else value
 
 
@@ -357,13 +372,14 @@ class _OwnedReader(io.IOBase):
 
 
 def resolve(raw, config=None):
-    """仅解析已声明的 SMB 根；普通本机文件返回 None。"""
+    """仅解析已声明的远端根；普通本机文件返回 None。"""
     if isinstance(raw, SmbResource):
         return raw
     from . import media_identity, settings_file
     from .platform import resolve_root
     config = config or settings_file.active()
-    if not any(value.get('transport') == 'smb' for value in getattr(config, 'storage_roots', {}).values()):
+    transports = {value.get('transport') for value in getattr(config, 'storage_roots', {}).values()}
+    if not transports & {'smb', 'webdav'}:
         return None
     location, index, tail = resolve_root(str(raw), config.locations)
     if location is None:
@@ -372,14 +388,18 @@ def resolve(raw, config=None):
     roots = media_identity.catalog(config)[1]
     found = next(((key, value) for key, value in roots.items()
                   if media_identity.path_key(value['root']) == media_identity.path_key(declared)), None)
-    if found is None or found[1].get('transport') != 'smb':
+    if found is None or found[1].get('transport') not in {'smb', 'webdav'}:
         return None
     key, value = found
+    if value['transport'] == 'webdav':
+        from .webdav_media import WebDavResource, connection_for as webdav_connection_for
+        return WebDavResource(key, declared, value['mount'], tail,
+                              webdav_connection_for(config, key, value['mount']))
     return SmbResource(key, declared, value['mount'], tail, connection_for(config, key, value['mount']))
 
 
 def input_url(source):
-    """本机路径原样交给工具；SMB 资源生成进程内有效的回环地址。"""
+    """本机路径原样交给工具；SMB/WebDAV 资源生成带文件名的进程内回环地址。"""
     resource = resolve(source)
     return _bridge().register(resource) if resource else str(source)
 
@@ -420,7 +440,7 @@ class _Bridge:
 
             def do_GET(self):
                 pieces = self.path.split('/')
-                if len(pieces) != 3 or not hmac.compare_digest(pieces[1], owner.secret):
+                if len(pieces) not in {3, 4} or not hmac.compare_digest(pieces[1], owner.secret):
                     self.send_error(404)
                     return
                 with owner.lock:
@@ -475,7 +495,9 @@ class _Bridge:
             if len(self.resources) >= 2048 and key not in self.resources:
                 self.resources.pop(next(iter(self.resources)))
             self.resources[key] = resource
-        return f'http://127.0.0.1:{self.server.server_port}/{self.secret}/{key}'
+        # 末尾保留文件名：播放器用 URL 最后一段当标题，纯哈希只能显示一串十六进制。
+        return (f'http://127.0.0.1:{self.server.server_port}/{self.secret}/{key}/'
+                f'{quote(resource.name, safe="")}')
 
     def invalidate(self, root_id):
         with self.lock:

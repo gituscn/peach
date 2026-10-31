@@ -25,7 +25,7 @@ import pystray
 from PIL import Image
 
 from . import error_reporting, ledger_backups, log_retention, onboarding, runtime_prepare, settings_file
-from .appid import MACOS_LAUNCH_AGENT_LABEL
+from .appid import MACOS_LAUNCH_AGENT_LABEL, MACOS_PORT, MACOS_TLS_PORT
 from .certs import ensure_certificate
 from .distribution import standalone
 from .config import (
@@ -51,11 +51,6 @@ from .windows_update import (
 LOGGER = logging.getLogger(__name__)
 
 
-#: macOS 菜单栏项拉起的端口。80/443 在 macOS 上要 root，开发机不该为一个菜单栏图标
-#: 去要管理员权限；本机 CA 的那套 TLS 材料也是给 Windows 生产实例签的。
-MACOS_PORT = 8900
-#: HTTPS 同理，443 也要 root，所以走 8443。
-MACOS_TLS_PORT = 8443
 #: LaunchAgent 的标签。托盘、安装脚本和 `.app` 外壳共用 `peach.appid` 这一处定义。
 LAUNCH_AGENT_LABEL = MACOS_LAUNCH_AGENT_LABEL
 
@@ -725,18 +720,25 @@ def build_macos_service_specs(
 ) -> tuple[ServiceSpec, ...]:
     """macOS 用非特权端口起 HTTP，有 TLS 材料时再加一个 HTTPS。
 
-    80/443 在 macOS 上要 root，所以服务本身跑在 8900/8443，由 pf 把 80/443 转过去
-    （`scripts/setup_macos_port80.sh`）。不钉 `--mdns-address`：这台机器会换网络，
-    钉死等于换个 Wi-Fi 就打不开（见 `peach.mdns` 的地址复查）。
+    80/443 在 macOS 上要 root，所以服务本身跑在 8900/8443；`scripts/setup_macos_port80.sh`
+    可选地把 80/443 转过去，但地址里带端口时不装 pf 也能用。不钉 `--mdns-address`：
+    这台机器会换网络，钉死等于换个 Wi-Fi 就打不开（见 `peach.mdns` 的地址复查）。
 
     证书缺失时**只是不起 HTTPS**，不像 Windows 那样直接报错——macOS 这份是开发环境，
     没有本机 CA 也应该能用。
 
     `mdns_hostname` 是明文口跳转的目标主机名，缺省取 `MDNS_HOSTNAME`；首次设置之后
-    必须由调用方传入新鲜读到的名字，理由见 `build_service_specs`。
+    必须由调用方传入新鲜读到的名字，理由见 `build_service_specs`。跳转目标带上
+    `MACOS_TLS_PORT`：不带端口的那条地址只在装过 pf 转发的机器上成立。
+
+    `PEACH_LAN_ADDRESS` 可选地钉住 mDNS 广播的 IPv4。双网卡同网段时默认路由可能落在
+    某张网卡上，而手机等设备从另一张网卡的路径根本连不过来；这时由启动脚本显式指定
+    可达的那张。不设时仍按路由表每次重新选择，换网络照旧自动跟进。
     """
     peach = str(_peach_executable())
-    redirect_origin = f"https://{mdns_hostname or MDNS_HOSTNAME}"
+    redirect_origin = f"https://{mdns_hostname or MDNS_HOSTNAME}:{MACOS_TLS_PORT}"
+    pinned = os.environ.get("PEACH_LAN_ADDRESS", "").strip()
+    mdns_address = ("--mdns-address", pinned) if pinned else ()
     specs = [
         ServiceSpec(
             "http",
@@ -766,7 +768,7 @@ def build_macos_service_specs(
             f"https://127.0.0.1:{MACOS_TLS_PORT}/healthz",
             (
                 peach, "serve", "--host", "0.0.0.0", "--port", str(MACOS_TLS_PORT),
-                "--no-ledger-sync",
+                "--no-ledger-sync", *mdns_address,
                 "--ssl-certfile", str(cert), "--ssl-keyfile", str(key),
             ),
             str(ca),
@@ -878,12 +880,18 @@ def normal_hostname(config) -> str:
 
 
 def normal_url(config) -> str:
-    """正常服务的固定地址。macOS 上 80/443 由 pf 转到高位端口
-    （scripts/setup_macos_port80.sh）。
+    """正常服务的固定地址。
+
+    macOS 的 HTTPS 跑在 8443（443 要 root）；地址里带上这个端口，不依赖 pf 是否装过。
+    没有 TLS 材料时托盘只在回环上起明文口，这时打开的也是那个回环地址。
     """
     from .distribution import standalone
     if standalone():
         return setup_url(config)
+    if sys.platform == 'darwin':
+        if (config.directory('secrets') / 'tls' / 'peach.crt').is_file():
+            return f"https://{normal_hostname(config)}:{MACOS_TLS_PORT}/"
+        return f"http://127.0.0.1:{MACOS_PORT}/"
     return f"https://{normal_hostname(config)}/"
 
 

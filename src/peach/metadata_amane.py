@@ -217,7 +217,7 @@ PACKAGED_RUNTIME_PROBLEM = "安装包中的采集工具缺失或版本不匹配�
 
 
 def find_uv() -> Path | None:
-    """建 venv 用的 uv。托盘进程的 PATH 未必带 WinGet 的 Links 目录，所以多看一眼那里。"""
+    """建 venv 用的 uv。托盘进程的 PATH 未必带安装目录，所以再看几处常见位置。"""
     explicit = os.environ.get("PEACH_UV", "").strip()
     candidates = [Path(explicit)] if explicit else []
     on_path = shutil.which("uv")
@@ -226,6 +226,8 @@ def find_uv() -> Path | None:
     local = os.environ.get("LOCALAPPDATA", "")
     if local:
         candidates.append(Path(local) / "Microsoft" / "WinGet" / "Links" / "uv.exe")
+    candidates.extend((Path.home() / ".local" / "bin" / "uv",
+                       Path("/opt/homebrew/bin/uv"), Path("/usr/local/bin/uv")))
     return next((path for path in candidates if path.is_file()), None)
 
 

@@ -75,14 +75,42 @@ class RuntimeConsistencyTests(unittest.TestCase):
         self.assertIn("0", contract.cache)
         self.assertNotIn("1", contract.cache)
 
-    def test_http_navigation_uses_fixed_origin_and_does_not_replay_writes(self):
-        with TestClient(create_redirect_app("https://peach.test")) as client:
+    def test_http_navigation_keeps_local_hosts_and_does_not_replay_writes(self):
+        with TestClient(create_redirect_app("https://peach.test:8443")) as client:
             health = client.get("/healthz")
             self.assertEqual(health.json()["service"], "peach-redirect")
+            # 陌生域名仍跳到固定 origin，查询串里的口令不转发。
             response = client.get("/items?q=a&q=b&t=secret", headers={"Host": "evil.test"},
                                   follow_redirects=False)
-            self.assertEqual(response.headers["location"], "https://peach.test/items?q=a&q=b")
+            self.assertEqual(response.headers["location"], "https://peach.test:8443/items?q=a&q=b")
+            # 局域网设备用 IP 打开时留在同一个地址，换到 HTTPS 端口，不赶去 mDNS 名。
+            by_ip = client.get("/items", headers={"Host": "192.0.2.10:8900"},
+                               follow_redirects=False)
+            self.assertEqual(by_ip.headers["location"], "https://192.0.2.10:8443/items")
+            loopback = client.get("/items", headers={"Host": "localhost:8900"},
+                                  follow_redirects=False)
+            self.assertEqual(loopback.headers["location"], "https://localhost:8443/items")
             self.assertEqual(client.post("/api/action", json={"value": 1}).status_code, 426)
+
+    def test_source_entry_url_matches_the_macos_tls_port(self):
+        import sys
+        from dataclasses import replace
+        from unittest.mock import patch
+        from peach import settings_file
+        from peach.routes_pages import _normal_url
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            config = settings_file.load_config(
+                project_root=root / "app", environ={"PEACH_DATA_ROOT": str(root / "data")})
+            config = replace(config, server=replace(
+                config.server, host="0.0.0.0", mdns_name="peach-writer"))
+            tls = config.directory("secrets") / "tls"
+            tls.mkdir(parents=True)
+            (tls / "peach.crt").write_text("test-only", encoding="utf-8")
+            with patch("peach.distribution.standalone", return_value=False):
+                self.assertEqual(
+                    _normal_url(config),
+                    "https://peach-writer.local" + (":8443" if sys.platform == "darwin" else "") + "/")
 
     def test_mutable_image_revalidates_after_replacement(self):
         with tempfile.TemporaryDirectory() as directory:

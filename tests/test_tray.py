@@ -607,7 +607,8 @@ class SetupGateTests(unittest.TestCase):
         self.assertEqual(manager.log_dir, self.data_root / "logs")
         self.assertEqual(manager.child_environment()["PEACH_DATA_ROOT"], str(self.data_root))
         self.assertEqual(gate.open_label(), "打开 Peach")
-        self.assertEqual(gate.open_url(), "https://peach-writer.local/")
+        self.assertEqual(gate.open_url(), "https://peach-writer.local" +
+                         (":8443" if sys.platform == "darwin" else "") + "/")
 
         scan = scan_popen.call_args
         self.assertEqual(list(scan.args[0][1:]), ["process", "local"])
@@ -643,7 +644,8 @@ class SetupGateTests(unittest.TestCase):
         for spec in redirecting:
             command = spec.command
             self.assertEqual(command[command.index("--redirect-origin") + 1],
-                             "https://peach-writer.local")
+                             "https://peach-writer.local" +
+                             (":8443" if sys.platform == "darwin" else ""))
 
     def test_missing_tls_material_keeps_the_gate_waiting(self):
         """没有 openssl 的机器上 CA 生成会失败；那时不能拿一组缺文件的规格去启动。
@@ -1106,6 +1108,20 @@ class MacMenuBarTests(unittest.TestCase):
             self.assertIn("--port", command)
             self.assertGreater(int(command[command.index("--port") + 1]), 1024)
             self.assertNotIn("--mdns-address", command)
+
+    def test_an_explicit_lan_address_is_pinned_for_macos_mdns(self):
+        """双网卡时由启动脚本指定手机能连到的那张网卡，不设时仍按路由表自动选。"""
+        with tempfile.TemporaryDirectory() as directory:
+            tls = Path(directory)
+            for name in ("peach-local-ca.crt", "peach.crt", "peach.key"):
+                (tls / name).write_text("test-only", encoding="utf-8")
+            with patch.dict(os.environ, {"PEACH_LAN_ADDRESS": "192.0.2.10"}):
+                specs = {spec.name: spec for spec in tray_module.build_macos_service_specs(tls_dir=tls)}
+            command = specs["https"].command
+            self.assertEqual(command[command.index("--mdns-address") + 1], "192.0.2.10")
+            with patch.dict(os.environ, {"PEACH_LAN_ADDRESS": ""}):
+                specs = {spec.name: spec for spec in tray_module.build_macos_service_specs(tls_dir=tls)}
+            self.assertNotIn("--mdns-address", specs["https"].command)
 
     def test_https_spec_only_appears_with_real_tls_material(self):
         """macOS 这份是开发环境：没有本机 CA 也应该能用，不像 Windows 那样直接报错。"""

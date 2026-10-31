@@ -44,15 +44,22 @@ import {
 import { busyProps, useAction } from './use-action';
 
 const sourceName = (location: string) => MEDIA_SOURCES.find(([kind]) => kind === location)?.[1] ?? location;
-const sourceOptions = [...MEDIA_SOURCES, ['smb', 'SMB 共享'] as const];
+const sourceOptions = [...MEDIA_SOURCES, ['smb', 'SMB 共享'] as const, ['webdav', 'WebDAV'] as const];
+/** 远端媒体地址对应的连接方式；本机目录返回空串。 */
+const remoteKind = (path: string): 'smb' | 'webdav' | '' =>
+  path.startsWith('smb://') ? 'smb' : /^https?:\/\//i.test(path) ? 'webdav' : '';
+const remoteEmptyPath = (kind: string) => kind === 'smb' ? 'smb://' : 'http://';
+const isRemoteRow = (row: { transport?: string }) => row.transport === 'smb' || row.transport === 'webdav';
 /** 媒体库在下拉里的图标：选过就用选的，否则按来源自动识别，和标题行的图标键一致。 */
-const libraryMark = (row: { library_icon: string; location: string; transport?: string }) => row.library_icon || libraryAutoChoice(row.transport === 'smb' ? 'smb' : row.location)[0];
+const libraryMark = (row: { library_icon: string; location: string; transport?: string }) =>
+  row.library_icon || libraryAutoChoice(row.transport === 'smb' || row.transport === 'webdav' ? row.transport : row.location)[0];
 const pickFolder = async (initial: string) =>
   (await apiSend<{ path: string | null }>(PICK_FOLDER_URL, { initial })).path;
 
 interface MediaRow {
-  transport: 'smb' | 'filesystem';
+  transport: 'smb' | 'webdav' | 'filesystem';
   smb_username?: string; smb_password?: string; smb_encrypt?: boolean; smb_clear?: boolean; smb_password_saved?: boolean;
+  webdav_username?: string; webdav_password?: string; webdav_clear?: boolean; webdav_password_saved?: boolean;
   path: string; location: string; root: string; root_id?: string; library_id: string; library: string; library_icon: string;
   library_color: string; library_policy: Preset; library_stages: string; cost: SourceCost | ''; change_mode?: string;
 }
@@ -67,7 +74,7 @@ interface FieldErrors { media_dirs?: string[]; port?: string }
 interface SaveResult { saved: boolean; url: string; revision: string }
 
 const blankRow = (path = ''): MediaRow => ({
-  path, transport: path.startsWith('smb://') ? 'smb' : 'filesystem', location: 'local', root: '', library_id: randomId(), library: '', library_icon: '',
+  path, transport: remoteKind(path) || 'filesystem', location: 'local', root: '', library_id: randomId(), library: '', library_icon: '',
   library_color: '', library_policy: 'auto', library_stages: '', cost: 'free',
 });
 
@@ -75,9 +82,11 @@ function initialRows(data: ConfigurationData): MediaRow[] {
   const known = data.media_sources?.filter((row) => MEDIA_SOURCES.some(([kind]) => kind === row.location));
   if (known?.length) {
     return known.map((row) => ({
-      transport: row.transport === 'smb' || row.path.startsWith('smb://') ? 'smb' : 'filesystem',
+      transport: (row.transport === 'webdav' || row.transport === 'smb') ? row.transport : remoteKind(row.path) || 'filesystem',
       smb_username: row.smb_username, smb_password: '', smb_encrypt: row.smb_encrypt,
       smb_password_saved: row.smb_password_saved,
+      webdav_username: row.webdav_username, webdav_password: '',
+      webdav_password_saved: row.webdav_password_saved,
       path: row.path, location: row.location, root: row.root, library: row.library || '', library_icon: row.library_icon || '',
       library_color: row.library_color || '', library_policy: row.library_policy || 'auto', library_stages: row.library_stages || '',
       root_id: row.root_id, library_id: row.library_id || randomId(),
@@ -127,7 +136,7 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
   const [scanNow, setScanNow] = useState(false);
   const [requireReadPolicy, setRequireReadPolicy] = useState(false);
   const [failure, setFailure] = useState('');
-  const [smbResults, setSmbResults] = useState<Record<number, { message: string; directories: string[] }>>({});
+  const [remoteResults, setRemoteResults] = useState<Record<number, { message: string; directories: string[] }>>({});
   const [saved, setSaved] = useState<SaveResult | null>(null);
   const revision = useRef(data.revision);
   const action = useAction();
@@ -228,7 +237,8 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 className={cardClass({ variant: 'raised', padding: 'none', className: 'flex flex-col p-2' })}
                 data-library={library.library_color ? library.library_id : undefined}>
                 <div data-library-head="">
-                  <LibraryIconPicker label={`${name} 图标`} value={library.library_icon} kind={library.transport === 'smb' ? 'smb' : library.location}
+                  <LibraryIconPicker label={`${name} 图标`} value={library.library_icon}
+                    kind={library.transport === 'smb' || library.transport === 'webdav' ? library.transport : library.location}
                     onChange={(library_icon) => editLibrary(first, { library_icon })} />
                   <Input className="w-full" aria-label={`${name} 名称`} maxLength={80} placeholder="媒体库名称"
                     value={library.library} onChange={(value) => editLibrary(first, { library: value })} />
@@ -248,18 +258,20 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                 <div data-library-folders="" role="group" aria-label={`${name} 的文件夹`}>
                 {members.map(({ row, index }) => (
                   <FolderRow key={index} label={`媒体目录 ${index + 1}`} path={row.path}
-                    onPath={(path) => edit(index, { path, transport: path.startsWith('smb://') ? 'smb' : row.transport })} error={rowErrors[index]} inputRef={inputRef(index)}
-                    picking={picking === index} onPick={() => void pick(index)}
+                    onPath={(path) => edit(index, { path, transport: remoteKind(path) || row.transport })} error={rowErrors[index]} inputRef={inputRef(index)}
+                    picking={picking === index} onPick={isRemoteRow(row) ? undefined : () => void pick(index)}
                     onRemove={rows.length > 1 ? () => remove(index) : undefined}
                     status={mountOf(row) ? <MountBadge online={mountOf(row)?.online} /> : null}>
                     <FolderFieldLine>
-                    <SourceSelect index={index} value={row.transport === 'smb' ? 'smb' : row.location} options={sourceOptions}
+                    <SourceSelect index={index} value={isRemoteRow(row) ? row.transport : row.location} options={sourceOptions}
                       onChange={(source) => {
-                        const smb = source === 'smb';
-                        edit(index, { transport: smb ? 'smb' : 'filesystem', location: smb ? 'local' : source, cost: smb || source === 'local' ? 'free' : '',
-                          path: smb ? (row.path.startsWith('smb://') ? row.path : 'smb://')
-                            : row.path.startsWith('smb://') ? '' : row.path });
-                        setSmbResults(current => { const next = { ...current }; delete next[index]; return next; });
+                        const remote = source === 'smb' || source === 'webdav';
+                        const kind = remoteKind(row.path);
+                        edit(index, { transport: remote ? source : 'filesystem', location: remote ? 'local' : source,
+                          cost: remote || source === 'local' ? 'free' : '',
+                          path: remote ? (kind === source ? row.path : remoteEmptyPath(source))
+                            : kind ? '' : row.path });
+                        setRemoteResults(current => { const next = { ...current }; delete next[index]; return next; });
                       }} />
                       <MediaReadPolicy index={index} cost={row.cost} onChange={(cost) => edit(index, { cost })}
                         error={requireReadPolicy && !row.cost ? '请选择媒体读取策略' : undefined} />
@@ -304,20 +316,50 @@ function MediaForm({ data, receipt }: ConfigurationGroupProps) {
                       <Checkbox isSelected={row.smb_clear || false} onChange={value => edit(index, { smb_clear: value })}>移除已保存的 SMB 账号</Checkbox>
                       <Button className="self-start" variant="secondary" {...busyProps(action.busy === `smb-${index}`)}
                         onClick={() => void action.run(`smb-${index}`, signal => apiSend<{ readable: boolean; directories: string[] }>(
-                          '/api/configuration/smb/test', row, 'POST', signal), result => setSmbResults(current => ({
+                          '/api/configuration/smb/test', row, 'POST', signal), result => setRemoteResults(current => ({
                             ...current, [index]: { message: '共享目录可读取', directories: result.directories },
-                          })), cause => setSmbResults(current => ({ ...current,
+                          })), cause => setRemoteResults(current => ({ ...current,
                             [index]: { message: errorMessage(cause), directories: [] },
                           })))}>测试连接</Button>
-                      {smbResults[index] ? <Help>{smbResults[index].message}</Help> : null}
-                      {smbResults[index]?.directories.length ? <Select aria-label={`SMB 子目录 ${index + 1}`} placeholder="进入子目录"
+                      {remoteResults[index] ? <Help>{remoteResults[index].message}</Help> : null}
+                      {remoteResults[index]?.directories.length ? <Select aria-label={`SMB 子目录 ${index + 1}`} placeholder="进入子目录"
                         selectedKey={null} onSelectionChange={key => { if (key) {
                           edit(index, { path: row.path.replace(/\/$/, '') + '/' + encodeURIComponent(String(key)) });
-                          setSmbResults(current => ({ ...current, [index]: { message: '请测试此子目录', directories: [] } }));
+                          setRemoteResults(current => ({ ...current, [index]: { message: '请测试此子目录', directories: [] } }));
                         } }}>
-                        {smbResults[index].directories.map(name => <SelectItem key={name} id={name}>{name}</SelectItem>)}
+                        {remoteResults[index].directories.map(name => <SelectItem key={name} id={name}>{name}</SelectItem>)}
                       </Select> : null}
                       <Help>地址填写 smb://服务器/共享/目录。按共享账号权限读写；整理和删除由对应操作触发，资料和预览保存在 Peach 数据目录。</Help>
+                    </div> : null}
+                    {row.transport === 'webdav' ? <div className="flex w-full flex-col gap-2">
+                      <FolderFieldLine>
+                        <FolderField label="WebDAV 账号" className="w-full @lg:flex-1">
+                          <Input aria-label={`WebDAV 账号 ${index + 1}`} value={row.webdav_username || ''}
+                            autoComplete="off" onChange={value => edit(index, { webdav_username: value })} />
+                        </FolderField>
+                        <FolderField label="WebDAV 密码" className="w-full @lg:flex-1">
+                          <Input aria-label={`WebDAV 密码 ${index + 1}`} type="password" value={row.webdav_password || ''}
+                            autoComplete="new-password" placeholder={row.webdav_password_saved ? '留空保留已保存密码' : ''}
+                            onChange={value => edit(index, { webdav_password: value })} />
+                        </FolderField>
+                      </FolderFieldLine>
+                      <Checkbox isSelected={row.webdav_clear || false} onChange={value => edit(index, { webdav_clear: value })}>移除已保存的 WebDAV 账号</Checkbox>
+                      <Button className="self-start" variant="secondary" {...busyProps(action.busy === `webdav-${index}`)}
+                        onClick={() => void action.run(`webdav-${index}`, signal => apiSend<{ readable: boolean; directories: string[] }>(
+                          '/api/configuration/webdav/test', row, 'POST', signal), result => setRemoteResults(current => ({
+                            ...current, [index]: { message: '媒体目录可读取', directories: result.directories },
+                          })), cause => setRemoteResults(current => ({ ...current,
+                            [index]: { message: errorMessage(cause), directories: [] },
+                          })))}>测试连接</Button>
+                      {remoteResults[index] ? <Help>{remoteResults[index].message}</Help> : null}
+                      {remoteResults[index]?.directories.length ? <Select aria-label={`WebDAV 子目录 ${index + 1}`} placeholder="进入子目录"
+                        selectedKey={null} onSelectionChange={key => { if (key) {
+                          edit(index, { path: row.path.replace(/\/$/, '') + '/' + encodeURIComponent(String(key)) });
+                          setRemoteResults(current => ({ ...current, [index]: { message: '请测试此子目录', directories: [] } }));
+                        } }}>
+                        {remoteResults[index].directories.map(name => <SelectItem key={name} id={name}>{name}</SelectItem>)}
+                      </Select> : null}
+                      <Help>地址填写 http:// 或 https:// 开头的 WebDAV 目录。只读：Peach 不写入、改名或删除远端文件；资料和预览保存在 Peach 数据目录。</Help>
                     </div> : null}
                   </FolderRow>
                 ))}

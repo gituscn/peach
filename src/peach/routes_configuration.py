@@ -825,6 +825,42 @@ def test_smb_connection(request: Request, body: dict[str, Any] = Body(default_fa
         raise HTTPException(502, 'SMB 共享无法读取，请检查地址、共享名和网络连接') from None
 
 
+@router.post('/api/configuration/webdav/test')
+def test_webdav_connection(request: Request, body: dict[str, Any] = Body(default_factory=dict),
+                           _args=Depends(require_auth)):
+    local_only(request)
+    same_origin(request)
+    from .webdav_media import canonical, credential_store
+    from .webdav_transport import WebDavConnection, WebDavTransport
+    config = settings_file.load_config()
+    try:
+        target = canonical(str(body.get('path', '')))
+        values = {}
+        key = str(body.get('root_id', ''))
+        known = config.storage_roots.get(key)
+        if known and known.get('transport') == 'webdav' and canonical(known['mount']) == target:
+            credential = credential_store(config).load('webdav-' + key)
+            values = credential.values if credential else {}
+        username = body.get('webdav_username', values.get('username', ''))
+        password = body.get('webdav_password') or (values.get('password', '') if username == values.get('username', '') else '')
+        if not isinstance(username, str) or not isinstance(password, str):
+            raise ValueError('WebDAV 账号和密码必须是文字')
+        transport = WebDavTransport(WebDavConnection(target, username=username, password=password, timeout=8))
+        try:
+            entries = transport.scandir(())
+        finally:
+            transport.close()
+        return {'readable': True, 'directories': [entry.name for entry in entries if entry.is_dir][:500]}
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from None
+    except PermissionError:
+        raise HTTPException(403, 'WebDAV 登录失败或没有读取权限，请检查账号、密码和目录权限') from None
+    except FileNotFoundError:
+        raise HTTPException(404, 'WebDAV 目录不存在，请检查地址') from None
+    except OSError:
+        raise HTTPException(502, 'WebDAV 服务无法读取，请检查地址和网络连接') from None
+
+
 def _validate(body: dict[str, Any], config) -> tuple[dict[str, Any], dict[str, Any]]:
     """逐项校验，错误按字段归位：文件夹按行、端口一句。全对时第一个返回值为空。"""
     errors: dict[str, Any] = {}
@@ -1154,8 +1190,13 @@ def save_configuration(request: Request, body: dict[str, Any] = Body(default_fac
             shutil.copy2(config.path, config.path.with_suffix(".previous.toml"))
             settings_file.keep_pre_identity_backup(config.path)
             temporary.write_text(settings_file.render(prepared), encoding="utf-8")
+            from contextlib import ExitStack
             from .smb_media import credential_transaction
-            with credential_transaction(prepared, body.get('media_sources', [])):
+            from .webdav_media import credential_transaction as webdav_credential_transaction
+            with ExitStack() as credentials:
+                credentials.enter_context(credential_transaction(prepared, body.get('media_sources', [])))
+                credentials.enter_context(
+                    webdav_credential_transaction(prepared, body.get('media_sources', [])))
                 os.replace(temporary, config.path)
             if body.get("scan_now"):
                 onboarding.request_first_scan(prepared, "configured")

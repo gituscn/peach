@@ -1,7 +1,7 @@
 (function() {
 	try {
 		var e = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : typeof global < "u" ? global : typeof self < "u" ? self : {}, t = new e.Error().stack;
-		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "069a9a10-4505-4904-b9b8-cb3f31361563", e._sentryDebugIdIdentifier = "sentry-dbid-069a9a10-4505-4904-b9b8-cb3f31361563");
+		t && (e._sentryDebugIds = e._sentryDebugIds || {}, e._sentryDebugIds[t] = "540a1db5-eb80-4c88-93da-72601e8c82af", e._sentryDebugIdIdentifier = "sentry-dbid-540a1db5-eb80-4c88-93da-72601e8c82af");
 	} catch {}
 })();
 import { Button as e, CLOUD_LOCATIONS as t, ErrorText as n, Help as r, IconButton as i, Input as a, Label as o, M6 as s, MEDIA_SOURCE_ICONS as c, MEDIA_SOURCE_OPTIONS as l, Select$1 as u, SelectItem as d, SourceMark as f, __toESM as p, busyProps as m, cx as h, require_jsx_runtime as g, require_react as _ } from "./peach-app.js";
@@ -146,12 +146,12 @@ function k({ label: t, path: n, onPath: r, error: o, inputRef: c, picking: l, on
 					className: "flex h-9 shrink-0 items-center",
 					children: f
 				}) : null,
-				/* @__PURE__ */ (0, y.jsx)(i, {
+				u ? /* @__PURE__ */ (0, y.jsx)(i, {
 					icon: b,
 					"aria-label": "选择文件夹",
 					onClick: u,
-					...m(l)
-				}),
+					...m(!!l)
+				}) : null,
 				d ? /* @__PURE__ */ (0, y.jsx)(e, {
 					variant: "danger",
 					iconOnly: !0,
@@ -187,4 +187,4 @@ function A({ index: e, value: t, onChange: n, options: r = x }) {
 }
 export { w as FolderField, T as FolderFieldLine, k as FolderRow, b as FolderSearchIcon, x as MEDIA_SOURCES, E as MediaReadPolicy, D as MediaReadPolicyHelp, A as SourceSelect, C as isCloudSource, S as sourceMark, O as useFolderRows };
 
-//# debugId=069a9a10-4505-4904-b9b8-cb3f31361563
+//# debugId=540a1db5-eb80-4c88-93da-72601e8c82af

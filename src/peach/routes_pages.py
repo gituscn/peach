@@ -161,10 +161,17 @@ def _normal_url(config) -> str:
     """设置完成之后本机浏览器要去的地址。
 
     独立包即使对局域网监听，本机也走回环；源码部署才走由托盘维护的 HTTPS 固定入口。
+    macOS 的 HTTPS 在 8443，地址必须带端口；没有 TLS 材料时只剩回环明文口。
     """
     if distribution.standalone() or config.server.host in _LOOPBACK:
         return f"http://127.0.0.1:{config.server.port}/"
-    return f"https://{config.server.mdns_name}.local/"
+    host = f"{config.server.mdns_name}.local"
+    if sys.platform == "darwin":
+        from .appid import MACOS_PORT, MACOS_TLS_PORT
+        if not (config.directory("secrets") / "tls" / "peach.crt").is_file():
+            return f"http://127.0.0.1:{MACOS_PORT}/"
+        return f"https://{host}:{MACOS_TLS_PORT}/"
+    return f"https://{host}/"
 
 
 def asset_response(request: Request, path: Path, media: str, *, immutable: bool = False) -> Response:

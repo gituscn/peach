@@ -215,15 +215,15 @@ def ledger_root_for(
     declared = declared_roots.get(location, ())
     location_mounts = tuple(mounts.get(location, ()))
     for declared_root, mount in zip(declared, location_mounts):
-        from .smb_media import is_address, canonical
-        if is_address(str(mount)):
+        from .smb_media import is_remote_address, remote_canonical
+        if is_remote_address(str(mount)):
             if text == declared_root or PureWindowsPath(text).is_relative_to(PureWindowsPath(declared_root)):
                 return text
-            if is_address(text) and canonical(text).startswith(canonical(str(mount)).rstrip('/') + '/'):
+            if is_remote_address(text) and remote_canonical(text).startswith(remote_canonical(str(mount)).rstrip('/') + '/'):
                 from urllib.parse import unquote
-                tail = tuple(unquote(part) for part in canonical(text)[len(canonical(str(mount))) + 1:].split('/'))
+                tail = tuple(unquote(part) for part in remote_canonical(text)[len(remote_canonical(str(mount))) + 1:].split('/'))
                 return str(PureWindowsPath(declared_root, *tail))
-            if is_address(text) and canonical(text) == canonical(str(mount)):
+            if is_remote_address(text) and remote_canonical(text) == remote_canonical(str(mount)):
                 return declared_root
             continue
         if not str(mount):
@@ -253,11 +253,11 @@ def walk_root_for(
     windows = os.name == "nt" if windows is None else windows
     _location, index, tail = resolve_root(root, declared_roots)
     location_mounts = tuple(mounts.get(location, ()))
-    from .smb_media import is_address, resolve
-    if index < len(location_mounts) and is_address(str(location_mounts[index])):
+    from .smb_media import is_remote_address, resolve
+    if index < len(location_mounts) and is_remote_address(str(location_mounts[index])):
         resource = resolve(root)
         if resource is None:
-            raise ScanTargetError('SMB 目录尚未保存到媒体库配置')
+            raise ScanTargetError('远端媒体目录尚未保存到媒体库配置')
         return resource
     if index >= len(location_mounts) or str(location_mounts[index]) in ("", ".") or is_unmapped(Path(location_mounts[index])):
         if windows:
