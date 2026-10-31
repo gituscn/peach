@@ -9,7 +9,7 @@
 | `upstream` / `branch` | 上游仓库与分支 |
 | `commit` | 已纳入的上游提交 |
 | `tree` | 该提交的树对象，用于核对同一份内容 |
-| `fork_commit` | 重建后的本地提交 |
+| `fork_commit` | 本次同步落地的主线提交 |
 | `synced_at` | 同步日期（Asia/Taipei） |
 
 ## 同步步骤
