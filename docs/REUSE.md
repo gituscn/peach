@@ -832,6 +832,7 @@ A 盘垃圾隔离使用短名称 `peach-purge-<32 位 UUID>.peach-quarantine`，
 - 本地与在线详情标签共用 `components/detail-tags.tsx` 与样式：同一标签外观、最近使用、搜索与新建、改名预览及单条删除入口。写入仍由各自的数据层负责；在线来源标签的单条隐藏保存在用户设置，来源原词保留。关注管理的标签页签复用 `TagManager`，支持集中屏蔽和恢复内容。未新增依赖。
 - 详情底部共用 `DetailContinuation`：分集队列在左、接着看在右，手机上下排列，两区独立横滚并共用底色。封面共用宽度与 16:9 比例；宽屏标题区通过 CSS subgrid 共用行高，摘要与操作键参与排版。`RelatedSection` 给卡片的 8px 悬停面留出滚动内距；分卷与版本的推荐按队列种子缓存。队列头像共用 `cardIdentity`、`avatarInner`，同时读取列表投影与详情 `entity_refs`，保留图片版本及人脸取景。
 - 艺人、卖家名册的 RSS 标记读取 `/api/index` 的 `following`：按实体 ID 汇总已启用的 JAV 新作订阅与关注来源，停用、移除及未确认绑定的同名来源不计入。标记复用 `PeopleGrid`、BoardUI `Chip` 与现有 RSS 字形，不增加取数请求或依赖。
+- 名称语言复用 `profile.settings_json`、女优资料原文及 `kanji.JP_KANJI_TO_SIMPLIFIED`；形状接口下发同一字形表，前端不另存转换词表。纯汉字原始署名可只读换字形，假名与字母名只采用已核对的同艺名对应；日文原文读取来源，不从中文逆推。显示名称与人物身份、查询值、作品署名分开，未取得唯一身份的共享写法不选中其他人。
 - 统计与口味两页按登录态 Vercel Analytics／Speed Insights 的当前页面重做，排行与数据源共用父网格的引导线。
 - 口味页顶部给出结论与可点入口：浏览与 Peach 两侧的共同信号、可探索标签、待补证据的下一步动作。
 - 操作回执复用 Toast（Sonner 的栈，`frontend/src/react/toaster.tsx`；壳里只调 `toast()`／`actionReceipt()`）；按钮以 Spinner 和 `aria-busy` 标明忙态。后台任务显示可恢复进度，断线自动重连。
@@ -1065,7 +1066,7 @@ Python 复用 MIT 许可的 [Ruff](https://docs.astral.sh/ruff/) 0.17.0，版本
 
 `frontend/src/copy-editor-core.js` 是应用、官网与演示站的原位编辑核心，以 classic script 注册 `PeachCopyEditorCore`。核心负责文字命中、原位输入、回车和失焦保存、Esc 取消、连续草稿和 JSON 结果解析；`create` 的 `resolve`／`prepare`／`save`／`onSaved` 保留各端来源定位与保存入口。适配器可用 `element` 与 `nodes` 指定连续行内文字的共同编辑区域，`replaceTextParts` 将纯文字修改映射到原有节点，保留未改动片段的样式，并清理无内容且仅带样式属性的行内元素。空字符串可作为删除结果，无法确认的保存响应保留核对提示。切换控件正常响应点击，Alt 点击进入文字编辑。官网与演示站按应用提交与 SHA256 同步核心，适配器先取得原始文字索引再运行页面脚本。
 
-核心的 `createTools()` 提供工具栏、编辑样式、状态、暂停／继续、导出／退出动作、恢复按钮与来源选择；工具栏和悬停范围跟随模态弹层，避让页面底部选择操作条，`destroy()` 清理节点、监听与未完成选择。应用适配器 `scripts/dev/copy-editor.js` 负责源码候选、草稿、自动生效状态与动作回调。源码模式按顺序加载 `/dev/copy-editor-core.js` 与 `/dev/copy-editor.js`，动态文案保留模板占位符。
+核心的 `createTools()` 提供工具栏、编辑样式、状态、暂停／继续、导出／退出动作、恢复按钮与来源选择。工具条通过原生 Popover 顶层按整个视口定位；打开模态框时保留可交互资格，不受弹窗裁切，也不向设置内容追加占位。`attachToolbarDrag()` 处理非按钮区域的指针拖动、方向键微调与双击或 Esc 复位，位置限制在可见视口内。工具条避让页面底部选择操作条和弹窗底栏，`destroy()` 清理节点、监听与未完成选择。应用适配器 `scripts/dev/copy-editor.js` 负责源码候选、草稿、自动生效状态与动作回调。源码模式按顺序加载 `/dev/copy-editor-core.js` 与 `/dev/copy-editor.js`，动态文案保留模板占位符。
 改字浮条使用多选操作条的 `data-selection-dock`、`data-glass-pane` 与 `data-batch-scope` 样式，几何、玻璃、字体和按钮共享；窄屏状态提示独占一行。
 应用的 React 与动态页面使用源码定位、摘要校验和备份入口；演示站使用浏览器草稿。两者只在 `?edit` 启用，无新增依赖。
 Python 源文件纳入 `src/peach/library_sharing.py` 与 `src/peach/library_processing.py`。动态句子复用标准库 `ast`、`string.Formatter` 定位 f-string 与相邻字符串，编辑时显示命名占位符，保存时校验占位符齐全且各出现一次。求值表达式与格式保留在 AST 中，当前数量只用于显示；其他 Python 文件不属于改字范围。

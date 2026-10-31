@@ -293,6 +293,58 @@ class TestPlanningTests(unittest.TestCase):
         costs = [row['estimated_seconds'] for row in matrix]
         self.assertLess(max(costs) - min(costs), 60)
 
+    def test_windows_python_partitions_balance_recorded_cost_and_keep_every_case(self):
+        seconds = json.loads((runner.ROOT / 'scripts/ci-python-timings.json').read_text(encoding='utf-8'))['seconds']
+        files = runner.selected_files('full')
+        with patch.dict(os.environ, {**CIFrontendOwnershipTests.CI, 'RUNNER_OS': 'Windows'}):
+            groups = [runner.assigned_files(files, index, 4) for index in range(4)]
+            serial = list(CIFrontendOwnershipTests.ids(runner.build_suite('full')))
+            collected = [name for index in range(4) for name in CIFrontendOwnershipTests.ids(
+                runner.build_suite('full', shard_index=index, shard_count=4))]
+        self.assertCountEqual(serial, collected)
+        self.assertEqual(len(collected), len(set(collected)))
+        self.assertCountEqual(files, [path for group in groups for path in group])
+        costs = [sum(seconds.get(path.stem, 1) for path in group) for group in groups]
+        self.assertLess(max(costs) - min(costs), 5)
+        self.assertGreater(len(groups[0]), 1)
+
+    def test_unassigned_ci_and_macos_keep_filename_partitions(self):
+        files = [runner.TESTS / f'test_selected_{index}.py' for index in range(8)]
+        for environment in ({'RUNNER_OS': 'Windows'}, {**CIFrontendOwnershipTests.CI, 'RUNNER_OS': 'macOS'}):
+            with self.subTest(environment=environment), patch.dict(os.environ, environment, clear=True):
+                self.assertEqual(runner.assigned_files(files, 1, 4), set(files[1::4]))
+
+    def test_broad_auto_matrix_keeps_each_selected_test_once(self):
+        for paths in (['src/peach/mp4repair.py', 'src/peach/web_media_repair.py'],
+                      ['src/peach/web_catalog.py']):
+            with self.subTest(paths=paths):
+                scopes, _ = runner.scopes_for_changes(paths)
+                plan = ci_plan.plan('push', paths)
+                windows = [row for row in plan['matrix']['include'] if row['os'] == 'windows-latest']
+                self.assertFalse(plan['wide'])
+                self.assertEqual(len(windows), 4)
+                self.assertEqual(len([row for row in plan['matrix']['include']
+                                      if row['os'] == 'macos-latest']), 1)
+                self.assertTrue(all(row['scope'] == 'auto' for row in windows))
+                with patch.dict(os.environ, CIFrontendOwnershipTests.CI):
+                    serial = list(CIFrontendOwnershipTests.ids(runner.build_suite(*scopes)))
+                    collected = [name for row in windows for name in CIFrontendOwnershipTests.ids(
+                        runner.build_suite(*scopes, shard_index=row['shard_index'],
+                                           shard_count=row['shard_count']))]
+                self.assertTrue(serial)
+                self.assertEqual(len(serial), len(set(serial)))
+                self.assertCountEqual(serial, collected)
+
+    def test_auto_partition_threshold_counts_unique_selected_files(self):
+        for count, expected in ((149, 1), (150, 4)):
+            with self.subTest(count=count), patch.object(runner, 'selected_files', return_value=tuple(
+                    runner.TESTS / f'test_selected_{index}.py' for index in range(count))):
+                plan = ci_plan.plan('pull_request', ['src/peach/web_catalog.py'])
+                windows = [row for row in plan['matrix']['include'] if row['os'] == 'windows-latest']
+                self.assertFalse(plan['wide'])
+                self.assertEqual(len(windows), expected)
+                self.assertTrue(all(row['scope'] == 'auto' for row in windows))
+
     def test_document_changes_avoid_optional_jobs_and_unknown_changes_require_them(self):
         documents = ci_plan.plan('pull_request', ['docs/TESTING.md'])
         self.assertEqual(documents['required_jobs'], ['plan', 'python', 'workflow-lint', 'frontend-ready'])
