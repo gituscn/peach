@@ -1,8 +1,8 @@
 {
   "upstream": "peach-mitao/peach",
   "branch": "master",
-  "commit": "428d1418907dab8e216e8b3162be9c7a45ae614d",
-  "tree": "d9ac5316ca542306e1f04ef515517df17ca2c313",
-  "fork_commit": "24b5bba0324c4b5f966a81ca8df7eb6a4736a526",
+  "commit": "960333a01677c3de639e6b00bd737ffe639b0381",
+  "tree": "982d8ffe2aac71276fcfb3020573f1c53aa57c98",
+  "fork_commit": "2150e50fc3193fa6866f32574f12a2741eb4dcec",
   "synced_at": "2026-10-31"
 }
