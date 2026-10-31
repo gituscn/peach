@@ -11,7 +11,7 @@
 - 代码判据确定、能按来源整批撤回的断言按 ADR-0052 落库；LLM 输出、打分、冲突与多候选只产生候选，不得自行标为 `approved`。真实写入执行 `peach-ledger-write`。
 - 编辑前核对 `git status`。代码任务使用 `scripts/agent_worktree.py create` 的隔离工作树，主检出负责集成；先读 `peach-worktree`。
 - 代码改动经 PR 交付，维护者自身也适用；issue 范围与交付流程见 `peach-issue-delivery`。
-- 本 fork 与上游没有共享提交谱系。同步上游按 `docs/UPSTREAM_SYNC.md` 的基线记录做内容差量并走 PR，禁止 GitHub Sync fork、`gh repo sync` 与 `merge-upstream` API。
+- 上游同步按 `docs/UPSTREAM_SYNC.md` 走 PR；GitHub Sync fork、`gh repo sync` 与 `merge-upstream` API 会直接写主线，绕过测试记录与署名门槛，不使用。
 - 服务、端口或重启操作先核对监听与进程归属。已提交且测试通过的适用代码用 `restart_windows_tray.py` 重启并核验；手动或 CLI 发起的主任务仍在跑时先问，其余任务均能续跑时直接重启。
 - `agent_worktree.py prune --apply` 可回收入口判定安全的工作树；只按 PID 清理本任务创建的进程，保护活动工作树、忽略文件与其他任务。
 
